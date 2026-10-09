@@ -18,6 +18,9 @@ Preparación de SFA Asistencia 1.1.0, 9 de octubre de 2026.
 | Credenciales en exportación | Token y Chat ID de Telegram omitidos |
 | Importación inválida | Rechazada sin alterar los datos |
 | Modo LAN del ejecutable | HTTP correcto en IP local calculada y puerto de prueba |
+| Varias interfaces | Respuesta en Ethernet, hotspot y localhost; selector de red para el QR |
+| Hotspot sin ruta de Internet | Prueba unitaria correcta; se descartan direcciones loopback y link-local |
+| Contenido de QR | Generación y decodificación comprobadas para Ethernet y hotspot |
 | QR y selector | Renderizados en el portable |
 | Vista móvil | Sin desbordamiento horizontal a 390 px |
 | Emergencia | Pantalla y cronómetro verificados por simulación de interfaz |
@@ -50,7 +53,7 @@ Archivo: `SFA-Asistencia-Anticaidas-v1.1.0-Windows.zip`
 SHA-256:
 
 ```text
-2EBD6467A342843B31C9DC6B4D99B1D9757A1A5F2DAEF4AA190AEF9EE7D9E37C
+E563A02914B601107A413640FC902957D91B2AD8B706F80B351F6CEFC3522C0E
 ```
 
 Las capturas son de una instalación aislada con datos ficticios. La carpeta de pruebas no se incluye en el release.
