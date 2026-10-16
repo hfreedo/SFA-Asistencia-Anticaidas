@@ -15,6 +15,7 @@ El repositorio contiene:
 - `iniciar_interfaz.bat`, `iniciar_acceso_movil.bat`, `detener_interfaz.bat`: inicio/parada desde fuentes en Windows.
 - `sfa_portable.py`, `SFA_Asistencia.spec`: lanzador y empaquetado.
 - `docs/STACK_TECNOLOGICO.md`: tecnologías, herramientas y Mermaid.
+- `docs/GUIA_ALUMNOS.md`: bloques del sistema, categorías y actividades de aprendizaje.
 - `docs/DESARROLLO.md`: instalación, ejecución, pruebas y construcción.
 - `docs/HARDWARE_Y_PROTOCOLO.md`: cableado y comunicación del cinturón.
 - `docs/VALIDACION_FUENTES.md`: comprobaciones de la publicación de fuentes.

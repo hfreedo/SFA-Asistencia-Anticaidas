@@ -8,7 +8,8 @@ Ahora se incluye el código fuente del estado actual: firmware Arduino, servidor
 Python, interfaz React y configuración de empaquetado. No se incluyen datos
 personales, credenciales ni dependencias instaladas.
 
-- [Stack tecnológico, programas y diagramas Mermaid](docs/STACK_TECNOLOGICO.md).
+- [Empieza aquí: guía paso a paso para alumnos](docs/GUIA_ALUMNOS.md).
+- [Stack tecnológico por etapas, programas y Mermaid](docs/STACK_TECNOLOGICO.md).
 - [Instalación y desarrollo desde las fuentes](docs/DESARROLLO.md).
 - [Hardware, pinout y protocolo](docs/HARDWARE_Y_PROTOCOLO.md).
 - [Comprobaciones de las fuentes publicadas](docs/VALIDACION_FUENTES.md).
