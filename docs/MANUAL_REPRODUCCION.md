@@ -1,5 +1,8 @@
 # Manual de Reproducción y Verificación
 
+Ubica primero las etapas en el [Mapa maestro](MAPA_MAESTRO.md). Este manual
+desarrolla la ejecución y los puntos de control de ese recorrido.
+
 ## 1. Propósito y Alcance
 
 Este manual permite instalar las fuentes en una carpeta independiente, ejecutar

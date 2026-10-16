@@ -3,6 +3,7 @@
 El repositorio contiene:
 
 - `README.md`: presentación general.
+- `docs/MAPA_MAESTRO.md`: mapa integral desde el problema hasta el estado actual, con herramientas, archivos y validación.
 - `AUTORIA.md`: declaración de autoría.
 - `LICENCIA_DE_USO_RESTRINGIDO.md`: condiciones de uso.
 - `RELEASES.md`: registro de versiones y comprobación del paquete.

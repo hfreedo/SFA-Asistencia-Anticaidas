@@ -1,5 +1,9 @@
 # Stack Tecnológico de SFA Asistencia
 
+Para ver primero cómo encaja todo, empieza por el
+[Mapa maestro de cero al estado actual](MAPA_MAESTRO.md). Esta guía amplía sus
+grupos de herramientas y responsabilidades.
+
 ## Qué Construimos
 
 Una aplicación web local conectada a un cinturón Arduino. La computadora recibe

@@ -2,6 +2,27 @@
 
 Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel local para cuidadores y familiares.
 
+## De Cero al Estado Actual
+
+**[Ver el mapa maestro completo](docs/MAPA_MAESTRO.md)**: conecta todas las etapas,
+las herramientas utilizadas, los archivos construidos y el estado de validación.
+Es el punto de entrada antes de consultar las guías por separado.
+
+```mermaid
+flowchart TD
+    A["Problema y diseño"] --> B["Preparar Arduino, Python y Node"]
+    B --> C["Firmware del cinturón"]
+    B --> D["Servidor y SQLite"]
+    B --> E["Interfaz React"]
+    C --> F["Integrar señal, API y WebSocket"]
+    D --> F
+    E --> F
+    F --> G["Alertas, perfiles, mapa, QR y avisos opcionales"]
+    G --> H["Probar y documentar límites"]
+    H --> I["Compilar web, empaquetar y publicar"]
+    I --> J["ACTUAL: fuentes publicadas y prototipo con validación parcial"]
+```
+
 ## Código Fuente y Guía Para Estudiantes
 
 Ahora se incluye el código fuente del estado actual: firmware Arduino, servidor

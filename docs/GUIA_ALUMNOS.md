@@ -1,5 +1,8 @@
 # SFA Paso a Paso: Guía Para Alumnos
 
+El [Mapa maestro](MAPA_MAESTRO.md) muestra el proyecto completo desde cero.
+Esta guía simplifica sus bloques y propone actividades para estudiarlos.
+
 ## Primero: Qué Estamos Construyendo
 
 Un cinturón produce lecturas de movimiento. Una computadora recibe esas lecturas
