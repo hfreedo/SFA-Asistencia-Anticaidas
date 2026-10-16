@@ -1,5 +1,9 @@
 # Desarrollo Desde el Código Fuente
 
+Para una reproducción guiada con puntos de control, resultados esperados y
+diagnóstico, utiliza el [Manual de reproducción](MANUAL_REPRODUCCION.md).
+Esta página es la referencia rápida de comandos de desarrollo.
+
 ## Requisitos
 
 - Windows para los BAT y para reproducir el empaquetado del portable.

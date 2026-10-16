@@ -143,6 +143,8 @@ Quien solo usa el portable no necesita instalar todo el entorno de desarrollo.
 
 ## Dónde Seguir
 
+- [Manual de reproducción](MANUAL_REPRODUCCION.md): instalación por pasos y resultados esperados.
+- [Ficha de pruebas](REGISTRO_REPRODUCCION.md): registro de resultados y pendientes.
 - [Stack por etapas](STACK_TECNOLOGICO.md): responsabilidades y herramientas con más detalle.
 - [Desarrollo](DESARROLLO.md): comandos para preparar y ejecutar.
 - [Hardware y protocolo](HARDWARE_Y_PROTOCOLO.md): cableado y mensajes.

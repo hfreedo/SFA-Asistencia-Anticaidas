@@ -23,7 +23,24 @@ fuentes, no reemplazan la validación del portable documentada por separado.
 - El servidor de prueba se detuvo al finalizar. Estas pruebas no son inspección
   visual de navegador ni prueba de cámara/QR en un teléfono real.
 
-## Límites
+## Verificación Adicional del Manual
+
+El 16 de octubre de 2026 se contrastó el flujo de reproducción con el backend
+de las fuentes, usando una base temporal independiente y un puerto libre:
+
+- Base inicial sin residentes; creación y edición de un perfil ficticio.
+- Perfil editado conservado tras detener e iniciar el proceso del servidor.
+- Simulación `CAIDA_CONFIRMADA` y atención `ALERTA_ATENDIDA` recibidas por
+  WebSocket y consultadas en el historial.
+- Exportación `sfa-configuration` sin token/chat de Telegram ni historial.
+- `pip check` sin dependencias incompatibles y enlaces locales de las guías correctos.
+
+Se verificó el flujo de datos, no la apariencia ni el cronómetro en navegador.
+No se ejecutó la ficha en una segunda PC ni se verificaron cámara, Telegram o
+hardware físico. La [ficha de reproducción](REGISTRO_REPRODUCCION.md) es una
+plantilla vacía para registrar esas pruebas, no evidencia de que estén aprobadas.
+
+## Límites de la Publicación
 
 No se modifica ni publica automáticamente el release 1.1.0 por publicar estas
 fuentes. No se recompila el portable como parte de esta actualización documental.

@@ -9,6 +9,8 @@ Python, interfaz React y configuración de empaquetado. No se incluyen datos
 personales, credenciales ni dependencias instaladas.
 
 - [Empieza aquí: guía paso a paso para alumnos](docs/GUIA_ALUMNOS.md).
+- [Manual de reproducción y verificación desde cero](docs/MANUAL_REPRODUCCION.md).
+- [Ficha para registrar pruebas y evidencias](docs/REGISTRO_REPRODUCCION.md).
 - [Stack tecnológico por etapas, programas y Mermaid](docs/STACK_TECNOLOGICO.md).
 - [Instalación y desarrollo desde las fuentes](docs/DESARROLLO.md).
 - [Hardware, pinout y protocolo](docs/HARDWARE_Y_PROTOCOLO.md).
