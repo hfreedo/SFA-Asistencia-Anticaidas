@@ -1,0 +1,932 @@
+from __future__ import annotations
+
+import asyncio
+import base64
+import binascii
+import json
+import os
+import socket
+import sqlite3
+import sys
+import threading
+import time
+import urllib.request
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import serial
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from serial.tools import list_ports
+from servidor_pc.red_local import local_addresses
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR))
+STATIC_DIR = RESOURCE_DIR / "interfaz_web" / "static"
+
+if getattr(sys, "frozen", False):
+    data_root = Path(sys.executable).resolve().parent / "data"
+    data_root.mkdir(parents=True, exist_ok=True)
+    DB_PATH = data_root / "sfa_eventos.sqlite3"
+else:
+    DB_PATH = BASE_DIR / "servidor_pc" / "sfa_eventos.sqlite3"
+
+
+class SerialConnectRequest(BaseModel):
+    port: str
+    baudrate: int = 115200
+
+
+class CommandRequest(BaseModel):
+    command: str
+
+
+class AlertActionRequest(BaseModel):
+    action: str
+    note: str | None = None
+
+
+class SimulationStateRequest(BaseModel):
+    state: str
+
+
+class ResidentProfileRequest(BaseModel):
+    full_name: str
+    room: str
+    phone: str
+    emergency_phone: str = "112"
+    medical_notes: str = ""
+
+
+class ResidentCreateRequest(BaseModel):
+    full_name: str
+    room: str
+    phone: str
+    emergency_phone: str = "112"
+    medical_notes: str = ""
+
+
+class ResidentPhotoRequest(BaseModel):
+    photo_base64: str = Field(max_length=2_000_000)
+
+
+class BackupResident(ResidentCreateRequest):
+    is_active: bool = False
+    photo_base64: str | None = Field(default=None, max_length=2_000_000)
+
+
+def public_resident(row: sqlite3.Row) -> dict[str, Any]:
+    result = dict(row)
+    photo = result.pop("photo", None)
+    result["photo_url"] = (
+        f"/api/residents/{result['id']}/photo" if photo else None
+    )
+    return result
+
+
+class GeofenceConfigRequest(BaseModel):
+    home_lat: float
+    home_lng: float
+    radius_m: int = 200
+    address_name: str = "Hogar / Residencia Central"
+
+
+class NotificationConfigRequest(BaseModel):
+    sound_enabled: bool = True
+    telegram_token: str = ""
+    telegram_chat_id: str = ""
+    notify_fall: bool = True
+    notify_sos: bool = True
+    notify_battery: bool = True
+    notify_first_motion: bool = True
+
+
+class ConfigurationBackup(BaseModel):
+    format: str
+    version: int
+    residents: list[BackupResident] = Field(max_length=1000)
+    geofence: GeofenceConfigRequest
+    notifications: NotificationConfigRequest
+
+
+class SerialBridge:
+    def __init__(self) -> None:
+        self.serial_port: serial.Serial | None = None
+        self.thread: threading.Thread | None = None
+        self.stop_event = threading.Event()
+        self.lock = threading.Lock()
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self.clients: set[WebSocket] = set()
+        self.latest: dict[str, Any] | None = None
+        self.connected_port: str | None = None
+        self.connected_baudrate: int | None = None
+        self.last_error: str | None = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self.loop = loop
+
+    def connect(self, port: str, baudrate: int) -> None:
+        with self.lock:
+            self.disconnect()
+            try:
+                self.serial_port = serial.Serial(port, baudrate, timeout=1)
+            except serial.SerialException as exc:
+                self.last_error = serial_error_message(exc, port)
+                raise RuntimeError(self.last_error) from exc
+            self.connected_port = port
+            self.connected_baudrate = baudrate
+            self.last_error = None
+            self.latest = None
+            self.stop_event.clear()
+            self.thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self.thread.start()
+
+    def disconnect(self) -> None:
+        self.stop_event.set()
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+        self.serial_port = None
+        self.connected_port = None
+        self.connected_baudrate = None
+
+    def send_command(self, command: str) -> None:
+        if not command.strip():
+            raise ValueError("Comando vacio")
+        with self.lock:
+            if not self.serial_port or not self.serial_port.is_open:
+                raise RuntimeError("No hay puerto serial conectado")
+            self.serial_port.write((command.strip() + "\n").encode("ascii", errors="ignore"))
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "connected": bool(self.serial_port and self.serial_port.is_open),
+            "port": self.connected_port,
+            "baudrate": self.connected_baudrate,
+            "latest": self.latest,
+            "error": self.last_error,
+        }
+
+    async def add_client(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.clients.add(websocket)
+        await websocket.send_json({"type": "status", **self.status()})
+
+    def remove_client(self, websocket: WebSocket) -> None:
+        self.clients.discard(websocket)
+
+    def publish_from_thread(self, payload: dict[str, Any]) -> None:
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.broadcast(payload), self.loop)
+
+    async def broadcast(self, payload: dict[str, Any]) -> None:
+        dead: list[WebSocket] = []
+        for client in self.clients:
+            try:
+                await client.send_json(payload)
+            except RuntimeError:
+                dead.append(client)
+        for client in dead:
+            self.remove_client(client)
+
+    def _reader_loop(self) -> None:
+        while not self.stop_event.is_set():
+            try:
+                if not self.serial_port:
+                    break
+                raw = self.serial_port.readline()
+                if not raw:
+                    continue
+                line = raw.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                payload = parse_serial_line(line)
+                if payload["type"] == "telemetry":
+                    self.latest = payload
+                if payload["type"] in {"event", "telemetry"}:
+                    save_record(payload)
+                self.publish_from_thread(payload)
+            except serial.SerialException as exc:
+                self.last_error = serial_error_message(exc, self.connected_port or "puerto")
+                self.connected_port = None
+                self.connected_baudrate = None
+                if self.serial_port and self.serial_port.is_open:
+                    self.serial_port.close()
+                self.serial_port = None
+                self.publish_from_thread({"type": "serial_error", "message": self.last_error})
+                self.publish_from_thread({"type": "status", **self.status()})
+                break
+
+
+bridge = SerialBridge()
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_local_ip() -> str:
+    addresses = local_addresses()
+    return addresses[0] if addresses else "127.0.0.1"
+
+
+def send_telegram_notification(text: str) -> bool:
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cfg = conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone()
+            if not cfg:
+                return False
+            token = (cfg["telegram_token"] or "").strip()
+            chat_id = (cfg["telegram_chat_id"] or "").strip()
+            if not token or not chat_id:
+                return False
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        data = json.dumps({"chat_id": chat_id, "text": text, "parse_mode": "HTML"}).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            return res.status == 200
+    except Exception as exc:
+        print(f"[Telegram Alert Error]: {exc}")
+        return False
+
+
+def check_and_notify_event(payload: dict[str, Any]) -> None:
+    event_type = payload.get("event_type") or payload.get("state")
+    if not event_type:
+        return
+
+    def _worker():
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                prof = conn.execute("SELECT * FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+                if not prof:
+                    prof = conn.execute("SELECT * FROM residents ORDER BY id ASC LIMIT 1").fetchone()
+                cfg = conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone()
+
+            name = prof["full_name"] if prof else "Residente"
+            room = prof["room"] if prof else "Habitación"
+
+            if event_type == "CAIDA_CONFIRMADA" and cfg and cfg["notify_fall"]:
+                msg = f"🚨 <b>ALERTA DE CAÍDA CONFIRMADA</b>\n\n👤 <b>Residente:</b> {name}\n📍 <b>Ubicación:</b> {room}\n⏱ <b>Hora:</b> {datetime.now().strftime('%H:%M:%S')}\n\n<i>Se requiere atención inmediata en el centro de monitoreo.</i>"
+                send_telegram_notification(msg)
+            elif "SOS" in str(event_type).upper() and cfg and cfg["notify_sos"]:
+                msg = f"🆘 <b>LLAMADA DE SOS / PÁNICO</b>\n\n👤 <b>Residente:</b> {name}\n📍 <b>Ubicación:</b> {room}\n⏱ <b>Hora:</b> {datetime.now().strftime('%H:%M:%S')}\n\n<i>El residente ha solicitado auxilio manual.</i>"
+                send_telegram_notification(msg)
+        except Exception as e:
+            print(f"[Event Notify Worker Error]: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def init_db() -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                type TEXT NOT NULL,
+                raw TEXT NOT NULL,
+                state TEXT,
+                event_type TEXT,
+                detail TEXT,
+                accel_g REAL,
+                tilt_deg REAL,
+                motion REAL,
+                fall_count INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS residents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                room TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                emergency_phone TEXT NOT NULL DEFAULT '112',
+                medical_notes TEXT DEFAULT '',
+                is_active INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        if "photo" not in {r[1] for r in conn.execute("PRAGMA table_info(residents)")}:
+            conn.execute("ALTER TABLE residents ADD COLUMN photo BLOB")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS geofence_config (
+                id INTEGER PRIMARY KEY,
+                home_lat REAL NOT NULL,
+                home_lng REAL NOT NULL,
+                radius_m INTEGER NOT NULL,
+                address_name TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notification_config (
+                id INTEGER PRIMARY KEY,
+                sound_enabled INTEGER NOT NULL DEFAULT 1,
+                telegram_token TEXT DEFAULT '',
+                telegram_chat_id TEXT DEFAULT '',
+                notify_fall INTEGER NOT NULL DEFAULT 1,
+                notify_sos INTEGER NOT NULL DEFAULT 1,
+                notify_battery INTEGER NOT NULL DEFAULT 1,
+                notify_first_motion INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        now = utc_now()
+        if not conn.execute("SELECT id FROM geofence_config WHERE id = 1").fetchone():
+            conn.execute(
+                "INSERT INTO geofence_config (id, home_lat, home_lng, radius_m, address_name, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
+                (-34.6037, -58.3816, 200, "Residencia / Hogar Central", now),
+            )
+        if not conn.execute("SELECT id FROM notification_config WHERE id = 1").fetchone():
+            conn.execute(
+                "INSERT INTO notification_config (id, sound_enabled, telegram_token, telegram_chat_id, notify_fall, notify_sos, notify_battery, notify_first_motion, updated_at) VALUES (1, 1, '', '', 1, 1, 1, 1, ?)",
+                (now,),
+            )
+
+
+def save_record(payload: dict[str, Any]) -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO records (
+                created_at, type, raw, state, event_type, detail,
+                accel_g, tilt_deg, motion, fall_count
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                utc_now(),
+                payload.get("type"),
+                payload.get("raw", ""),
+                payload.get("state"),
+                payload.get("event_type"),
+                payload.get("detail"),
+                payload.get("accel_g"),
+                payload.get("tilt_deg"),
+                payload.get("motion"),
+                payload.get("fall_count"),
+            ),
+        )
+    check_and_notify_event(payload)
+
+
+def parse_serial_line(line: str) -> dict[str, Any]:
+    parts = [part.strip() for part in line.split(",")]
+    kind = parts[0].upper() if parts else "RAW"
+
+    if kind == "TEL" and len(parts) >= 10:
+        return {
+            "type": "telemetry",
+            "raw": line,
+            "device_ms": to_int(parts[1]),
+            "state": parts[2],
+            "ax": to_float(parts[3]),
+            "ay": to_float(parts[4]),
+            "az": to_float(parts[5]),
+            "accel_g": to_float(parts[6]),
+            "tilt_deg": to_float(parts[7]),
+            "motion": to_float(parts[8]),
+            "fall_count": to_int(parts[9]),
+            "received_at": utc_now(),
+        }
+
+    if kind == "EVT" and len(parts) >= 4:
+        payload = {
+            "type": "event",
+            "raw": line,
+            "device_ms": to_int(parts[1]),
+            "event_type": parts[2],
+            "detail": ",".join(parts[3:]),
+            "received_at": utc_now(),
+        }
+        if parts[2] == "CAIDA_CONFIRMADA":
+            payload["priority"] = "critical"
+        return payload
+
+    if kind == "RSP" and len(parts) >= 3:
+        return {
+            "type": "response",
+            "raw": line,
+            "command": parts[1],
+            "result": ",".join(parts[2:]),
+            "received_at": utc_now(),
+        }
+
+    if kind == "BOOT":
+        return {"type": "boot", "raw": line, "received_at": utc_now()}
+
+    return {"type": "raw", "raw": line, "received_at": utc_now()}
+
+
+def to_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def to_int(value: str) -> int | None:
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def serial_error_message(exc: Exception, port: str) -> str:
+    text = str(exc).lower()
+    if "access is denied" in text or "acceso denegado" in text or "permissionerror" in text:
+        return f"No se puede abrir {port}: está siendo utilizado por otro programa. Cierre el Monitor Serie y vuelva a conectar."
+    if "cannot find" in text or "no se encuentra" in text or "no puede encontrar" in text or "filenotfounderror" in text:
+        return f"No se encuentra {port}. Revise el cable USB y actualice los puertos."
+    return f"Error de comunicación con {port}: {exc}"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    bridge.set_loop(asyncio.get_running_loop())
+    yield
+    bridge.disconnect()
+
+
+app = FastAPI(title="SFA Alerta Anticaídas", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+def favicon() -> FileResponse:
+    svg_path = STATIC_DIR / "favicon.svg"
+    if svg_path.exists():
+        return FileResponse(svg_path, media_type="image/svg+xml")
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/assets/{path:path}")
+def direct_assets(path: str) -> FileResponse:
+    asset_file = STATIC_DIR / "assets" / path
+    if asset_file.exists():
+        return FileResponse(asset_file)
+    return FileResponse(STATIC_DIR / "index.html", status_code=404)
+
+
+@app.get("/api/ports")
+def ports() -> list[dict[str, Any]]:
+    return [
+        {
+            "device": port.device,
+            "description": port.description,
+            "hwid": port.hwid,
+        }
+        for port in list_ports.comports()
+    ]
+
+
+@app.get("/api/status")
+def status() -> dict[str, Any]:
+    return bridge.status()
+
+
+@app.post("/api/connect")
+async def connect(req: SerialConnectRequest) -> dict[str, Any]:
+    try:
+        bridge.connect(req.port, req.baudrate)
+    except RuntimeError:
+        payload = {"type": "status", **bridge.status()}
+        await bridge.broadcast(payload)
+        return payload
+    # El UNO suele reiniciarse al abrir el USB. Esperar evita que pierda el
+    # comando y garantiza que un STREAM OFF previo no deje el tablero sin datos.
+    await asyncio.sleep(2.0 if req.baudrate == 115200 else 0.2)
+    try:
+        bridge.send_command("STREAM ON")
+    except (RuntimeError, serial.SerialException):
+        pass
+    payload = {"type": "status", **bridge.status()}
+    await bridge.broadcast(payload)
+    return payload
+
+
+@app.post("/api/disconnect")
+async def disconnect() -> dict[str, Any]:
+    bridge.disconnect()
+    payload = {"type": "status", **bridge.status()}
+    await bridge.broadcast(payload)
+    return payload
+
+
+@app.post("/api/command")
+async def command(req: CommandRequest) -> dict[str, str]:
+    bridge.send_command(req.command)
+    return {"status": "sent", "command": req.command}
+
+
+@app.post("/api/simulate/fall")
+async def simulate_fall() -> dict[str, Any]:
+    payload = {
+        "type": "event",
+        "event_type": "CAIDA_CONFIRMADA",
+        "detail": "simulacion_interfaz",
+        "raw": "EVT,0,CAIDA_CONFIRMADA,simulacion_interfaz",
+        "received_at": utc_now(),
+        "priority": "critical",
+    }
+    save_record(payload)
+    await bridge.broadcast(payload)
+    return payload
+
+
+@app.post("/api/simulate/state")
+async def simulate_state(req: SimulationStateRequest) -> dict[str, Any]:
+    state = req.state.strip().upper()
+    allowed = {
+        "NORMAL": (1.0, 6.0, 0.012),
+        "EVENTO_INERCIAL": (2.55, 28.0, 0.260),
+        "POSIBLE_CAIDA": (1.18, 64.0, 0.035),
+        "CAIDA_CONFIRMADA": (1.05, 72.0, 0.006),
+        "ALERTA_SILENCIADA": (1.02, 61.0, 0.010),
+    }
+    if state not in allowed:
+        return {"type": "error", "message": "Estado de simulación no soportado"}
+
+    accel_g, tilt_deg, motion = allowed[state]
+    payload = {
+        "type": "telemetry",
+        "raw": f"TEL,0,{state},0.000,0.000,1.000,{accel_g:.3f},{tilt_deg:.1f},{motion:.3f},0",
+        "device_ms": 0,
+        "state": state,
+        "ax": 0.0,
+        "ay": 0.0,
+        "az": 1.0,
+        "accel_g": accel_g,
+        "tilt_deg": tilt_deg,
+        "motion": motion,
+        "fall_count": 0,
+        "received_at": utc_now(),
+        "simulated": True,
+    }
+    bridge.latest = payload
+    save_record(payload)
+    await bridge.broadcast(payload)
+
+    if state in {"EVENTO_INERCIAL", "POSIBLE_CAIDA", "CAIDA_CONFIRMADA"}:
+        event_payload = {
+            "type": "event",
+            "event_type": state,
+            "detail": "simulacion_guiada",
+            "raw": f"EVT,0,{state},simulacion_guiada",
+            "received_at": utc_now(),
+            "priority": "critical" if state == "CAIDA_CONFIRMADA" else "warning",
+        }
+        save_record(event_payload)
+        await bridge.broadcast(event_payload)
+
+    return payload
+
+
+@app.post("/api/alert-action")
+async def alert_action(req: AlertActionRequest) -> dict[str, Any]:
+    normalized = req.action.strip().lower()
+    labels = {
+        "attended": ("ALERTA_ATENDIDA", "Alerta marcada como atendida"),
+        "false_alarm": ("FALSA_ALARMA", "Evento registrado como falsa alarma"),
+        "mute": ("ALERTA_SILENCIADA", "Alarma silenciada desde la interfaz"),
+    }
+    if normalized not in labels:
+        return {"type": "error", "message": "Acción no soportada"}
+
+    event_type, detail = labels[normalized]
+    if req.note:
+        detail = f"{detail}: {req.note}"
+
+    payload = {
+        "type": "event",
+        "event_type": event_type,
+        "detail": detail,
+        "raw": f"EVT,0,{event_type},{detail}",
+        "received_at": utc_now(),
+        "operator_action": True,
+    }
+    save_record(payload)
+    await bridge.broadcast(payload)
+    return payload
+
+
+@app.get("/api/records")
+def records(limit: int = 80) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 300))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM records ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/residents")
+def get_residents() -> list[dict[str, Any]]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM residents ORDER BY is_active DESC, id ASC").fetchall()
+        return [public_resident(r) for r in rows]
+
+
+@app.put("/api/residents/{res_id}/photo")
+def upload_resident_photo(res_id: int, req: ResidentPhotoRequest) -> dict[str, Any]:
+    try:
+        photo = base64.b64decode(req.photo_base64, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(400, "Imagen codificada incorrectamente")
+    if not photo.startswith(b"\xff\xd8\xff") or not photo.endswith(b"\xff\xd9"):
+        raise HTTPException(400, "La foto debe estar en formato JPEG")
+    if len(photo) > 1_500_000:
+        raise HTTPException(413, "La foto supera el tamaño permitido")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("UPDATE residents SET photo = ? WHERE id = ?", (photo, res_id))
+        if not cursor.rowcount:
+            raise HTTPException(404, "Residente no encontrado")
+    return {"photo_url": f"/api/residents/{res_id}/photo?v={time.time_ns()}"}
+
+
+@app.get("/api/residents/{res_id}/photo")
+def get_resident_photo(res_id: int) -> Response:
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT photo FROM residents WHERE id = ?", (res_id,)).fetchone()
+    if not row or not row[0]:
+        raise HTTPException(404, "Foto no disponible")
+    return Response(row[0], media_type="image/jpeg", headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+    })
+
+
+@app.delete("/api/residents/{res_id}/photo")
+def remove_resident_photo(res_id: int) -> dict[str, Any]:
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("UPDATE residents SET photo = NULL WHERE id = ?", (res_id,))
+        if not cursor.rowcount:
+            raise HTTPException(404, "Residente no encontrado")
+    return {"photo_url": None}
+
+
+@app.post("/api/residents")
+def create_resident(req: ResidentCreateRequest) -> dict[str, Any]:
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO residents (full_name, room, phone, emergency_phone, medical_notes, is_active, updated_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?)
+            """,
+            (req.full_name.strip(), req.room.strip(), req.phone.strip(), req.emergency_phone.strip(), req.medical_notes.strip(), now),
+        )
+        new_id = cursor.lastrowid
+        count = conn.execute("SELECT COUNT(*) FROM residents").fetchone()[0]
+        if count == 1:
+            conn.execute("UPDATE residents SET is_active = 1 WHERE id = ?", (new_id,))
+        return {"id": new_id, "status": "ok"}
+
+
+@app.post("/api/residents/{res_id}/activate")
+def activate_resident(res_id: int) -> dict[str, Any]:
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE residents SET is_active = 0")
+        conn.execute("UPDATE residents SET is_active = 1, updated_at = ? WHERE id = ?", (now, res_id))
+    return {"status": "ok", "active_id": res_id}
+
+
+@app.delete("/api/residents/{res_id}")
+def delete_resident(res_id: int) -> dict[str, Any]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM residents WHERE id = ?", (res_id,))
+        active = conn.execute("SELECT id FROM residents WHERE is_active = 1").fetchone()
+        if not active:
+            first = conn.execute("SELECT id FROM residents ORDER BY id ASC LIMIT 1").fetchone()
+            if first:
+                conn.execute("UPDATE residents SET is_active = 1 WHERE id = ?", (first[0],))
+    return {"status": "ok"}
+
+
+@app.get("/api/profile")
+def get_profile() -> dict[str, Any]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+        if not row:
+            row = conn.execute("SELECT * FROM residents ORDER BY id ASC LIMIT 1").fetchone()
+        return public_resident(row) if row else {}
+
+
+@app.put("/api/profile")
+def update_profile(req: ResidentProfileRequest) -> dict[str, Any]:
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT id FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+        if row:
+            res_id = row[0]
+            conn.execute(
+                """
+                UPDATE residents
+                SET full_name = ?, room = ?, phone = ?, emergency_phone = ?, medical_notes = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (req.full_name.strip(), req.room.strip(), req.phone.strip(), req.emergency_phone.strip(), req.medical_notes.strip(), now, res_id),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO residents (full_name, room, phone, emergency_phone, medical_notes, is_active, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, ?)
+                """,
+                (req.full_name.strip(), req.room.strip(), req.phone.strip(), req.emergency_phone.strip(), req.medical_notes.strip(), now),
+            )
+        conn.row_factory = sqlite3.Row
+        saved = conn.execute("SELECT * FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+        resident = public_resident(saved)
+    return {"status": "ok", "updated_at": now, "resident": resident}
+
+
+@app.get("/api/geofence")
+def get_geofence() -> dict[str, Any]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM geofence_config WHERE id = 1").fetchone()
+        return dict(row) if row else {}
+
+
+@app.put("/api/geofence")
+def update_geofence(req: GeofenceConfigRequest) -> dict[str, Any]:
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            UPDATE geofence_config
+            SET home_lat = ?, home_lng = ?, radius_m = ?, address_name = ?, updated_at = ?
+            WHERE id = 1
+            """,
+            (req.home_lat, req.home_lng, req.radius_m, req.address_name.strip(), now),
+        )
+    return {"status": "ok", "updated_at": now}
+
+
+@app.get("/api/notifications")
+def get_notifications() -> dict[str, Any]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone()
+        if not row:
+            return {}
+        data = dict(row)
+        data["sound_enabled"] = bool(data.get("sound_enabled", 1))
+        data["notify_fall"] = bool(data.get("notify_fall", 1))
+        data["notify_sos"] = bool(data.get("notify_sos", 1))
+        data["notify_battery"] = bool(data.get("notify_battery", 1))
+        data["notify_first_motion"] = bool(data.get("notify_first_motion", 1))
+        return data
+
+
+@app.put("/api/notifications")
+def update_notifications(req: NotificationConfigRequest) -> dict[str, Any]:
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            UPDATE notification_config
+            SET sound_enabled = ?, telegram_token = ?, telegram_chat_id = ?,
+                notify_fall = ?, notify_sos = ?, notify_battery = ?, notify_first_motion = ?, updated_at = ?
+            WHERE id = 1
+            """,
+            (
+                int(req.sound_enabled),
+                req.telegram_token.strip(),
+                req.telegram_chat_id.strip(),
+                int(req.notify_fall),
+                int(req.notify_sos),
+                int(req.notify_battery),
+                int(req.notify_first_motion),
+                now,
+            ),
+        )
+    return {"status": "ok", "updated_at": now}
+
+
+@app.post("/api/notifications/test-telegram")
+def test_telegram() -> dict[str, Any]:
+    now = datetime.now().strftime("%H:%M:%S")
+    msg = f"🔔 <b>PRUEBA DE CONEXIÓN SFA</b>\n\nEl canal de alertas de emergencia con Telegram está configurado y funcionando correctamente.\n⏱ <i>Hora del servidor: {now}</i>"
+    success = send_telegram_notification(msg)
+    return {"status": "ok" if success else "error", "sent": success}
+
+
+@app.get("/api/network-info")
+def network_info(request: Request) -> dict[str, Any]:
+    addresses = local_addresses()
+    server = request.scope.get("server")
+    port = server[1] if server else int(os.environ.get("SFA_SERVER_PORT", "8780"))
+    server_ip = server[0] if server else None
+    ip = server_ip if server_ip in addresses else (addresses[0] if addresses else "127.0.0.1")
+    available = False
+    if ip != "127.0.0.1":
+        try:
+            with socket.create_connection((ip, port), timeout=0.3):
+                available = True
+        except OSError:
+            pass
+    return {
+        "local_ip": ip,
+        "port": port,
+        "url": f"http://{ip}:{port}",
+        "lan_available": available,
+        "addresses": addresses,
+    }
+
+
+@app.get("/api/configuration/export")
+def export_configuration() -> Response:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        residents = []
+        for row in conn.execute("SELECT * FROM residents ORDER BY id"):
+            residents.append({
+                key: row[key] for key in ("full_name", "room", "phone", "emergency_phone", "medical_notes", "is_active")
+            } | {"photo_base64": base64.b64encode(row["photo"]).decode("ascii") if row["photo"] else None})
+        geofence = dict(conn.execute("SELECT * FROM geofence_config WHERE id = 1").fetchone())
+        notifications = dict(conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone())
+    notifications["telegram_token"] = ""
+    notifications["telegram_chat_id"] = ""
+    payload = {"format": "sfa-configuration", "version": 1, "exported_at": utc_now(),
+               "residents": residents, "geofence": geofence, "notifications": notifications}
+    return Response(json.dumps(payload, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="SFA-configuracion.json"', "Cache-Control": "no-store"})
+
+
+@app.post("/api/configuration/import")
+def import_configuration(backup: ConfigurationBackup) -> dict[str, Any]:
+    if backup.format != "sfa-configuration" or backup.version != 1:
+        raise HTTPException(400, "Formato de copia no compatible")
+    photos = []
+    for resident in backup.residents:
+        try:
+            photo = base64.b64decode(resident.photo_base64, validate=True) if resident.photo_base64 else None
+        except (ValueError, binascii.Error):
+            raise HTTPException(400, "Foto codificada incorrectamente")
+        if photo and (len(photo) > 1_500_000 or not photo.startswith(b"\xff\xd8\xff") or not photo.endswith(b"\xff\xd9")):
+            raise HTTPException(400, "Foto de la copia no válida")
+        photos.append(photo)
+    now = utc_now()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM residents")
+        active_assigned = False
+        for resident, photo in zip(backup.residents, photos):
+            active = bool(resident.is_active and not active_assigned)
+            active_assigned |= active
+            conn.execute("INSERT INTO residents (full_name, room, phone, emergency_phone, medical_notes, is_active, updated_at, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                         (resident.full_name.strip(), resident.room.strip(), resident.phone.strip(), resident.emergency_phone.strip(), resident.medical_notes.strip(), int(active), now, photo))
+        if not active_assigned:
+            conn.execute("UPDATE residents SET is_active = 1 WHERE id = (SELECT MIN(id) FROM residents)")
+        geo = backup.geofence
+        conn.execute("UPDATE geofence_config SET home_lat=?, home_lng=?, radius_m=?, address_name=?, updated_at=? WHERE id=1",
+                     (geo.home_lat, geo.home_lng, geo.radius_m, geo.address_name, now))
+        prefs = backup.notifications
+        conn.execute("UPDATE notification_config SET sound_enabled=?, notify_fall=?, notify_sos=?, notify_battery=?, notify_first_motion=?, updated_at=? WHERE id=1",
+                     (prefs.sound_enabled, prefs.notify_fall, prefs.notify_sos, prefs.notify_battery, prefs.notify_first_motion, now))
+    return {"status": "ok", "residents_restored": len(backup.residents)}
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    await bridge.add_client(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        bridge.remove_client(websocket)

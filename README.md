@@ -2,6 +2,20 @@
 
 Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel local para cuidadores y familiares.
 
+## Código Fuente y Guía Para Estudiantes
+
+Ahora se incluye el código fuente del estado actual: firmware Arduino, servidor
+Python, interfaz React y configuración de empaquetado. No se incluyen datos
+personales, credenciales ni dependencias instaladas.
+
+- [Stack tecnológico, programas y diagramas Mermaid](docs/STACK_TECNOLOGICO.md).
+- [Instalación y desarrollo desde las fuentes](docs/DESARROLLO.md).
+- [Hardware, pinout y protocolo](docs/HARDWARE_Y_PROTOCOLO.md).
+- [Comprobaciones de las fuentes publicadas](docs/VALIDACION_FUENTES.md).
+
+Para ejecutar las fuentes, primero instala las dependencias y compila la interfaz
+siguiendo la guía. `interfaz_web/static` se genera localmente y no está versionado.
+
 ![Panel principal](docs/capturas/01-panel.png)
 
 ## Versión 1.1.0
@@ -62,6 +76,10 @@ Consulta [las pruebas y límites de compatibilidad](docs/VALIDACION.md) y [las v
 
 Prototipo educativo y experimental. No es un dispositivo médico certificado ni sustituye supervisión humana o servicios de emergencia. La validación física, un teléfono real y el driver con placa conectada requieren pruebas adicionales.
 
-Este repositorio publica presentación, documentación y capturas. No publica fuentes editables, firmware, bases de datos ni credenciales. Los ejecutables se distribuyen en Releases.
+Este repositorio publica documentación, capturas, fuentes editables y firmware.
+Las bases de datos, copias personales y credenciales permanecen privadas.
+Los ejecutables se distribuyen en Releases. Publicar las fuentes no concede una
+licencia libre ni modifica los permisos del ejecutable; consulta las condiciones
+de uso y la declaración de autoría del repositorio.
 
 Las licencias de terceros siguen vigentes. El símbolo gráfico fue retocado a partir de una imagen aportada por el usuario; el retoque no sustituye los permisos del original.
