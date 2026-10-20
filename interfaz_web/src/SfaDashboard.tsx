@@ -1,5 +1,6 @@
 import L from "leaflet";
 import QRCode from "qrcode";
+import { EmailSettings, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -35,7 +36,7 @@ type Telemetry = {
   geofence_radius_m?: number | null;
 };
 
-type SystemEvent = { id: string; type: string; detail: string; at: string };
+type SystemEvent = { id: string; type: string; detail: string; at: string; residentId?: number };
 type Port = { device: string; description: string };
 
 type ResidentProfile = {
@@ -64,6 +65,7 @@ type NotificationConfig = {
   notify_sos: boolean;
   notify_battery: boolean;
   notify_first_motion: boolean;
+  notify_geofence: boolean;
 };
 
 type NetworkInfo = {
@@ -229,6 +231,7 @@ export function SfaDashboardApp() {
   // Lista de residentes registrados y residente activo
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
+  const locationSnapshot = useResidentLocation(profile?.id);
 
   const [geofence, setGeofence] = useState<GeofenceConfig>({
     home_lat: -34.6037,
@@ -246,6 +249,7 @@ export function SfaDashboardApp() {
       notify_sos: true,
       notify_battery: true,
       notify_first_motion: true,
+      notify_geofence: true,
     });
 
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo | null>(null);
@@ -287,13 +291,6 @@ export function SfaDashboardApp() {
   useEffect(() => {
     loadResidents();
 
-    fetch("/api/geofence")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.home_lat) setGeofence(data);
-      })
-      .catch(() => {});
-
     fetch("/api/notifications")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -309,10 +306,19 @@ export function SfaDashboardApp() {
       .catch(() => {});
   }, [loadResidents]);
 
-  const addEvent = useCallback((type: string, detail: string, at: string) => {
+  useEffect(() => {
+    if (!profile?.id) return;
+    let disposed = false;
+    fetch(`/api/residents/${profile.id}/geofence`).then(res => res.ok ? res.json() : null).then(data => {
+      if (data && !disposed) setGeofence(data);
+    }).catch(() => {});
+    return () => { disposed = true; };
+  }, [profile?.id]);
+
+  const addEvent = useCallback((type: string, detail: string, at: string, residentId?: number) => {
     setEvents((current) =>
       [
-        { id: `${type}-${at}-${Math.random()}`, type, detail, at },
+        { id: `${type}-${at}-${Math.random()}`, type, detail, at, residentId },
         ...current,
       ].slice(0, 30),
     );
@@ -361,16 +367,27 @@ export function SfaDashboardApp() {
             applyTelemetry(payload.latest);
         } else if (payload.type === "telemetry") {
           applyTelemetry(payload);
+        } else if (payload.type === "location") {
+          window.dispatchEvent(new Event("sfa-location-refresh"));
         } else if (payload.type === "event" && isRealPayload(payload)) {
+          if (payload.resident_id && payload.resident_id !== profile?.id) return;
           addEvent(
             payload.event_type,
             payload.detail || "Evento registrado",
             payload.received_at || new Date().toISOString(),
+            payload.resident_id,
           );
           if (payload.event_type === "CAIDA_CONFIRMADA")
             setEmergencyStartedAt(
               (current) => current ?? new Date(payload.received_at),
             );
+          if (["GEOCERCA_SALIDA", "GEOCERCA_REINGRESO", "UBICACION_PERDIDA"].includes(payload.event_type)) {
+            notify(payload.detail, payload.event_type === "GEOCERCA_REINGRESO" ? "success" : "error");
+            showBrowserAlert("SFA Asistencia", payload.detail);
+            window.dispatchEvent(new Event("sfa-location-refresh"));
+          } else if (payload.event_type === "CAIDA_CONFIRMADA") {
+            showBrowserAlert("SFA Asistencia: caída detectada", payload.detail || "Requiere atención");
+          }
         } else if (payload.type === "serial_error") {
           setConnected(false);
           setConnectionError(payload.message);
@@ -386,7 +403,7 @@ export function SfaDashboardApp() {
       if (retryId) window.clearTimeout(retryId);
       socket?.close();
     };
-  }, [addEvent, applyTelemetry]);
+  }, [addEvent, applyTelemetry, profile?.id]);
 
   async function confirmAttention() {
     emergencyAlarm.stop();
@@ -440,6 +457,7 @@ export function SfaDashboardApp() {
       {view === "home" && (
         <HomeScreen
           profile={profile}
+          locationSnapshot={locationSnapshot}
           telemetry={telemetry}
           connected={connected}
           firstMotion={firstMotion}
@@ -455,7 +473,7 @@ export function SfaDashboardApp() {
         <MapScreen
           geofence={geofence}
           profile={profile}
-          telemetry={telemetry}
+          locationSnapshot={locationSnapshot}
           onUpdateGeofence={(updated) => setGeofence(updated)}
         />
       )}
@@ -737,7 +755,7 @@ function AppShell({
 
 function HomeScreen({
   profile, telemetry, connected, firstMotion, events, accelHistory,
-  onOpenMap, onTriggerFallSimulation, onOpenSettings, geofence,
+  onOpenMap, onTriggerFallSimulation, onOpenSettings, geofence, locationSnapshot,
 }: {
   profile: ResidentProfile | null;
   telemetry: Telemetry | null;
@@ -749,6 +767,7 @@ function HomeScreen({
   onTriggerFallSimulation: () => void;
   onOpenSettings: () => void;
   geofence: GeofenceConfig;
+  locationSnapshot: LocationSnapshot | null;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -767,11 +786,11 @@ function HomeScreen({
   const time = (date: Date) => date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
   const today = new Date(now).toDateString();
   const motionToday = firstMotion?.toDateString() === today ? firstMotion : null;
-  const todayEvents = events.filter(e => new Date(e.at).toDateString() === today);
+  const todayEvents = events.filter(e => new Date(e.at).toDateString() === today && (!e.residentId || e.residentId === profile?.id));
   const recent = [...todayEvents].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 4);
   const sos = todayEvents.filter(e => e.type.includes("SOS")).length;
   const battery = telemetry?.battery_percent;
-  const gps = telemetry?.latitude != null && telemetry?.longitude != null;
+  const gps = Boolean(locationSnapshot?.position);
   const points = accelHistory.map((value, i) =>
     `${i * 480 / Math.max(1, accelHistory.length - 1)},${Math.max(8, Math.min(72, 40 - (value - 1) * 30))}`).join(" ");
   const titleId = "resident-heading";
@@ -831,7 +850,7 @@ function HomeScreen({
 
       <section className="focus-location">
         <Icon name="map-pin" size={23} />
-        <div><h2>{gps ? "Última posición recibida" : "Zona de referencia"}</h2><p>{gps ? `${telemetry!.latitude!.toFixed(5)}, ${telemetry!.longitude!.toFixed(5)}` : geofence.address_name || "Sin zona configurada"}{!gps && " · Ubicación del residente no disponible"}</p></div>
+        <div><h2>{locationLabel(locationSnapshot?.status || "no_fix")}</h2><p>{gps ? `${locationSnapshot!.position!.latitude.toFixed(5)}, ${locationSnapshot!.position!.longitude.toFixed(5)}` : geofence.address_name || "Sin zona configurada"}</p></div>
         <button onClick={onOpenMap} className="resident-button link-resident"><Icon name="map" size={17} />{gps ? "Ver ubicación" : "Ver geocerca"}<Icon name="arrow-right" size={16} /></button>
       </section>
       <div className="focus-test"><button onClick={onTriggerFallSimulation} className="care-text-action text-sm"><Icon name="flask-conical" size={16} />Probar alerta de caída</button></div>
@@ -953,12 +972,12 @@ function FallAlertScreen({
 function MapScreen({
   geofence,
   profile,
-  telemetry,
+  locationSnapshot,
   onUpdateGeofence,
 }: {
   geofence: GeofenceConfig;
   profile: ResidentProfile | null;
-  telemetry: Telemetry | null;
+  locationSnapshot: LocationSnapshot | null;
   onUpdateGeofence: (updated: GeofenceConfig) => void;
 }) {
   const [selectedRadius, setSelectedRadius] = useState<number>(geofence.radius_m);
@@ -981,7 +1000,7 @@ function MapScreen({
         radius_m: selectedRadius,
         address_name: geofence.address_name,
       };
-      await actionRequest("/api/geofence", {
+      await actionRequest(`/api/residents/${profile?.id}/geofence`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -995,12 +1014,13 @@ function MapScreen({
     }
   }
 
-  const hasGps = telemetry?.latitude != null && telemetry?.longitude != null;
+  const hasGps = Boolean(locationSnapshot?.position);
   const residentName = profile?.full_name || "Residente";
 
   return (
     <div className="location-workspace">
-      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Configura la zona de referencia de {residentName}.</p></div><span className={`care-status ${hasGps ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{hasGps ? "Coordenadas recibidas" : "Sin posición GPS"}</span></div>
+      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Configura la zona de referencia de {residentName}.</p></div><span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span></div>
+      <LocationPanel key={profile?.id || "none"} residentId={profile?.id} snapshot={locationSnapshot} />
       <div className="location-layout">
         <section className="location-controls">
           <div className="location-section"><Icon name="scan-line" size={25} className="text-[#0D9488]" /><h2>Zona de referencia</h2><p>{geofence.address_name || "Sin nombre"}</p></div>
@@ -1008,17 +1028,18 @@ function MapScreen({
             {[100,200,300,500].map(radius => <button key={radius} aria-pressed={selectedRadius === radius} onClick={() => setSelectedRadius(radius)}>{radius} m</button>)}
           </div><p className="control-hint">Distancia desde el centro de la zona.</p></div>
           <div className="location-section"><h3>Centro de la zona</h3><dl className="location-coordinates"><div><dt>Latitud</dt><dd>{tempLat.toFixed(5)}</dd></div><div><dt>Longitud</dt><dd>{tempLng.toFixed(5)}</dd></div></dl><p className="control-hint">Selecciona un punto en el mapa para cambiar el centro.</p></div>
-          <button className="care-action" onClick={saveGeofence} disabled={saving}><Icon name="save" size={18} />{saving ? "Guardando…" : "Guardar geocerca"}</button>
-          <div className="location-note"><Icon name="info" size={20} /><p>{hasGps ? "La posición corresponde a la última lectura del dispositivo." : "Se muestra la zona configurada. La ubicación del residente aparecerá al recibir GPS."}</p></div>
+          <button className="care-action" onClick={saveGeofence} disabled={saving || !profile?.id}><Icon name="save" size={18} />{saving ? "Guardando…" : "Guardar geocerca"}</button>
+          <div className="location-note"><Icon name="info" size={20} /><p>{hasGps ? "Última posición del celular vinculado, no del cinturón." : "Sin posición del celular. Se muestra solo la zona configurada."}</p></div>
         </section>
         <LocationMap
           homeLat={tempLat}
           homeLng={tempLng}
           radiusM={selectedRadius}
-          residentLat={telemetry?.latitude ?? tempLat}
-          residentLng={telemetry?.longitude ?? tempLng}
+          residentLat={locationSnapshot?.position?.latitude ?? tempLat}
+          residentLng={locationSnapshot?.position?.longitude ?? tempLng}
           residentName={residentName}
           hasGps={hasGps}
+          fresh={!locationSnapshot || !["stale", "unlinked", "zone_changed", "awaiting_device"].includes(locationSnapshot.status)}
           onMapClick={(lat, lng) => { setTempLat(lat); setTempLng(lng); }}
         />
       </div>
@@ -1034,6 +1055,7 @@ function LocationMap({
   residentLng,
   residentName,
   hasGps,
+  fresh,
   onMapClick,
 }: {
   homeLat: number;
@@ -1043,6 +1065,7 @@ function LocationMap({
   residentLng: number;
   residentName: string;
   hasGps: boolean;
+  fresh: boolean;
   onMapClick: (lat: number, lng: number) => void;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
@@ -1086,7 +1109,7 @@ function LocationMap({
 
     const icon = L.divIcon({
       className: "",
-      html: '<div class="sfa-pulse-marker"></div>',
+      html: fresh ? '<div class="sfa-pulse-marker"></div>' : '<div class="sfa-position-static"></div>',
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });
@@ -1106,11 +1129,12 @@ function LocationMap({
       fillColor: "#0F766E",
       fillOpacity: 0.08,
     }).addTo(map);
-  }, [homeLat, homeLng, radiusM, residentLat, residentLng, residentName, hasGps]);
+  }, [homeLat, homeLng, radiusM, residentLat, residentLng, residentName, hasGps, fresh]);
 
   return (
     <div className="location-map-frame relative overflow-hidden">
       <div ref={elementRef} className="location-map-canvas w-full cursor-crosshair" />
+      {hasGps && <button className="geo-center-map" title="Centrar zona y última posición" aria-label="Centrar zona y última posición" onClick={() => mapRef.current?.fitBounds(L.latLngBounds([homeLat, homeLng], [residentLat, residentLng]).pad(.25), { maxZoom: 16 })}><Icon name="locate-fixed" size={20} /></button>}
       <div className="map-legend"><span className="legend-zone" />Zona de referencia · {radiusM} m{hasGps && <><span className="legend-position" />Última posición</>}</div>
     </div>
   );
@@ -1414,7 +1438,8 @@ function SettingsScreen({
   async function handleSaveGeofence(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await actionRequest("/api/geofence", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geofenceForm) });
+      if (!profile?.id) throw new Error("Selecciona un residente");
+      await actionRequest(`/api/residents/${profile.id}/geofence`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geofenceForm) });
       onUpdateGeofence(geofenceForm);
       notify("Geocerca guardada");
     } catch (e) { notify(e instanceof Error ? e.message : "No se pudo guardar la geocerca.", "error"); }
@@ -1731,11 +1756,12 @@ function SettingsScreen({
                 Reglas y Canales de Notificación
               </h3>
               <p className="text-xs text-[#55625E] mt-1">
-                Alertas audibles locales y enlace con bot de Telegram para avisos al móvil.
+                Alertas locales, correo electrónico y Telegram opcional.
               </p>
             </div>
 
             <div className="notification-rules">
+              <div className="flex items-baseline justify-between pt-3"><div><p className="text-sm text-[#14201D]">Geocerca y pérdida de ubicación</p><p className="text-xs text-[#55625E]">Salida, reingreso y falta de señal reciente</p></div><button type="button" role="switch" aria-checked={notifForm.notify_geofence} className="settings-switch" onClick={() => setNotifForm({ ...notifForm, notify_geofence: !notifForm.notify_geofence })}><span className="switch-track" aria-hidden="true" /><span className="sr-only">Avisos de geocerca</span></button></div>
               <div className="flex items-baseline justify-between pt-3">
                 <div>
                   <p className="text-sm text-[#14201D]">Sirena web audible</p>
@@ -1800,6 +1826,7 @@ function SettingsScreen({
               </div>
             </div>
 
+            <EmailSettings />
             {/* Telegram */}
             <div className="notification-channel space-y-4">
               <p className="font-serif text-lg font-normal text-[#14201D]">

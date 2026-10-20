@@ -47,6 +47,11 @@ sin resultado para no presentar una plantilla como evidencia experimental.
 | R15 | Geocerca opcional | Configuración conservada al recargar | | |
 | R16 | Telegram opcional | Mensaje efectivamente recibido | | |
 | R17 | Portable opcional | Ejecución y datos desde otra ubicación | | |
+| R18 | Geocerca operativa | Salida/reingreso confirmados sin duplicar por cada muestra | | |
+| R19 | Calidad de ubicación | Lectura imprecisa/antigua no se presenta como seguridad confirmada | | |
+| R20 | Revocación | Un QR nuevo o desvinculación invalida el token previo | | |
+| R21 | HTTPS del teléfono | Certificado confiable y posición realmente recibida con consentimiento | | |
+| R22 | Correo real | Mensaje en el buzón, distinguiendo aceptación SMTP de recepción | | |
 
 ## Detalle de Cada Prueba
 

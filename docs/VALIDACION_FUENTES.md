@@ -1,5 +1,23 @@
 # Comprobación de las Fuentes Publicadas
 
+## Ampliación de Ubicación y Correo — 20 de Octubre de 2026
+
+Las fuentes incorporan `ubicacion.py`, `correo.py`, emisor web del celular y
+arranque HTTPS. Se comprobaron tanto la copia de desarrollo como la copia para
+GitHub: build web correcto y 23 pruebas correctas de geocerca, autenticación,
+separación de residentes, caducidad, revocación, HTTP, SMTP simulado y HTTPS/WSS.
+La prueba TLS utiliza certificados temporales con confianza solo dentro del
+proceso de prueba; no instala certificados en el equipo ni demuestra confianza
+del navegador de un teléfono. El aviso de bundle grande persiste.
+
+No se verificó visualmente la nueva UI, no se recibió una posición real de un
+teléfono y no se envió correo real. Se necesitan certificado confiable, cuenta
+SMTP y ensayo consentido. La APK Kotlin y push en segundo plano siguen pendientes.
+No se reconstruyeron los portables anteriores: esta ampliación está en fuentes.
+Consultar [Geolocalización](GEOLOCALIZACION.md) y [Notificaciones](NOTIFICACIONES.md).
+
+## Referencia de la Publicación Inicial
+
 Publicación preparada el 16 de octubre de 2026. Estas pruebas corresponden a las
 fuentes, no reemplazan la validación del portable documentada por separado.
 

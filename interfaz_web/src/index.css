@@ -1,6 +1,38 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+.geo-tracking { border-block: 1px solid #e2e8f0; padding: 18px 0; margin: 0 0 20px; }
+.geo-network { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; font-size: 14px; font-weight: 600; }
+.geo-network select { max-width: 100%; padding: 9px; background: white; border: 1px solid #cbd5e1; border-radius: 6px; }
+.geo-center-map { position: absolute; top: 12px; right: 12px; z-index: 500; background: white; border: 1px solid #cbd5e1; width: 42px; height: 42px; border-radius: 6px; display: grid; place-items: center; color: #0f766e; }
+.sfa-position-static { width: 18px; height: 18px; border-radius: 50%; background: #64748b; border: 3px solid white; }
+.geo-tracking-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: #0f766e; }
+.geo-tracking-status > div { flex: 1; min-width: 180px; }
+.geo-tracking-status p { margin: 4px 0 0; color: #475569; font-size: 14px; }
+.geo-tracking-status h3 { margin: 0; font-size: 18px; font-weight: 650; color: #14201d; }
+.geo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.geo-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #99d9d0; border-radius: 6px; background: #fff; padding: 10px 14px; color: #0f766e; min-height: 44px; font: inherit; font-weight: 600; cursor: pointer; }
+.geo-actions button:hover { background: #ecfdf5; border-color: #0d9488; }
+.geo-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.geo-message { margin: 12px 0 0; font-size: 14px; color: #475569; }
+.geo-pairing { margin-top: 16px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.geo-pairing img { background: white; width: 224px; height: 224px; border: 1px solid #e2e8f0; border-radius: 6px; }
+.geo-event-list { display: grid; gap: 8px; margin-top: 16px; }
+.geo-event-list > div, .geo-deliveries li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #e2e8f0; padding: 8px 0; font-size: 14px; }
+.geo-event-list time, .geo-deliveries time { color: #64748b; font-variant-numeric: tabular-nums; }
+.geo-email-section { border-top: 1px solid #e2e8f0; margin-top: 18px; padding-top: 18px; }
+.geo-deliveries { list-style: none; padding: 0; margin: 16px 0; }
+.phone-location-page { min-height: 100dvh; background: #f8fafc; color: #14201d; padding: 24px; }
+.phone-location-page header { display: flex; gap: 12px; align-items: center; color: #0f766e; font-weight: 700; margin-bottom: 40px; }
+.phone-location-page section { max-width: 520px; margin: 0 auto; }
+.phone-location-page h1 { font-size: 28px; line-height: 1.2; font-weight: 700; }
+.phone-location-page dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 28px 0; }
+.phone-location-page dt { color: #64748b; font-size: 14px; }
+.phone-location-page dd { margin: 8px 0 0; font-size: 20px; font-weight: 600; }
+.phone-location-page button { width: 100%; min-height: 52px; display: flex; gap: 10px; justify-content: center; align-items: center; }
+.phone-location-page button:disabled { opacity: .5; }
+.phone-location-limit { font-size: 14px; color: #64748b; margin-top: 24px; line-height: 1.6; }
+
 .resident-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 9px 13px; border-radius: 6px; border: 1px solid; font-family: Geist, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .18s, border-color .18s, box-shadow .18s; }
 .link-resident { color: #0F766E; background: #FFFFFF; border-color: #A6DCD4; }
 .link-resident:hover { background: #E8F5F2; border-color: #0D9488; box-shadow: 0 2px 4px #14201D08; }

@@ -3,6 +3,9 @@
 Ubica primero las etapas en el [Mapa maestro](MAPA_MAESTRO.md). Este manual
 desarrolla la ejecución y los puntos de control de ese recorrido.
 
+Para la ampliación de ubicación/correo del 20 de octubre, completar también
+[Geolocalización](GEOLOCALIZACION.md) y [Notificaciones](NOTIFICACIONES.md).
+
 ## 1. Propósito y Alcance
 
 Este manual permite instalar las fuentes en una carpeta independiente, ejecutar
@@ -162,17 +165,22 @@ Si se añade foto, usar una ilustración propia o con permiso, no un retrato pri
    que aparece un número.
 3. Pulsar `Confirmar atención` y revisar el registro de eventos.
 
-Si se necesita activar la simulación desde terminal, con el navegador abierto:
+El botón anterior prueba la pantalla localmente. Para probar además el registro
+de una caída simulada en el backend se puede ejecutar desde terminal (con avisos
+externos deshabilitados o destinatarios advertidos):
 
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8780/api/simulate/fall
 Invoke-RestMethod 'http://127.0.0.1:8780/api/records?limit=10'
 ```
 
-**Esperado:** evento `CAIDA_CONFIRMADA` con detalle `simulacion_interfaz`; la
-confirmación registra `ALERTA_ATENDIDA`. Guardar captura del cronómetro y evidencia
-del registro. Esta prueba incluye servidor, canal de actualización y pantalla;
-no utiliza el MPU6050 y no prueba el algoritmo físico ni el buzzer del cinturón.
+**Esperado:** el botón permite observar la pantalla y su cronómetro; la
+confirmación registra `ALERTA_ATENDIDA`. El POST adicional registra
+`CAIDA_CONFIRMADA` con detalle `simulacion_interfaz`. La interfaz filtra los
+mensajes identificados como simulación y no debe confundirse esa respuesta con
+una emergencia real: son comprobaciones separadas, no una prueba física integral.
+Guardar captura y registros correspondientes. No utiliza el MPU6050 ni valida
+el algoritmo físico o el buzzer del cinturón.
 
 ### A3. Exportación de Configuración
 
@@ -280,8 +288,11 @@ deshabilitado, no esperar calles nuevas del mapa ni entrega de Telegram.
 .\.venv313\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-**Esperado para el estado actual:** dos pruebas de red correctas. No representan
-cobertura de todos los módulos. Registrar resultado y revisión del código.
+**Referencia tras la ampliación:** 23 pruebas locales correctas, incluyendo
+geocerca, autenticación, HTTP, SMTP simulado y TLS/WebSocket seguro. La prueba TLS
+necesita OpenSSL opcional y se omite si falta; las pruebas HTTP requieren la web
+compilada. No representan cobertura de todos los módulos ni pruebas físicas.
+Registrar el número realmente ejecutado, omisiones y revisión del código.
 
 Se puede declarar **reproducción de la aplicación sin hardware** cuando se
 completan instalación, build, HTTP, perfil persistido y alerta simulada. Para

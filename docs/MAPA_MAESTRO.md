@@ -4,8 +4,8 @@
 las herramientas, las piezas construidas, su integración y la entrega. Las otras
 guías amplían sus etapas; no hace falta leerlas todas antes de entenderlo.
 
-Referencia: estado de las fuentes de `8448771` y actualización documental del
-16 de octubre de 2026. Es una reconstrucción pedagógica, no una cronología exacta
+Referencia: recorrido base del 16 de octubre y ampliación de fuentes del
+20 de octubre de 2026. Es una reconstrucción pedagógica, no una cronología exacta
 de cada sesión de trabajo. Se distingue lo implementado de lo efectivamente probado.
 
 ## 1. El Proyecto Completo en un Solo Mapa
@@ -56,6 +56,12 @@ flowchart TD
         Mapa["Leaflet: mapa de referencia y geocerca"]
         Movil["Servidor LAN + QR: abrir el mismo panel en celular"]
         Avisos["Telegram opcional: mensaje por Internet"]
+        Celular["Ubicación web del celular: HTTPS y vínculo revocable"]
+        Evaluar["Geocerca individual: precisión, permanencia y antigüedad"]
+        Correo["Correo SMTP alternativo + avisos del navegador"]
+        Celular --> Evaluar
+        Evaluar --> Panel
+        Evaluar --> Correo
         Enlace --> WS
         API --> Panel
         WS --> Panel
@@ -63,6 +69,7 @@ flowchart TD
         API --> Gestion
         API --> Mapa
         Panel --> Movil
+        Movil --> Celular
         Enlace --> Avisos
     end
 
@@ -92,6 +99,7 @@ flowchart TD
     Mapa --> Pruebas
     Movil --> Pruebas
     Avisos --> Pruebas
+    Correo --> Pruebas
 ```
 
 El mapa muestra qué se construye y cómo se relaciona, no declara aprobadas todas
@@ -162,8 +170,9 @@ al servidor. GitHub no participa en este recorrido de telemetría.
 | Exportación de configuración | Implementada | Comprobada sin token/chat ni historial; no es backup completo |
 | Fotos, interfaz y formularios | Implementados | Hay capturas previas; no equivalen a revisión visual de cada versión |
 | USB/HC-06 y salidas del cinturón | Implementados en firmware/servidor | Validación física integral del montaje pendiente |
-| QR y LAN | Implementados | Pruebas locales documentadas; cámara y acceso real desde teléfono pendientes |
-| Mapa/geocerca | Implementados como referencia/configuración | No prueba GPS, seguimiento ni rutas |
+| QR y LAN | Acceso general y vínculo privado de ubicación implementados | HTTPS/WSS y autenticación probados localmente; cámara/teléfono pendientes |
+| Mapa/geocerca | Zonas individuales y motor de entrada/salida implementados | Precisión, permanencia y caducidad probadas con datos de prueba; no demuestra GPS real ni rutas |
+| Correo | SMTP cifrado, reintentos y registro implementados | SMTP simulado comprobado; entrega a un buzón real pendiente |
 | Telegram | Integración disponible | Entrega real en un celular pendiente de documentar |
 | Portable | Preparado | Pruebas locales documentadas, no garantía para toda PC |
 | GitHub | Fuentes y guías publicadas | Release 1.0.0 público; 1.1.0 sigue en borrador a fecha de esta revisión |
@@ -181,7 +190,7 @@ flowchart TD
     Actual -.-> Validar["Pendiente de verificación: banco, teléfono y otra PC"]
     Actual -.-> Tesis["Pendiente documental/experimental: esquema eléctrico final y estudio del detector"]
     Actual -.-> Futuro["Posibles expansiones; no implementadas"]
-    Futuro --> GPS["Fuente real de GPS y nivel de batería"]
+    Futuro --> GPS["GPS y batería autónomos del cinturón"]
     Futuro --> App["App Android Kotlin y vinculación de dispositivos"]
     Futuro --> Nube["Nube y autenticación, por ejemplo Supabase o Firebase"]
     Futuro --> Rutas["Rutas, tiempo de llegada y seguimiento autorizado"]
@@ -189,7 +198,9 @@ flowchart TD
 ```
 
 La interfaz contempla batería y GPS, pero el UNO/MPU6050 no los proporciona por
-sí solo. No confundir campos preparados con adquisición real implementada.
+sí solo. Ahora existe un emisor web del celular, pendiente de prueba real y sin
+garantía en segundo plano. [Activación y límites](GEOLOCALIZACION.md).
+No confundir ese canal con GPS incorporado al wearable.
 Los pendientes de prueba no son lo mismo que las funciones futuras.
 
 ## 6. Cómo Usar Este Mapa Para Reconstruir o Explicar

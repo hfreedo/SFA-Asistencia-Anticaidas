@@ -16,6 +16,8 @@ interfaz_web/static/
 *.db-*
 .env
 .env.*
+!.env.example
+certs/
 data/
 copias_privadas/
 Ideas/

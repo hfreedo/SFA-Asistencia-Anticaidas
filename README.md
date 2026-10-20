@@ -2,6 +2,20 @@
 
 Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel local para cuidadores y familiares.
 
+## Ampliación de Fuentes: Ubicación y Correo
+
+Las fuentes del 20 de octubre de 2026 incorporan vínculo de celular por QR,
+recepción HTTPS de posiciones, geocercas por residente y correo SMTP alternativo
+a Telegram. **Esta ampliación no está incluida en los portables anteriores.**
+
+- [Activar geolocalización y geocerca](docs/GEOLOCALIZACION.md).
+- [Configurar correo y otros avisos](docs/NOTIFICACIONES.md).
+
+La vista web de envío requiere permanecer abierta; todavía no es una app Kotlin
+con seguimiento en segundo plano. Hace falta configurar HTTPS de confianza y,
+para correos reales, una cuenta SMTP. El panel general sigue siendo solo para LAN
+de confianza, no para exposición pública en Internet.
+
 ## De Cero al Estado Actual
 
 **[Ver el mapa maestro completo](docs/MAPA_MAESTRO.md)**: conecta todas las etapas,
@@ -53,13 +67,15 @@ No requiere instalar Python, Node.js ni dependencias del frontend. Incluye fuent
 - Monitoreo inercial por USB o Bluetooth serial, con estados de señal reciente y desconexión.
 - Protocolo visual de caída, cronómetro y confirmación de atención.
 - Perfiles con fotos, selección y edición sincronizada; feedback mediante toasts.
-- Mapa de referencia y geocerca. No inventa posición si falta GPS.
+- Mapa y geocerca por residente, con estados de precisión, permanencia y antigüedad de la ubicación del celular.
 - Preferencias de alertas y configuración de Telegram.
-- Acceso móvil por Wi-Fi/hotspot con QR generado localmente.
+- Acceso móvil por Wi-Fi/hotspot y QR privado para vincular el emisor de ubicación.
 - Exportación e importación de perfiles, fotos y preferencias.
 - Interfaz adaptable a escritorio y celular.
 
-Batería y GPS sólo aparecen cuando el dispositivo los informa; Arduino UNO/MPU6050 no los aporta por sí solo. El acceso web móvil no equivale a una APK ni a una cuenta vinculada.
+La batería del cinturón sigue sin medición. La posición llega por un canal del
+celular separado de la telemetría del UNO/MPU6050. El QR de acceso general y el QR
+privado de ubicación tienen funciones distintas; no hay aún cuentas de cuidadores.
 
 ## Capturas
 

@@ -19,6 +19,10 @@ El repositorio contiene:
 - `docs/GUIA_ALUMNOS.md`: bloques del sistema, categorías y actividades de aprendizaje.
 - `docs/MANUAL_REPRODUCCION.md`: instalación, controles por etapa y diagnóstico.
 - `docs/REGISTRO_REPRODUCCION.md`: plantilla de pruebas y evidencias, sin resultados inventados.
+- `docs/GEOLOCALIZACION.md`: HTTPS, vínculo del celular, reglas de geocerca y API para Kotlin.
+- `docs/NOTIFICACIONES.md`: correo SMTP y límites de los canales alternativos.
+- `.env.example`: variables vacías de ejemplo, nunca credenciales reales.
+- `iniciar_geolocalizacion.bat`: inicio HTTPS desde fuentes con certificados propios.
 - `docs/DESARROLLO.md`: instalación, ejecución, pruebas y construcción.
 - `docs/HARDWARE_Y_PROTOCOLO.md`: cableado y comunicación del cinturón.
 - `docs/VALIDACION_FUENTES.md`: comprobaciones de la publicación de fuentes.

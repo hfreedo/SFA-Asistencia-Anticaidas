@@ -11,21 +11,26 @@ import sys
 import threading
 import time
 import urllib.request
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from html import escape
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import serial
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from serial.tools import list_ports
 from servidor_pc.red_local import local_addresses
+from servidor_pc.ubicacion import FenceInput, LocationService, PositionInput
+from servidor_pc.correo import EmailChannel
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv((Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else BASE_DIR) / ".env")
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR))
 STATIC_DIR = RESOURCE_DIR / "interfaz_web" / "static"
 
@@ -78,6 +83,7 @@ class ResidentPhotoRequest(BaseModel):
 class BackupResident(ResidentCreateRequest):
     is_active: bool = False
     photo_base64: str | None = Field(default=None, max_length=2_000_000)
+    geofence: FenceInput | None = None
 
 
 def public_resident(row: sqlite3.Row) -> dict[str, Any]:
@@ -90,9 +96,9 @@ def public_resident(row: sqlite3.Row) -> dict[str, Any]:
 
 
 class GeofenceConfigRequest(BaseModel):
-    home_lat: float
-    home_lng: float
-    radius_m: int = 200
+    home_lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    home_lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    radius_m: int = Field(default=200, ge=25, le=100000)
     address_name: str = "Hogar / Residencia Central"
 
 
@@ -104,6 +110,7 @@ class NotificationConfigRequest(BaseModel):
     notify_sos: bool = True
     notify_battery: bool = True
     notify_first_motion: bool = True
+    notify_geofence: bool = True
 
 
 class ConfigurationBackup(BaseModel):
@@ -223,6 +230,8 @@ class SerialBridge:
 
 
 bridge = SerialBridge()
+location_service = LocationService(lambda: DB_PATH)
+email_channel = EmailChannel(lambda: DB_PATH)
 
 
 def utc_now() -> str:
@@ -256,15 +265,19 @@ def send_telegram_notification(text: str) -> bool:
 
 
 def check_and_notify_event(payload: dict[str, Any]) -> None:
-    event_type = payload.get("event_type") or payload.get("state")
-    if not event_type:
+    event_type = payload.get("event_type")
+    # A sustained telemetry state is not a new incident on every sample.
+    if payload.get("type") != "event" or not event_type:
         return
 
     def _worker():
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 conn.row_factory = sqlite3.Row
-                prof = conn.execute("SELECT * FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+                resident_id = payload.get("resident_id")
+                prof = conn.execute("SELECT * FROM residents WHERE id=?", (resident_id,)).fetchone() if resident_id else conn.execute("SELECT * FROM residents WHERE is_active = 1 LIMIT 1").fetchone()
+                if resident_id and not prof:
+                    return
                 if not prof:
                     prof = conn.execute("SELECT * FROM residents ORDER BY id ASC LIMIT 1").fetchone()
                 cfg = conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone()
@@ -272,12 +285,13 @@ def check_and_notify_event(payload: dict[str, Any]) -> None:
             name = prof["full_name"] if prof else "Residente"
             room = prof["room"] if prof else "Habitación"
 
-            if event_type == "CAIDA_CONFIRMADA" and cfg and cfg["notify_fall"]:
-                msg = f"🚨 <b>ALERTA DE CAÍDA CONFIRMADA</b>\n\n👤 <b>Residente:</b> {name}\n📍 <b>Ubicación:</b> {room}\n⏱ <b>Hora:</b> {datetime.now().strftime('%H:%M:%S')}\n\n<i>Se requiere atención inmediata en el centro de monitoreo.</i>"
-                send_telegram_notification(msg)
-            elif "SOS" in str(event_type).upper() and cfg and cfg["notify_sos"]:
-                msg = f"🆘 <b>LLAMADA DE SOS / PÁNICO</b>\n\n👤 <b>Residente:</b> {name}\n📍 <b>Ubicación:</b> {room}\n⏱ <b>Hora:</b> {datetime.now().strftime('%H:%M:%S')}\n\n<i>El residente ha solicitado auxilio manual.</i>"
-                send_telegram_notification(msg)
+            enabled = cfg and ((event_type == "CAIDA_CONFIRMADA" and cfg["notify_fall"])
+                       or ("SOS" in str(event_type).upper() and cfg["notify_sos"])
+                       or (event_type in {"GEOCERCA_SALIDA", "GEOCERCA_REINGRESO", "UBICACION_PERDIDA"} and cfg["notify_geofence"]))
+            if enabled:
+                msg = f"SFA Asistencia\n{event_type}\nResidente: {name}\nReferencia: {room}\n{payload.get('detail', '')}\nHora UTC: {payload.get('received_at', utc_now())}"
+                threading.Thread(target=email_channel.send, args=(event_type, msg, prof["id"] if prof else None), daemon=True).start()
+                send_telegram_notification(escape(msg))
         except Exception as e:
             print(f"[Event Notify Worker Error]: {e}")
 
@@ -358,6 +372,10 @@ def init_db() -> None:
                 "INSERT INTO notification_config (id, sound_enabled, telegram_token, telegram_chat_id, notify_fall, notify_sos, notify_battery, notify_first_motion, updated_at) VALUES (1, 1, '', '', 1, 1, 1, 1, ?)",
                 (now,),
             )
+        if "notify_geofence" not in {r[1] for r in conn.execute("PRAGMA table_info(notification_config)")}:
+            conn.execute("ALTER TABLE notification_config ADD COLUMN notify_geofence INTEGER NOT NULL DEFAULT 1")
+    location_service.init_db()
+    email_channel.init_db()
 
 
 def save_record(payload: dict[str, Any]) -> None:
@@ -461,8 +479,24 @@ def serial_error_message(exc: Exception, port: str) -> str:
 async def lifespan(app: FastAPI):
     init_db()
     bridge.set_loop(asyncio.get_running_loop())
-    yield
-    bridge.disconnect()
+    async def watchdog():
+        while True:
+            await asyncio.sleep(5)
+            try:
+                for payload in await asyncio.to_thread(location_service.mark_stale):
+                    save_record(payload)
+                    await bridge.broadcast(payload)
+            except sqlite3.OperationalError:
+                # A temporary database lock must not permanently disable supervision.
+                continue
+    task = asyncio.create_task(watchdog())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        bridge.disconnect()
 
 
 app = FastAPI(title="SFA Alerta Anticaídas", lifespan=lifespan)
@@ -477,6 +511,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
+@app.get("/compartir-ubicacion")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
@@ -727,6 +762,7 @@ def activate_resident(res_id: int) -> dict[str, Any]:
 @app.delete("/api/residents/{res_id}")
 def delete_resident(res_id: int) -> dict[str, Any]:
     with sqlite3.connect(DB_PATH) as conn:
+        location_service.purge_resident(conn, res_id)
         conn.execute("DELETE FROM residents WHERE id = ?", (res_id,))
         active = conn.execute("SELECT id FROM residents WHERE is_active = 1").fetchone()
         if not active:
@@ -811,6 +847,7 @@ def get_notifications() -> dict[str, Any]:
         data["notify_sos"] = bool(data.get("notify_sos", 1))
         data["notify_battery"] = bool(data.get("notify_battery", 1))
         data["notify_first_motion"] = bool(data.get("notify_first_motion", 1))
+        data["notify_geofence"] = bool(data.get("notify_geofence", 1))
         return data
 
 
@@ -822,7 +859,7 @@ def update_notifications(req: NotificationConfigRequest) -> dict[str, Any]:
             """
             UPDATE notification_config
             SET sound_enabled = ?, telegram_token = ?, telegram_chat_id = ?,
-                notify_fall = ?, notify_sos = ?, notify_battery = ?, notify_first_motion = ?, updated_at = ?
+                notify_fall = ?, notify_sos = ?, notify_battery = ?, notify_first_motion = ?, notify_geofence = ?, updated_at = ?
             WHERE id = 1
             """,
             (
@@ -833,6 +870,7 @@ def update_notifications(req: NotificationConfigRequest) -> dict[str, Any]:
                 int(req.notify_sos),
                 int(req.notify_battery),
                 int(req.notify_first_motion),
+                int(req.notify_geofence),
                 now,
             ),
         )
@@ -864,7 +902,7 @@ def network_info(request: Request) -> dict[str, Any]:
     return {
         "local_ip": ip,
         "port": port,
-        "url": f"http://{ip}:{port}",
+        "url": f"{request.url.scheme}://{ip}:{port}",
         "lan_available": available,
         "addresses": addresses,
     }
@@ -878,7 +916,8 @@ def export_configuration() -> Response:
         for row in conn.execute("SELECT * FROM residents ORDER BY id"):
             residents.append({
                 key: row[key] for key in ("full_name", "room", "phone", "emergency_phone", "medical_notes", "is_active")
-            } | {"photo_base64": base64.b64encode(row["photo"]).decode("ascii") if row["photo"] else None})
+            } | {"photo_base64": base64.b64encode(row["photo"]).decode("ascii") if row["photo"] else None,
+                 "geofence": location_service.fence(conn, row["id"])})
         geofence = dict(conn.execute("SELECT * FROM geofence_config WHERE id = 1").fetchone())
         notifications = dict(conn.execute("SELECT * FROM notification_config WHERE id = 1").fetchone())
     notifications["telegram_token"] = ""
@@ -904,22 +943,102 @@ def import_configuration(backup: ConfigurationBackup) -> dict[str, Any]:
         photos.append(photo)
     now = utc_now()
     with sqlite3.connect(DB_PATH) as conn:
+        location_service.purge_resident(conn)
         conn.execute("DELETE FROM residents")
         active_assigned = False
         for resident, photo in zip(backup.residents, photos):
             active = bool(resident.is_active and not active_assigned)
             active_assigned |= active
-            conn.execute("INSERT INTO residents (full_name, room, phone, emergency_phone, medical_notes, is_active, updated_at, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            cursor = conn.execute("INSERT INTO residents (full_name, room, phone, emergency_phone, medical_notes, is_active, updated_at, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                          (resident.full_name.strip(), resident.room.strip(), resident.phone.strip(), resident.emergency_phone.strip(), resident.medical_notes.strip(), int(active), now, photo))
+            if resident.geofence:
+                fence = resident.geofence
+                conn.execute("INSERT INTO resident_geofences VALUES (?,?,?,?,?)", (cursor.lastrowid, fence.home_lat, fence.home_lng, fence.radius_m, fence.address_name))
         if not active_assigned:
             conn.execute("UPDATE residents SET is_active = 1 WHERE id = (SELECT MIN(id) FROM residents)")
         geo = backup.geofence
         conn.execute("UPDATE geofence_config SET home_lat=?, home_lng=?, radius_m=?, address_name=?, updated_at=? WHERE id=1",
                      (geo.home_lat, geo.home_lng, geo.radius_m, geo.address_name, now))
         prefs = backup.notifications
-        conn.execute("UPDATE notification_config SET sound_enabled=?, notify_fall=?, notify_sos=?, notify_battery=?, notify_first_motion=?, updated_at=? WHERE id=1",
-                     (prefs.sound_enabled, prefs.notify_fall, prefs.notify_sos, prefs.notify_battery, prefs.notify_first_motion, now))
+        conn.execute("UPDATE notification_config SET sound_enabled=?, notify_fall=?, notify_sos=?, notify_battery=?, notify_first_motion=?, notify_geofence=?, updated_at=? WHERE id=1",
+                     (prefs.sound_enabled, prefs.notify_fall, prefs.notify_sos, prefs.notify_battery, prefs.notify_first_motion, prefs.notify_geofence, now))
     return {"status": "ok", "residents_restored": len(backup.residents)}
+
+
+def require_local_operator(request: Request) -> None:
+    own_addresses = {"127.0.0.1", "::1", *local_addresses()}
+    if not request.client or request.client.host not in own_addresses:
+        raise HTTPException(403, "Esta operación se realiza desde la PC del servidor")
+    origin = request.headers.get("origin")
+    allowed = {f"{request.url.scheme}://{request.url.netloc}"}
+    if request.client.host in {"127.0.0.1", "::1"}:
+        allowed.update({"http://127.0.0.1:5173", "http://localhost:5173"})
+    if origin and origin not in allowed:
+        raise HTTPException(403, "Origen no autorizado")
+
+
+@app.middleware("http")
+async def private_responses(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/") or request.url.path == "/compartir-ubicacion":
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.post("/api/residents/{resident_id}/location-device")
+def pair_location_device(resident_id: int, request: Request):
+    require_local_operator(request)
+    return location_service.pair(resident_id)
+
+
+@app.delete("/api/residents/{resident_id}/location-device")
+def revoke_location_device(resident_id: int, request: Request):
+    require_local_operator(request)
+    location_service.revoke(resident_id)
+    return {"status": "revoked"}
+
+
+@app.get("/api/residents/{resident_id}/location")
+def resident_location(resident_id: int):
+    return location_service.snapshot(resident_id)
+
+
+@app.get("/api/residents/{resident_id}/geofence")
+def resident_geofence(resident_id: int):
+    return location_service.get_fence(resident_id)
+
+
+@app.put("/api/residents/{resident_id}/geofence")
+def save_resident_geofence(resident_id: int, fence: FenceInput, request: Request):
+    require_local_operator(request)
+    return location_service.set_fence(resident_id, fence)
+
+
+@app.post("/api/location")
+async def receive_location(sample: PositionInput, request: Request, authorization: str = Header(default="")):
+    if request.url.scheme != "https" and (not request.client or request.client.host not in {"127.0.0.1", "::1"}):
+        raise HTTPException(403, "Compartir ubicación requiere HTTPS")
+    if not authorization.startswith("Bearer ") or len(authorization) > 200:
+        raise HTTPException(401, "Se requiere el vínculo del dispositivo")
+    snapshot, events = await asyncio.to_thread(location_service.ingest, authorization[7:], sample)
+    for payload in events:
+        save_record(payload)
+        await bridge.broadcast(payload)
+    await bridge.broadcast({"type": "location", **snapshot})
+    return snapshot
+
+
+@app.get("/api/notifications/email")
+def email_status(request: Request):
+    require_local_operator(request)
+    return email_channel.status()
+
+
+@app.post("/api/notifications/test-email")
+async def test_email(request: Request):
+    require_local_operator(request)
+    return await asyncio.to_thread(email_channel.send, "PRUEBA", "Prueba de correo de SFA Asistencia. Confirmar recepción en el buzón; la aceptación SMTP no garantiza la entrega.")
 
 
 @app.websocket("/ws")

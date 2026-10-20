@@ -4,6 +4,11 @@ Para ver primero cómo encaja todo, empieza por el
 [Mapa maestro de cero al estado actual](MAPA_MAESTRO.md). Esta guía amplía sus
 grupos de herramientas y responsabilidades.
 
+Ampliación del 20 de octubre: el backend incorpora GeographicLib para distancia
+WGS84 y SMTP de Python para correo; la interfaz incorpora un emisor de ubicación
+web. [Geolocalización](GEOLOCALIZACION.md) explica HTTPS y el contrato preparado
+para Kotlin; [Notificaciones](NOTIFICACIONES.md) distingue correo de push.
+
 ## Qué Construimos
 
 Una aplicación web local conectada a un cinturón Arduino. La computadora recibe

@@ -3,6 +3,10 @@
 El [Mapa maestro](MAPA_MAESTRO.md) muestra el proyecto completo desde cero.
 Esta guía simplifica sus bloques y propone actividades para estudiarlos.
 
+La ampliación de [ubicación del celular](GEOLOCALIZACION.md) añade otra fuente de
+datos al bloque servidor, sin convertir el MPU6050 en GPS. El [correo](NOTIFICACIONES.md)
+es otro canal de salida, no una nueva interfaz ni una app nativa.
+
 ## Primero: Qué Estamos Construyendo
 
 Un cinturón produce lecturas de movimiento. Una computadora recibe esas lecturas
