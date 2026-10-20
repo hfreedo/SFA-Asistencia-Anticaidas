@@ -9,6 +9,7 @@ recepción HTTPS de posiciones, geocercas por residente y correo SMTP alternativ
 a Telegram. **Esta ampliación no está incluida en los portables anteriores.**
 
 - [Activar geolocalización y geocerca](docs/GEOLOCALIZACION.md).
+- [Preparación HTTPS asistida para PC y Android](docs/HTTPS_ANDROID.md).
 - [Configurar correo y otros avisos](docs/NOTIFICACIONES.md).
 
 La vista web de envío requiere permanecer abierta; todavía no es una app Kotlin

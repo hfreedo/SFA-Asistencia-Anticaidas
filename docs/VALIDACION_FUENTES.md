@@ -2,6 +2,14 @@
 
 ## Ampliación de Ubicación y Correo — 20 de Octubre de 2026
 
+Corrección de preparación TLS: el BAT comprueba/genera certificados usando
+OpenSSL local antes de iniciar. Se ejecutaron 28 pruebas correctas, incluidas
+cinco de preparación: reutilización de CA/certificado, cambio de IP, preservación
+de archivos personalizados, rechazo de CA incompleta y cancelación sin instalar
+confianza. Se generaron archivos locales y se verificó HTTPS con confianza
+aislada del cliente; no se agregó la CA al almacén de Windows ni se configuró un
+Android real. Los certificados y las claves no se publican. Ver [HTTPS Android](HTTPS_ANDROID.md).
+
 Las fuentes incorporan `ubicacion.py`, `correo.py`, emisor web del celular y
 arranque HTTPS. Se comprobaron tanto la copia de desarrollo como la copia para
 GitHub: build web correcto y 23 pruebas correctas de geocerca, autenticación,

@@ -23,6 +23,9 @@ El repositorio contiene:
 - `docs/NOTIFICACIONES.md`: correo SMTP y límites de los canales alternativos.
 - `.env.example`: variables vacías de ejemplo, nunca credenciales reales.
 - `iniciar_geolocalizacion.bat`: inicio HTTPS desde fuentes con certificados propios.
+- `servidor_pc/preparar_https.py`: generación y comprobación local de certificados, sin confianza automática.
+- `confiar_https_pc.bat`: aceptación explícita de la CA en la cuenta Windows.
+- `docs/HTTPS_ANDROID.md`: pasos para preparar HTTPS y transferir solo la CA pública al teléfono.
 - `docs/DESARROLLO.md`: instalación, ejecución, pruebas y construcción.
 - `docs/HARDWARE_Y_PROTOCOLO.md`: cableado y comunicación del cinturón.
 - `docs/VALIDACION_FUENTES.md`: comprobaciones de la publicación de fuentes.

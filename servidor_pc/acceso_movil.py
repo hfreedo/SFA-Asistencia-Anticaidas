@@ -20,8 +20,8 @@ def main() -> None:
         cert = os.getenv("SFA_TLS_CERT", "certs/sfa.pem")
         key = os.getenv("SFA_TLS_KEY", "certs/sfa-key.pem")
         if not Path(cert).is_file() or not Path(key).is_file():
-            print("Faltan certificados TLS. Consulta docs/GEOLOCALIZACION.md antes de iniciar.")
-            return
+            print("Faltan certificados TLS. Ejecuta iniciar_geolocalizacion.bat para prepararlos.")
+            raise SystemExit(1)
         tls = {"ssl_certfile": cert, "ssl_keyfile": key}
     scheme = "https" if args.https else "http"
     host = get_local_ip()

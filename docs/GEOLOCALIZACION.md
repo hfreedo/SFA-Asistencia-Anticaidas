@@ -49,6 +49,12 @@ residente, no un historial ilimitado de recorridos.
 
 ## 2. Preparar HTTPS de Confianza
 
+**Ruta recomendada para Windows/Android:** ejecutar `iniciar_geolocalizacion.bat`.
+Ahora incluye un asistente que usa OpenSSL local para generar los archivos.
+Seguir [HTTPS en PC y Android](HTTPS_ANDROID.md) para aceptar expresamente la CA.
+Preparar archivos y confiar en ellos son pasos distintos. Lo siguiente conserva
+la alternativa manual con mkcert; no mezclar dos CA diferentes por accidente.
+
 La ubicación web requiere un contexto seguro y permiso del usuario. Abrir el panel
 con `http://192.168...` no satisface este requisito. No desactivar la seguridad del
 navegador ni ignorar avisos de certificados como solución.

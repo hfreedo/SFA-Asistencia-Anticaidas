@@ -7,12 +7,16 @@ if not exist "%SFA_PYTHON%" (
   py -3.13 -m venv "%~dp0.venv313"
   if errorlevel 1 goto error
 )
-"%SFA_PYTHON%" -m pip install --disable-pip-version-check -r "%~dp0servidor_pc\requirements.txt"
+echo Verificando dependencias locales...
+"%SFA_PYTHON%" -m pip install --quiet --disable-pip-version-check -r "%~dp0servidor_pc\requirements.txt"
+if errorlevel 1 goto error
+"%SFA_PYTHON%" -m servidor_pc.preparar_https
 if errorlevel 1 goto error
 "%SFA_PYTHON%" -m servidor_pc.acceso_movil --https
+set "RESULT=%errorlevel%"
 pause
-exit /b
+exit /b %RESULT%
 :error
-echo No se pudo preparar el entorno local de Python.
+echo No se pudo completar la preparacion. Revisa el mensaje anterior.
 pause
 exit /b 1
