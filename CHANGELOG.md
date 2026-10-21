@@ -1,5 +1,17 @@
 # Changelog
 
+## Android 0.4.1-prototipo (5) - Diagnostico de vinculacion
+
+- Reemplazado el mensaje ambiguo de permisos/certificado/sesion/conexion por
+  categorias de timeout, DNS, TLS, red, permiso Android y estado HTTP.
+- Error persistente y legible hasta el siguiente intento. Nunca muestra cuerpos
+  del servidor, tokens ni detalles internos de excepciones.
+- Conexion limitada a 15 s y lectura a 30 s, en lugar de 10 s; sin reintentos
+  automaticos de escrituras y sin desactivar validacion TLS o permisos.
+- 15 pruebas unitarias Android, ensamblado y lint aprobados. Firma de prueba
+  conservada. No se afirma solucion fisica hasta probar el caso del celular.
+- Actualizacion Android independiente: Windows y portal permanecen en rc5.
+
 ## 1.2.0-rc5 - Mapa sin solicitud de clave (pre-release)
 
 - El fondo del mapa remoto cambia de CARTO a OpenStreetMap estandar: se elimina

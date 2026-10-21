@@ -1,5 +1,13 @@
 # Versiones
 
+## Android 0.4.1-prototipo (5)
+
+Actualizacion independiente de Windows rc5. Diagnostico persistente de errores
+de red/sesion/permisos, espera ampliada y firma conservada. No incluye nuevos
+permisos ni costos. 15 pruebas unitarias, APK y lint aprobados; caso fisico pendiente.
+
+[APK y SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.4.1-android-prototipo)
+
 ## v1.2.0-rc5 - Mapa remoto sin clave CARTO
 
 Mapa OpenStreetMap estandar sin registro adicional ni facturacion. Corregida

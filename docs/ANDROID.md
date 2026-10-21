@@ -93,3 +93,24 @@ globales. El ajuste temporal de sockets Java se limita al proceso de build.
 
 La compilacion y el lint no prueban GPS, bateria, pantalla bloqueada ni HC-06.
 Completar REGISTRO_REPRODUCCION.md con el modelo de telefono y resultados reales.
+# Correccion Android 0.4.1-prototipo
+
+Actualizacion independiente de Windows rc5. Mantiene applicationId y firma de
+prueba; se instala encima de 0.4.0. No hace falta borrar datos ni renovar el QR.
+Version interna: 5. La cuenta vuelve a iniciar sesion si el proceso se reinicia.
+
+Si falla Compartir > Por internet > seleccionar residente, el paso es una
+solicitud autenticada a Supabase, anterior al permiso GPS. La app distingue:
+
+- RED-TIEMPO: espera agotada; probar otra red/datos moviles y repetir.
+- RED-DNS / RED-CONEXION: resolucion de servidor o transporte.
+- RED-TLS: fecha/hora o conexion segura; nunca desactivar verificacion.
+- HTTP-401: iniciar sesion de nuevo en Cuidar.
+- HTTP-403: permisos de la cuenta o vinculo revocado; no es permiso GPS Android.
+- HTTP-404: funcion no disponible para esa sesion; revisar despliegue/permisos.
+- ANDROID-PERMISO: permiso del sistema operativo realmente bloqueado.
+
+Los errores quedan visibles hasta el siguiente intento; no incluyen secretos.
+Timeout de conexion 15 s, lectura 30 s, sin repetir escrituras automaticamente.
+15 pruebas unitarias, lint y APK aprobados; falta verificar el fallo concreto
+en el celular. Las demas limitaciones del prototipo siguen vigentes.

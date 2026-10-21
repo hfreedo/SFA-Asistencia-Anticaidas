@@ -38,6 +38,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
         var importCa by remember { mutableStateOf(false) }
         var tab by remember { mutableIntStateOf(0) }
         var message by remember { mutableStateOf("") }
+        var operationError by remember { mutableStateOf("") }
         var busy by remember { mutableStateOf(false) }
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
@@ -84,18 +86,12 @@ class MainActivity : ComponentActivity() {
         fun work(block: suspend () -> Unit) {
             if (busy) return
             busy = true
-            scope.launch { message = ""; try {
+            scope.launch { message = ""; operationError = ""; try {
                 if (jwt != null) jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
                 block()
-            } catch (error: ApiFailure) {
-                message = when (error.status) {
-                    401 -> "Sesión vencida. Vuelve a iniciar sesión."
-                    403 -> "La cuenta no tiene permiso para esta operación o se revocó el vínculo."
-                    404 -> "Esta función aún no está habilitada en el servidor Supabase."
-                    400 -> "Solicitud no aceptada. En pruebas remotas, espera un minuto antes de repetir."
-                    else -> "No se pudo completar la operación (${error.status})."
-                }
-            } catch (_: Exception) { message = "No se pudo completar la operación. Revisa permisos, certificado, sesión y conexión." } finally { pushActive = push.enabled; busy = false } }
+            } catch (error: CancellationException) { throw error
+            } catch (error: Exception) { operationError = operationErrorMessage(error)
+            } finally { pushActive = push.enabled; busy = false } }
         }
         val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
             if (allowed && jwt != null) work { push.update(jwt!!, true); pushActive = push.enabled; message = "Celular registrado para alertas remotas" }
@@ -164,6 +160,14 @@ class MainActivity : ComponentActivity() {
             }) { padding ->
             Box(Modifier.padding(padding).fillMaxSize().imePadding(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (operationError.isNotBlank()) {
+                    Surface(color = Color(0xFFFFF7ED), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFFED7AA))) {
+                        Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Outlined.Info, contentDescription = null, tint = Color(0xFF9A3412))
+                            Text(operationError, Modifier.weight(1f), color = Color(0xFF9A3412), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
                 if (tab == 0) {
                     SfaHeading("Comparte tu ubicación", "El cinturón es opcional para el seguimiento GPS.")
                     SfaSection("Conexión", Icons.Outlined.Wifi)

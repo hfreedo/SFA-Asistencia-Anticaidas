@@ -4,6 +4,16 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
+### APK corregida 0.4.1-prototipo (5)
+
+[Descargar APK actualizada](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.4.1-android-prototipo/SFA-Asistencia-Android-0.4.1-prototipo.apk)
+| [Notas Android](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.4.1-android-prototipo)
+
+Mejor diagnostico al vincular GPS: distingue conexion lenta, DNS, TLS, sesion
+y permisos; no atribuye todos los errores a Android. Espera de red ampliada,
+15 pruebas unitarias y lint aprobados. Misma firma de prueba: actualizar sin
+desinstalar. Windows/portal siguen en rc5. Caso fisico del celular por confirmar.
+
 ### Correccion actual 1.2.0-rc5: GPS remoto y mapa sin clave CARTO
 
 [Descargar Windows actualizado](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc5/SFA-Asistencia-1.2.0-rc5-Windows.zip)

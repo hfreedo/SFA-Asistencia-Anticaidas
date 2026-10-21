@@ -1,5 +1,10 @@
 # Empieza aqui
 
+Android dispone de una correccion independiente **0.4.1-prototipo (5)** para
+diagnosticar errores de conexion y tolerar respuestas lentas. Actualiza la APK
+sin desinstalar. Windows sigue en rc5; los paquetes rc3/rc4/rc5 conservan su APK
+original 0.4.0 y no fueron reemplazados retroactivamente.
+
 ## Usar el proyecto en esta PC
 
 Abre **SFA Asistencia.lnk**, el acceso directo con el logo del proyecto.

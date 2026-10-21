@@ -43,7 +43,7 @@ class NativeApi(private val context: Context) {
         require(address.protocol == "https" && address.userInfo == null)
         if (!local) require(address.host == "lxymfaoraayccmxwiubw.supabase.co")
         val connection = address.openConnection() as HttpsURLConnection
-        connection.connectTimeout = 10000; connection.readTimeout = 10000
+        connection.connectTimeout = 15000; connection.readTimeout = 30000
         connection.instanceFollowRedirects = false
         if (local && ca.exists()) {
             val store = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null) }
