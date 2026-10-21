@@ -12,8 +12,11 @@ export function RemoteLocation({ position, clock }: { position: RemotePosition |
     if (!element.current || !position || !Number.isFinite(position.latitude) || !Number.isFinite(position.longitude)) return;
     const center: L.LatLngExpression = [position.latitude, position.longitude];
     const map = L.map(element.current, { scrollWheelZoom: false }).setView(center, 17);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 20,
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      // Identify the site to the tile service without exposing the access URL or its parameters.
+      referrerPolicy: "origin",
     }).addTo(map);
     L.circleMarker(center, { radius: 8, color: fresh ? "#0d9488" : "#64748b", fillOpacity: 1 }).addTo(map);
     L.circle(center, { radius: position.accuracy_m, color: "#0d9488", fillOpacity: .08, weight: 1 }).addTo(map);

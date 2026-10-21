@@ -1,5 +1,21 @@
 # Evidencia de la ampliacion
 
+## rc5: fondo de mapa sin clave
+
+80 pruebas Python y 33 web aprobadas, incluida la URL OpenStreetMap, atribucion,
+referrerPolicy origin para las imagenes y permiso CSP especifico en el portal.
+Compilados panel, portal y EXE. El proveedor CARTO confirma que su marca
+"API key required" corresponde a la nueva exigencia de clave de sus mapas:
+https://www.carto.com/basemaps/apikey/index.html
+Se usa OpenStreetMap estandar sin registro ni facturacion, con cache normal,
+atribucion y sin precarga/offline, respetando:
+https://operations.osmfoundation.org/policies/tiles/
+
+Antes del reinicio rc5 el panel real mostro una muestra cloud con fecha,
+precision y antiguedad. Eso confirma consulta de datos, no precision fisica
+ni seguimiento continuo. Tras reiniciar, falta reanudar sesion y comprobar
+visualmente el mapa real sin marca desde la cuenta del usuario.
+
 ## rc4: lectura cloud desde el panel local
 
 80 pruebas Python y 33 web aprobadas. Nuevo endpoint solo loopback, protegido

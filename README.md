@@ -4,10 +4,10 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### Correccion actual 1.2.0-rc4: GPS remoto en el panel local
+### Correccion actual 1.2.0-rc5: GPS remoto y mapa sin clave CARTO
 
-[Descargar Windows actualizado](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc4/SFA-Asistencia-1.2.0-rc4-Windows.zip)
-| [Release rc4](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc4)
+[Descargar Windows actualizado](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc5/SFA-Asistencia-1.2.0-rc5-Windows.zip)
+| [Release rc5](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc5)
 
 En **Ubicacion > Por internet**, el panel local consulta el GPS que la APK ya
 envia a Supabase. Abrir Acceso y vinculo de esta PC, iniciar sesion y reanudar

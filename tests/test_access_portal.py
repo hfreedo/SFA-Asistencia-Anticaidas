@@ -24,6 +24,7 @@ class AccessPortalTests(unittest.TestCase):
             html = response.read().decode()
         self.assertIn('Acceso | SFA Asistencia', html)
         self.assertIn('no-referrer', html)
+        self.assertIn("img-src 'self' data: https://tile.openstreetmap.org;", html)
         self.assertNotIn('sb_secret_', html)
         for resource in re.findall(r'(?:src|href)="\./([^"]+)"', html):
             with urllib.request.urlopen(base + resource) as response:

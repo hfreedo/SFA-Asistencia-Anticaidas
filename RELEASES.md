@@ -1,5 +1,12 @@
 # Versiones
 
+## v1.2.0-rc5 - Mapa remoto sin clave CARTO
+
+Mapa OpenStreetMap estandar sin registro adicional ni facturacion. Corregida
+la politica de imagenes del portal. APK identica a rc3/rc4; no reinstalar.
+
+[Release y descargas](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc5)
+
 ## v1.2.0-rc4 - GPS remoto en el panel local
 
 Windows integra Ubicacion > Por internet con Supabase, permisos RLS, vinculo

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0-rc5 - Mapa sin solicitud de clave (pre-release)
+
+- El fondo del mapa remoto cambia de CARTO a OpenStreetMap estandar: se elimina
+  la dependencia de una clave CARTO y su marca "API key required".
+- La politica de imagenes del portal permite solo el dominio adicional de mapas.
+  Las imagenes identifican el origen del sitio, sin enviar rutas, tokens ni
+  parametros del acceso. Se conserva no-referrer para los demas recursos.
+- Atribucion visible, cache normal del navegador, sin descarga masiva ni mapas
+  offline. Servicio comunitario sin garantia de disponibilidad; no se activa
+  facturacion, suscripcion ni prueba. Para gran escala revisar otro alojamiento.
+- Sin cambios en la APK ni en las credenciales Supabase/FCM. Las limitaciones
+  de geocerca remota de rc4 siguen vigentes.
+
 ## 1.2.0-rc4 - GPS remoto visible en el panel local (pre-release)
 
 - Corregida la separacion de rc3: Ubicacion del panel local ahora ofrece
