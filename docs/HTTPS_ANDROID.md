@@ -8,7 +8,7 @@ de certificado y clave del servidor. El BAT ahora ejecuta su preparación asisti
 
 ## Preparación Asistida
 
-`iniciar_geolocalizacion.bat` prepara Python, comprueba/genera los certificados y
+`herramientas/compatibilidad/iniciar_geolocalizacion.bat` prepara Python, comprueba/genera los certificados y
 después inicia HTTPS. Usa OpenSSL del PATH o de una instalación habitual de Git
 para Windows. Si no está disponible, muestra cómo continuar; no descarga binarios
 ni modifica la confianza del sistema silenciosamente.
@@ -36,7 +36,7 @@ No compartir la carpeta completa ni distribuir sus claves con el release.
 
 ## 1. Confiar la CA en la PC
 
-Ejecutar `confiar_https_pc.bat`, revisar la advertencia y, solo si se autoriza,
+Ejecutar `herramientas/compatibilidad/confiar_https_pc.bat`, revisar la advertencia y, solo si se autoriza,
 escribir `CONFIAR SFA`. El asistente agrega el certificado a la cuenta actual de
 Windows con `certutil -user`; no instala confianza en el teléfono. Puede ser
 necesario cerrar y abrir el navegador.
@@ -66,7 +66,7 @@ No se presume que todos los Android tengan los mismos menús.
 ## 3. Iniciar y Abrir el Panel
 
 Cerrar únicamente la instancia propia de SFA que ocupe 8780. Después ejecutar
-`iniciar_geolocalizacion.bat` y abrir `https://localhost:8780` en la PC.
+`herramientas/compatibilidad/iniciar_geolocalizacion.bat` y abrir `https://localhost:8780` en la PC.
 En Ubicación, guardar una zona real y crear el QR privado del residente.
 Con el teléfono en la misma red, escanearlo y conceder ubicación.
 No se necesitan direcciones largas escritas en el celular.

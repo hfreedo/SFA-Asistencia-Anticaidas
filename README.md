@@ -125,13 +125,13 @@ Capturas del ejecutable preparado con perfiles ficticios y configuración aislad
 ## Inicio
 
 1. Extraer todo el ZIP en una carpeta con permiso de escritura.
-2. Ejecutar `ABRIR_SFA_ASISTENCIA.bat` o `SFA_Asistencia.exe`.
+2. Ejecutar `SFA_Asistencia.exe`, el centro de inicio del ZIP actual.
 3. Registrar o importar residentes.
 4. Elegir el puerto real de la placa en Ajustes > Dispositivo.
 
 USB: 115200 baudios. HC-06: 9600 baudios. Cierra el Monitor Serie antes de conectar.
 
-Para el celular, cierra el modo local y ejecuta `ABRIR_ACCESO_MOVIL.bat`. Conecta ambos equipos a la misma red de confianza y abre Ajustes > Acceso móvil. Este modo permite acceso al panel a equipos de esa red, sin autenticación de usuarios. No modifica el firewall automáticamente.
+Para acceso LAN al panel, activa Celular y ubicacion en el centro. Este modo requiere la misma red de confianza y no modifica el firewall automaticamente. Para compartir GPS desde otra red usa la APK rc3, Compartir > Por internet, con una cuenta autorizada; no necesitas un BAT ni certificados de la PC.
 
 ## Datos y Migración
 

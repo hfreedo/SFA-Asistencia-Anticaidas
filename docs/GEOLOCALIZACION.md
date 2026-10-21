@@ -50,7 +50,8 @@ automatica. La consulta de historial esta limitada por pagina, no su retencion.
 
 ## 2. Preparar HTTPS de Confianza
 
-**Ruta recomendada para Windows/Android:** ejecutar `iniciar_geolocalizacion.bat`.
+**Alternativa avanzada por fuentes, solo LAN:** ejecutar `herramientas/compatibilidad/iniciar_geolocalizacion.bat`.
+Para el GPS remoto de rc3 usar [la guia actual](PRUEBA_GPS_Y_ALARMAS.md), sin misma red.
 Ahora incluye un asistente que usa OpenSSL local para generar los archivos.
 Seguir [HTTPS en PC y Android](HTTPS_ANDROID.md) para aceptar expresamente la CA.
 Preparar archivos y confiar en ellos son pasos distintos. Lo siguiente conserva
@@ -87,7 +88,7 @@ Retirar la CA de pruebas de los dispositivos cuando deje de ser necesaria.
 ## 3. Iniciar y Vincular sin Escribir Direcciones
 
 1. Detener la instancia anterior del servidor, identificándola; no cerrar procesos ajenos.
-2. Ejecutar `iniciar_geolocalizacion.bat`. También puede ejecutarse
+2. Ejecutar `herramientas/compatibilidad/iniciar_geolocalizacion.bat`. También puede ejecutarse
    `.\.venv313\Scripts\python.exe -m servidor_pc.acceso_movil --https`.
 3. En la PC abrir `https://localhost:8780`. El certificado debe ser de confianza.
 4. Registrar/seleccionar un residente y abrir Ubicación.

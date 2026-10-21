@@ -55,11 +55,12 @@ no tendrá la interfaz compilada para servir.
 ```
 
 Abre `http://127.0.0.1:8780`. Detén con `Ctrl+C` en esa terminal.
-Después de compilar la interfaz también puedes usar `iniciar_interfaz.bat`.
+Después de compilar la interfaz también puedes usar `herramientas/compatibilidad/iniciar_interfaz.bat`.
 El BAT prepara/verifica Python y sus paquetes; no compila React.
 
-`detener_interfaz.bat` termina el proceso que escucha en 8780: úsalo solo si ese
-puerto corresponde a SFA. `Ctrl+C` en su terminal es más específico.
+El centro general permite detener su servidor de forma autenticada. El BAT de
+compatibilidad para detener abre ese centro; no termina procesos por puerto.
+Para un servidor iniciado en esta terminal, utiliza `Ctrl+C`.
 
 ## Conectar Arduino
 
@@ -86,7 +87,7 @@ Este modo no es el portable ni el acceso LAN. Al terminar los cambios, ejecuta
 
 ## Celular y QR
 
-Detén el modo local y ejecuta `iniciar_acceso_movil.bat` desde la raíz. Conecta
+Detén el modo local y ejecuta `herramientas/compatibilidad/iniciar_acceso_movil.bat` desde la raíz. Conecta
 PC y celular a la misma red o utiliza un hotspot compartido. En Ajustes > Acceso
 móvil selecciona la red del celular si aparece más de una y escanea el QR con
 la cámara. No es necesario escribir direcciones.

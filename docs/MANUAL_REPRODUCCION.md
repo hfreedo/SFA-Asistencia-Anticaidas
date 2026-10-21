@@ -273,7 +273,7 @@ Nunca provocar una caída en una persona ni golpear el dispositivo para demostra
 | Prueba | Procedimiento | Resultado que se debe comprobar |
 | --- | --- | --- |
 | HC-06 | Emparejar en Windows, obtener COM serial, liberar USB si procede y conectar el COM del módulo a 9600 | Telemetría real por Bluetooth; no basta emparejar |
-| QR/red local | Detener modo local, ejecutar `iniciar_acceso_movil.bat`, compartir red, seleccionar interfaz y escanear QR | Panel accesible desde el teléfono, no solo QR visible en PC |
+| QR/red local | Detener modo local, ejecutar `herramientas/compatibilidad/iniciar_acceso_movil.bat`, compartir red, seleccionar interfaz y escanear QR | Panel accesible desde el teléfono, no solo QR visible en PC |
 | Geocerca | Cambiar centro/radio, guardar y recargar | Configuración conservada; no demuestra posición GPS del residente |
 | Telegram | Configurar bot/chat en la copia de práctica y usar la prueba disponible | Mensaje recibido en el celular y hora registrada, sin exponer token |
 | EXE | Seguir el empaquetado de Desarrollo y ejecutar desde otra carpeta | Inicio, web y escritura de datos locales correctos |
