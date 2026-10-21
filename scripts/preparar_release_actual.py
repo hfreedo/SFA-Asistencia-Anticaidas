@@ -7,6 +7,11 @@ import zipfile
 
 root = Path(__file__).resolve().parents[1]
 version = '1.2.0-rc5'
+android_source = root / 'release/SFA-Asistencia-1.2.0-rc3-Android-prototipo.apk'
+if not android_source.is_file():
+    android_source = root / 'android_app/artifacts/SFA-Asistencia-Android-prototipo.apk'
+if not android_source.is_file() or hashlib.sha256(android_source.read_bytes()).hexdigest() != '20d2951328dd5c613f0aee020bfa8539c784390971e10816855fbddda717d31e':
+    raise SystemExit('rc5 requiere la APK 0.4.0 original verificada; no mezclar la actualizacion Android 0.4.1 con sus notas antiguas')
 if not (root / 'distribucion/recursos/Driver_CH340_CH341').is_dir():
     raise SystemExit('Extraer Driver_CH340_CH341 y Licencias de un release verificado en distribucion/recursos antes de empaquetar')
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
@@ -69,7 +74,7 @@ with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zip_file:
 with zipfile.ZipFile(archive) as check:
     assert check.testzip() is None
 apk = root / 'release' / f'SFA-Asistencia-{version}-Android-prototipo.apk'
-shutil.copy2(root / 'android_app/artifacts/SFA-Asistencia-Android-prototipo.apk', apk)
+shutil.copy2(android_source, apk)
 checksums = root / 'release' / f'SFA-Asistencia-{version}.sha256'
 checksums.write_text(''.join(hashlib.sha256(file.read_bytes()).hexdigest() + '  ' + file.name + '\n' for file in (archive, apk)), encoding='ascii')
 print('Packaged Windows, Android and SHA-256 manifest')

@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                 if (jwt != null) jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
                 block()
             } catch (error: CancellationException) { throw error
-            } catch (error: Exception) { operationError = operationErrorMessage(error)
+            } catch (error: Exception) { operationError = operationErrorMessage(error); message = operationError
             } finally { pushActive = push.enabled; busy = false } }
         }
         val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
