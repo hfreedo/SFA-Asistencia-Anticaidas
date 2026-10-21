@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { Activity, Bell, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
 import { accessDataClient } from "./accessClient";
 import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
+import { RemoteLocation, type RemotePosition } from "./RemoteLocation";
 
 type Resident = { id: string; full_name: string; room: string };
 type Sample = { id: string; observed_at: string; received_at: string; payload: { state?: string; accel_g?: number; tilt_deg?: number; motion?: number; fall_count?: number; simulated?: boolean } };
@@ -85,6 +86,8 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
   const [residents, setResidents] = useState<Resident[]>([]);
   const [selected, setSelected] = useState("");
   const [sample, setSample] = useState<Sample | null>(null);
+  const [position, setPosition] = useState<RemotePosition | null>(null);
+  const [positionError, setPositionError] = useState("");
   const [events, setEvents] = useState<Event[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -105,7 +108,7 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
   }, [session.access_token]);
   useEffect(() => {
     let active = true;
-    setSample(null); setEvents([]);
+    setSample(null); setEvents([]); setPosition(null); setPositionError("");
     if (!selected) return;
     const data = accessDataClient(session.access_token);
     const load = async () => {
@@ -122,6 +125,22 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
     const timer = window.setInterval(() => void load(), 5000);
     return () => { active = false; window.clearInterval(timer); };
   }, [selected, session.access_token]);
+  useEffect(() => {
+    let active = true;
+    if (!selected) return;
+    const load = async () => {
+      try {
+        const result = await accessDataClient(session.access_token).from("sfa_positions")
+          .select("latitude,longitude,accuracy_m,observed_at").eq("resident_id", selected).eq("simulated", false)
+          .order("observed_at", { ascending: false }).limit(1);
+        if (result.error) throw new Error();
+        if (active) { setPosition(result.data?.[0] ?? null); setPositionError(""); }
+      } catch { if (active) { setPosition(null); setPositionError("No se pudo consultar la ubicación remota."); } }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 10000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [selected, session.access_token]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   const person = residents.find(r => r.id === selected);
   const fresh = sample && isFreshSample(sample.observed_at, Boolean(sample.payload.simulated), clock);
@@ -136,6 +155,8 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
         <div className="cloud-person"><div><h3>{person.full_name}</h3><p>{person.room}</p></div><span className={fresh ? `cloud-signal ${["CAIDA_CONFIRMADA","POSIBLE_CAIDA"].includes(sample.payload.state ?? "") ? "critical" : "fresh"}` : "cloud-signal"}><Activity size={16} />{fresh ? STATE[sample.payload.state ?? ""] ?? "Lectura reciente" : sample?.payload.simulated ? "Muestra de simulación" : "Sin lecturas recientes"}</span></div>
         <div className="cloud-metrics"><div><span>Aceleración</span><strong>{metric(sample?.payload.accel_g, " g")}</strong></div><div><span>Inclinación</span><strong>{metric(sample?.payload.tilt_deg, "°")}</strong></div><div><span>Movimiento</span><strong>{metric(sample?.payload.motion)}</strong></div></div>
         <p className="cloud-last"><Clock3 size={16} />{sample ? `Última muestra: ${time(sample.observed_at)} · hace ${Math.floor(age ?? 0)} s` : "Sin muestras del cinturón para este perfil"}</p>
+        {positionError && <p role="alert" className="cloud-warning">{positionError}</p>}
+        <RemoteLocation position={position} clock={clock} />
         <div className="cloud-section-title"><Bell size={19} /><h3>Eventos recibidos</h3></div>
         {events.length ? <ol className="cloud-events">{events.map(event => <li key={event.id}><div><strong>{event.event_type.replaceAll("_", " ")}</strong><p>{event.detail.text ?? ""}</p></div><div>{event.simulated && <span>Simulado</span>}<time>{time(event.observed_at)}</time></div></li>)}</ol> : <p className="cloud-footnote">No hay eventos recibidos para este perfil.</p>}
       </>}

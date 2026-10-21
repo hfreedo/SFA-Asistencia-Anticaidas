@@ -1,8 +1,13 @@
 # Centro de inicio SFA
 
+Entrega actual: **1.2.0-rc3**. Empezar por `ABRIR_AQUI.md` en la raiz.
+Los BAT avanzados se agruparon en `herramientas/compatibilidad/`; no son necesarios
+para abrir normalmente el sistema. GPS Android remoto usa internet y no requiere
+activar HTTPS local. Esa opcion del iniciador sigue disponible para el modo LAN.
+
 Abrir el acceso directo `SFA Asistencia.lnk` de la raiz, que apunta a
-`dist/SFA_Centro.exe`. Ambos EXE principales de dist se actualizaron a la misma
-version. Incluye botones para iniciar y detener su
+`dist/SFA_Centro.exe`. Es el unico ejecutable de uso normal en dist; los binarios
+de compilacion estan en dist/rc3. Incluye botones para iniciar y detener su
 servidor, abrir el panel local, acceder a sincronizacion y abrir el portal
 remoto. Cerrar la ventana pide confirmar la detencion del servidor propio.
 
@@ -38,7 +43,7 @@ Si se conecta a un servidor existente, utiliza los datos de ese servidor.
 La ventana distingue ambos casos. No copiar bases mientras se estan escribiendo;
 usar exportacion o una copia consistente SQLite para una migracion posterior.
 
-No se modificaron los BAT antiguos ni se publico un nuevo release en esta tarea.
+Los BAT de soporte mantienen deteccion relativa de la raiz tras su reubicacion.
 Las pruebas del iniciador comprueban apertura de las rutas mediante navegador
 simulado, inicio/detencion/reinicio en puerto y base temporales, y que un
 servidor externo no se pueda detener accidentalmente.

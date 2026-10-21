@@ -6,23 +6,25 @@ import sys
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-version = '1.2.0-rc2'
+version = '1.2.0-rc3'
+if not (root / 'distribucion/recursos/Driver_CH340_CH341').is_dir():
+    raise SystemExit('Extraer Driver_CH340_CH341 y Licencias de un release verificado en distribucion/recursos antes de empaquetar')
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 if folder.exists() and '--resume' not in sys.argv:
     raise SystemExit('Package folder already exists; inspect it rather than overwrite')
 folder.mkdir(parents=True, exist_ok=True)
-shutil.copy2(root / 'dist/fcm/SFA_Asistencia.exe', folder / 'SFA_Asistencia.exe')
+shutil.copy2(root / 'dist/rc3/SFA_Asistencia.exe', folder / 'SFA_Asistencia.exe')
 shutil.copy2(root / '.env.example', folder / '.env.example')
 shutil.copy2(root / 'CHANGELOG.md', folder / 'CHANGELOG.md')
-shutil.copytree(root / 'release/SFA_Asistencia_v1.1.0/Driver_CH340_CH341', folder / 'Driver_CH340_CH341', dirs_exist_ok=True)
-shutil.copytree(root / 'release/SFA_Asistencia_v1.1.0/Licencias', folder / 'Licencias', dirs_exist_ok=True)
+shutil.copytree(root / 'distribucion/recursos/Driver_CH340_CH341', folder / 'Driver_CH340_CH341', dirs_exist_ok=True)
+shutil.copytree(root / 'distribucion/recursos/Licencias', folder / 'Licencias', dirs_exist_ok=True)
 for license_dir in (root / '.venv313/Lib/site-packages').glob('cryptography-*.dist-info/licenses'):
     shutil.copytree(license_dir, folder / 'Licencias/cryptography', dirs_exist_ok=True)
 docs = folder / 'Documentacion'
 docs.mkdir(exist_ok=True)
-for name in ('INICIADOR.md', 'ANDROID.md', 'GEOLOCALIZACION.md', 'STACK_TECNOLOGICO.md', 'VALIDACION_AMPLIACION.md', 'PLAN_AMPLIACION.md', 'FIREBASE_FCM.md', 'PRUEBA_APK_FCM.md'):
+for name in ('INICIADOR.md', 'ANDROID.md', 'GEOLOCALIZACION.md', 'STACK_TECNOLOGICO.md', 'VALIDACION_AMPLIACION.md', 'PLAN_AMPLIACION.md', 'FIREBASE_FCM.md', 'PRUEBA_APK_FCM.md', 'PRUEBA_GPS_Y_ALARMAS.md'):
     shutil.copy2(root / 'docs' / name, docs / name)
-(folder / 'LEEME.txt').write_text('''SFA Asistencia 1.2.0-rc2 - PROTOTIPO
+(folder / 'LEEME.txt').write_text('''SFA Asistencia 1.2.0-rc3 - PROTOTIPO
 
 WINDOWS: extraer toda la carpeta y abrir SFA_Asistencia.exe.
 No requiere Python, Node, Git ni OpenSSL instalados. CH340/CH341 es opcional
@@ -38,11 +40,16 @@ incluye perfiles, fotos, ubicaciones, tokens ni configuracion del desarrollador.
 Para migrar configuraciones usar exportacion/importacion deliberada.
 
 ANDROID: APK de prueba separada, Android 12+. Firma debug, no produccion.
-GPS hacia la PC en la misma red; consulta de eventos cloud autorizados.
+GPS remoto hacia Supabase con Wi-Fi o datos moviles; no requiere cinturon.
+El modo local directo a la PC se conserva como alternativa, con HTTPS y QR.
+La APK indica 0.4.0-prototipo (4); navegacion Compartir, Cuidar y Pruebas.
 FCM incluido: activar avisos en Cuidar con cuenta Supabase autorizada.
 El emisor PC necesita una credencial privada propia y sesion cloud activa.
 Esta distribucion NO contiene esa credencial ni configuracion personal.
-GPS hacia Supabase sigue pendiente. Ver Documentacion/PRUEBA_APK_FCM.md.
+Pruebas locales y push dirigido solo al celular solicitante, etiquetado.
+Ver Documentacion/PRUEBA_GPS_Y_ALARMAS.md. GPS remoto no depende de la PC;
+el emisor push actual SI necesita PC, internet, credencial y sesion activa.
+El editor de geocerca local aun no sincroniza su zona con Supabase.
 
 La validacion automatizada no prueba pantalla bloqueada, HC-06 ni deteccion
 fisica de caidas. No es un dispositivo medico o servicio de emergencia.

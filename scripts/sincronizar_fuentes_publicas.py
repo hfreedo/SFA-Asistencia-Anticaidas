@@ -10,7 +10,7 @@ if not (target / '.git').exists():
 excluded = {'.git', '.venv', '.venv313', '__pycache__', 'node_modules', 'build', '.gradle', '.jvm-tmp', 'artifacts', 'static', 'dist-acceso', 'certs', 'data', 'copias_privadas', 'secrets'}
 source_suffixes = {'.py', '.ts', '.tsx', '.json', '.css', '.html', '.md', '.sql', '.mjs', '.kts', '.kt', '.xml', '.properties', '.bat', '.jar', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.txt', '.yml', '.yaml', '.ino', '.h', '.cpp', '.toml'}
 copied = []
-for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 'scripts', 'docs', '.github'):
+for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 'scripts', 'docs', 'herramientas', '.github'):
     for source in (root / tree).rglob('*'):
         if not source.is_file():
             continue
@@ -27,7 +27,8 @@ for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         copied.append(relative.as_posix())
-for name in ('sfa_portable.py', 'SFA_Asistencia.spec', '.env.example', 'CHANGELOG.md', 'UX_GUIDELINES.md'):
+for name in ('sfa_portable.py', 'SFA_Asistencia.spec', '.env.example', 'CHANGELOG.md', 'UX_GUIDELINES.md', 'ABRIR_AQUI.md', 'distribucion/LEEME.md'):
+    (target / name).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(root / name, target / name)
     copied.append(name)
 for relative in copied:

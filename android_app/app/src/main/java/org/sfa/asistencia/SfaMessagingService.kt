@@ -28,10 +28,11 @@ class SfaMessagingService : FirebaseMessagingService() {
         manager.createNotificationChannel(NotificationChannel("sfa_remote", "Alertas remotas SFA", NotificationManager.IMPORTANCE_HIGH))
         if (!manager.areNotificationsEnabled()) return
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val test = message.data["is_test"] == "true"
         val notification = android.app.Notification.Builder(this, "sfa_remote")
             .setSmallIcon(R.drawable.ic_sfa)
-            .setContentTitle("Alerta de SFA Asistencia")
-            .setContentText("Hay un evento que requiere atención. Abre SFA para revisarlo.")
+            .setContentTitle(if (test) "Prueba de aviso remoto SFA" else "Alerta de SFA Asistencia")
+            .setContentText(if (test) "Prueba recibida. No es una emergencia." else "Hay un evento que requiere atención. Abre SFA para revisarlo.")
             .setVisibility(android.app.Notification.VISIBILITY_PRIVATE)
             .setContentIntent(open).setAutoCancel(true).build()
         manager.notify(event, 0, notification)

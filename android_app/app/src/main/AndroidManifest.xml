@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-    <application android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:label="SFA Asistencia" android:theme="@style/AppTheme" android:usesCleartextTraffic="false" android:icon="@drawable/ic_sfa" android:supportsRtl="true">
+    <application android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:label="SFA Asistencia" android:theme="@style/AppTheme" android:usesCleartextTraffic="false" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true">
         <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <service android:name=".SfaMessagingService" android:exported="false">

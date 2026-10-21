@@ -1,5 +1,20 @@
 # Versiones
 
+## v1.2.0-rc3 - GPS remoto y laboratorio de pruebas
+
+APK 0.4.0-prototipo (4), Android 12+, misma firma de pruebas que rc2.
+GPS directo a Supabase sin cinturon ni red compartida. Laboratorio con alarma
+local, escenarios de practica y prueba FCM etiquetada solo al celular solicitante.
+UI reorganizada, icono adaptativo propio y mapa del portal remoto.
+Windows portable con emisor v2 y driver CH340 opcional. Sin claves privadas.
+
+[Release](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc3)
+| [Guia actual](docs/PRUEBA_GPS_Y_ALARMAS.md)
+| [Organizacion](ABRIR_AQUI.md)
+
+Pruebas de software no reemplazan GPS/push y revision visual en el telefono.
+Geocerca cloud y portabilidad multiadministrador completa son etapas posteriores.
+
 ## v1.2.0-rc2 - FCM para pruebas
 
 Nueva APK version 0.3.0-prototipo (3) con **Alertas en este celular**, permiso,

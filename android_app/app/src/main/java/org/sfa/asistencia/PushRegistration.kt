@@ -23,6 +23,13 @@ class PushRegistration(private val context: Context) {
     val enabled get() = preferences.getBoolean("enabled", false)
     val renewalPending get() = preferences.getBoolean("renewal_pending", false)
     val configured get() = FirebaseApp.getApps(context).isNotEmpty()
+    suspend fun test(jwt: String, resident: String) {
+        check(enabled) { "Activa los avisos primero" }
+        val installation = preferences.getString("installation", null) ?: error("Sin registro")
+        withContext(Dispatchers.IO) {
+            NativeApi(context).rpc("sfa_request_push_test", jwt, JSONObject().put("p_resident", resident).put("p_installation", installation))
+        }
+    }
     suspend fun update(jwt: String, active: Boolean) {
         check(configured) { "Falta la configuración Firebase" }
         val installation = preferences.getString("installation", null) ?: UUID.randomUUID().toString().also {

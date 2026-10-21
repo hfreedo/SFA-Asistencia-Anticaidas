@@ -60,6 +60,17 @@ class FcmTests(unittest.TestCase):
         sender=FcmSender(self.path,lambda *args:self.fail('Unexpected network'))
         self.assertEqual(sender.send(self.job),'expired')
 
+    def test_test_delivery_is_explicitly_labelled(self):
+        def transport(url, headers, body):
+            payload=json.loads(body)['message']['data']
+            self.assertEqual(payload['is_test'],'true')
+            self.assertNotIn('resident_id',payload)
+            return 200,{'name':'projects/sfa-asistencia/messages/fixture-test'}
+        sender=FcmSender(self.path,transport)
+        sender.access_token='fixture_access_token'; sender.expires=time.time()+3600
+        self.job['is_test']=True
+        self.assertEqual(sender.send(self.job),'sent')
+
     def test_rejects_other_project(self):
         value=json.loads(self.path.read_text()); value['project_id']='other'
         self.path.write_text(json.dumps(value))

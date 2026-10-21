@@ -4,22 +4,26 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### Ampliacion 1.2.0-rc2: notificaciones FCM para pruebas
+### Candidata actual 1.2.0-rc3: GPS remoto sin cinturon y pruebas de alarmas
 
-[Descargar APK rc2 con FCM](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc2/SFA-Asistencia-1.2.0-rc2-Android-prototipo.apk)
-| [Release completo y SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc2)
-| [Pasos de prueba](docs/PRUEBA_APK_FCM.md)
+[Descargar APK actual](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc3/SFA-Asistencia-1.2.0-rc3-Android-prototipo.apk)
+| [Windows, APK y SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc3)
+| [GPS y pruebas de alarma](docs/PRUEBA_GPS_Y_ALARMAS.md)
+| [Que abrir y que contiene cada carpeta](ABRIR_AQUI.md)
 
-APK Android 12+, version 0.3.0-prototipo (3), firma debug. En Cuidar, despues
-de iniciar sesion, aparece **Alertas en este celular**. La APK rc1 no tiene
-esa opcion. La entrega incluye fuentes, registro privado Supabase y emisor PC;
-la entrega real en Android sigue pendiente de prueba fisica.
+APK Android 12+, version **0.4.0-prototipo (4)**, misma firma debug que rc2.
+En **Compartir > Por internet**, GPS directo a Supabase con Wi-Fi o datos moviles,
+sin misma red ni cinturon. En **Pruebas**, alarma local, escenarios simulados y
+push etiquetado solo al celular solicitante. La PC emisora debe usar rc3 para
+las pruebas push; las versiones anteriores no las recogen. La validacion
+fisica y visual en Android sigue pendiente; no equivale a un producto certificado.
 
 El estado actual incluye centro de inicio unificado, base compartida entre
 fuentes y EXE del proyecto, HTTPS asistido, geocerca con incertidumbre y aviso
 persistente, historial sin purga automatica y un prototipo Android Kotlin/Compose.
 Supabase aporta Auth, RLS y sincronizacion PC; la APK consulta eventos remotos,
-con FCM integrado en rc2. **GPS hacia Supabase sigue pendiente**.
+con FCM y **GPS directo a Supabase implementados en rc3**. El editor cloud de
+geocerca y el aviso remoto por salidas de zona siguen pendientes.
 El emisor requiere credencial privada propia, nunca incluida en el repositorio
 ni en el paquete; ver [configuracion y limites FCM](docs/FIREBASE_FCM.md).
 
@@ -41,8 +45,8 @@ a Telegram. **Esta ampliación no está incluida en los portables anteriores.**
 - [Preparación HTTPS asistida para PC y Android](docs/HTTPS_ANDROID.md).
 - [Configurar correo y otros avisos](docs/NOTIFICACIONES.md).
 
-La vista web de envio requiere permanecer abierta. La APK nueva implementa un
-servicio foreground hacia la PC de la misma red; falta validarlo fisicamente.
+La vista web local de envio requiere permanecer abierta. La APK rc3 usa servicio
+foreground: modo remoto por internet o modo local hacia PC de la misma red.
 Hace falta configurar HTTPS de confianza y,
 para correos reales, una cuenta SMTP. El panel general sigue siendo solo para LAN
 de confianza, no para exposición pública en Internet.

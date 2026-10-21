@@ -19,6 +19,7 @@ beforeEach(() => {
     sfa_residents: { data: [{ id: "fixture", full_name: "Residente de prueba", room: "Sala" }], error: null },
     sfa_pc_samples: { data: [], error: null },
     sfa_events: { data: [], error: null },
+    sfa_positions: { data: [], error: null },
   };
 });
 afterEach(cleanup);

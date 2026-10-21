@@ -95,6 +95,8 @@ class FcmSender:
         body = {'message': {'token': token, 'data': {
             'event_id': event_id, 'observed_at_ms': str(int(observed.timestamp() * 1000))},
             'android': {'priority': 'high', 'ttl': '300s'}}}
+        if job.get('is_test') is True:
+            body['message']['data']['is_test'] = 'true'
         status, result = self.transport(SEND_URL, {'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + self._access()}, json.dumps(body).encode())
         if status == 200 and isinstance(result.get('name'), str):

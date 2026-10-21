@@ -1,5 +1,14 @@
 # SFA: ampliacion por etapas
 
+## Actualizacion rc3: 21 de octubre de 2026
+
+Implementados GPS Android directo a Supabase y laboratorio de pruebas, conservando
+el modo local. Ver [prueba actual](PRUEBA_GPS_Y_ALARMAS.md) y
+[validacion](VALIDACION_AMPLIACION.md). Pendientes: pruebas fisicas, editor y
+eventos de geocerca cloud, firma de distribucion y portabilidad multiadministrador.
+La siguiente etapa se detalla en [Portabilidad para alumnos](PORTABILIDAD_ALUMNOS.md).
+Los apartados fechados a continuacion registran las etapas anteriores.
+
 ## Estado al 20 de octubre de 2026
 
 La etapa 1 prepara arquitectura, esquema y pruebas. No activa cuentas, nube,

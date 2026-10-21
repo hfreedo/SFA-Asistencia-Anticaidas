@@ -223,6 +223,56 @@ try {
     await login(1); assert.equal((await claimPush()).length,0);
     await login(null,'anon'); await assert.rejects(()=>register(id(100),'fixture_token_abcdefghijklmnop_1'),e=>e.code==='42501');
   });
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../migrations/202610210004_phone_location.sql', import.meta.url), 'utf8'));
+  let phone;
+  const registerPhone = resident => db.query('select public.sfa_register_phone($1) as result',[resident]);
+  const sendPosition = (device, sampleId, values={}) => db.query('select public.sfa_ingest_phone($1,$2,$3) as result',
+    [device,sampleId,JSON.stringify({latitude:-25,longitude:-57,accuracy_m:5,observed_at:new Date().toISOString(),...values})]);
+  await check('GPS registration requires configuration permission, not just read access', async () => {
+    await login(3); await assert.rejects(()=>registerPhone(id(11)),e=>e.code==='42501');
+    await login(2); await assert.rejects(()=>registerPhone(id(11)),e=>e.code==='42501');
+    await login(1); phone=(await registerPhone(id(11))).rows[0].result.device_id;
+    assert.equal((await registerPhone(id(11))).rows[0].result.device_id,phone);
+  });
+  await check('GPS only needs phone, not belt; retries are idempotent', async () => {
+    const first=(await sendPosition(phone,id(110))).rows[0].result;
+    assert.equal(first.accepted,id(110));
+    assert.deepEqual((await sendPosition(phone,id(110))).rows[0].result,first);
+  });
+  await check('GPS rejects another owner, anonymous clients and direct table writes', async () => {
+    await login(3); await assert.rejects(()=>sendPosition(phone,id(111)),e=>e.code==='42501');
+    await login(null,'anon'); await assert.rejects(()=>sendPosition(phone,id(111)),e=>e.code==='42501');
+    await login(1); await assert.rejects(()=>db.exec('delete from public.sfa_positions'),e=>e.code==='42501');
+  });
+  await check('GPS rejects stale, invalid, out-of-order and excessive samples', async () => {
+    for (const values of [{observed_at:'2020-01-01T00:00:00Z'},{latitude:91},{accuracy_m:0},{}])
+      await assert.rejects(()=>sendPosition(phone,id(111),values),e=>e.code==='22023');
+  });
+  await check('GPS context does not enable a simulated geofence', async () => {
+    const result=(await db.query('select public.sfa_phone_context($1) as value',[phone])).rows[0].value;
+    assert.equal(result.geofence,null);
+  });
+  await check('test push is simulated, explicitly labelled and only addressed to requester', async () => {
+    await register(id(100),'fixture_token_abcdefghijklmnop_1');
+    const call=()=>db.query('select public.sfa_request_push_test($1,$2) as value',[id(11),id(100)]);
+    assert.equal((await call()).rows[0].value.queued,true);
+    await assert.rejects(call,e=>e.code==='22023');
+    assert.equal((await claimPush()).length,0,'Old senders must not claim test notifications');
+    const jobs=(await db.query('select public.sfa_claim_push_v2() as jobs')).rows[0].jobs;
+    assert.equal(jobs.length,1); assert.equal(jobs[0].is_test,true);
+    assert.equal(jobs[0].token,'fixture_token_abcdefghijklmnop_1'); await ackPush(jobs[0]);
+  });
+  await check('test push cannot target another account or resident from another space', async () => {
+    await login(3);
+    await assert.rejects(()=>db.query('select public.sfa_request_push_test($1,$2)',[id(11),id(100)]),e=>e.code==='42501');
+  });
+  await check('revoked GPS devices cannot submit or fetch context', async () => {
+    await db.exec('reset role'); await db.query('update public.sfa_devices set revoked_at=now() where id=$1',[phone]);
+    await login(1);
+    await assert.rejects(()=>sendPosition(phone,id(112)),e=>e.code==='42501');
+    await assert.rejects(()=>db.query('select public.sfa_phone_context($1)',[phone]),e=>e.code==='42501');
+  });
   console.log(`${checks} database checks passed (isolated PGlite; not hosted Supabase).`);
 } finally {
   await db.close();

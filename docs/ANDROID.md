@@ -1,5 +1,13 @@
 # Android: prototipo nativo y limites
 
+## Candidata actual: rc3
+
+APK 0.4.0-prototipo (4). GPS directo a Supabase, sin cinturon ni red compartida,
+con cuenta autorizada, consentimiento y servicio foreground. Modo local preservado.
+Navegacion Compartir / Cuidar / Pruebas, controles uniformes y logo adaptativo propio.
+Ver [pasos y limites actuales](PRUEBA_GPS_Y_ALARMAS.md). La seccion siguiente
+describe el alcance historico de rc2, no el alcance nuevo de rc3.
+
 ## Entrega
 
 Proyecto `android_app/` para Android Studio: Kotlin, Jetpack Compose y Android

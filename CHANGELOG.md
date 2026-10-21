@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.0-rc3 - GPS remoto y laboratorio de alarmas (pre-release)
+
+- GPS Android directo a Supabase por internet, sin cinturon ni red compartida.
+- Modo local HTTPS/QR conservado, separado del modo remoto.
+- Registro de emisor restringido a administrador o permiso de configuracion;
+  RPC autenticadas, vinculo por propietario, RLS y bloqueo de dispositivos revocados.
+- Consentimiento explicito antes de enviar GPS; sesiones renovadas en memoria.
+- Historial conservado y muestras recientes con identificador estable para reintentos.
+- Ultima ubicacion consultable en Android y mapa del portal remoto; datos de mas
+  de 90 s no se presentan como posicion actual. No se fusionan bases locales/cloud.
+- Laboratorio Android: alarma local, escenarios de practica y push de prueba
+  solo al celular solicitante. Un evento de prueba nunca se presenta como caida real.
+- Emisor push v2 identifica pruebas; emisores anteriores no las recogen.
+- UI Android: navegacion inferior, botones de 52 dp minimos y ancho consistente,
+  seleccion de perfiles legible, jerarquia tipografica y feedback transitorio.
+- Logo propio como icono adaptativo; simbolo monocromo de asistencia en avisos.
+- APK 0.4.0-prototipo, versionCode 4; misma firma debug que rc2, sin migracion
+  a firma de distribucion todavia y sin incluir claves privadas en los paquetes.
+- BAT de soporte en herramientas/compatibilidad; guia ABRIR_AQUI y archivo
+  recuperable de paquetes anteriores. El centro general sigue siendo el acceso normal.
+- Sin facturacion, suscripciones ni pruebas promocionales. GPS y push reales
+  con pantalla bloqueada siguen pendientes de validacion en Android fisico.
+- No incluye editor cloud de geocercas ni envio de sus salidas al emisor FCM.
+
 ## 1.2.0-rc2 - integracion FCM (pre-release)
 
 - Configuracion Android Firebase validada localmente; SDK Messaging sin Analytics.

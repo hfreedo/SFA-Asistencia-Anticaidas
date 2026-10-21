@@ -20,7 +20,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 data class PhoneState(val running: Boolean = false, val message: String = "Seguimiento detenido", val accuracy: Float? = null,
-                      val lastSent: String? = null, val belt: BeltReading? = null, val zone: String = "Sin evaluación")
+                      val lastSent: String? = null, val belt: BeltReading? = null, val zone: String = "Sin evaluación", val lastFix: Long? = null)
 object PhoneRuntime { val state = MutableStateFlow(PhoneState()) }
 
 class TrackingService : Service(), LocationListener {
@@ -28,6 +28,8 @@ class TrackingService : Service(), LocationListener {
     private lateinit var database: LocationOutbox
     private lateinit var api: NativeApi
     private var binding: PhoneBinding? = null
+    private var cloudDevice: String? = null
+    private val linkId get() = cloudDevice?.let { "cloud:$it" } ?: binding?.id
     private var bluetooth: BluetoothSocket? = null
     private val engine = GeofenceEngine()
     @Volatile private var fence: JSONObject? = null
@@ -47,21 +49,22 @@ class TrackingService : Service(), LocationListener {
         if (PhoneRuntime.state.value.running) return START_NOT_STICKY
         val gps = intent?.getBooleanExtra("gps", true) ?: true
         val address = intent?.getStringExtra("bluetooth")
+        cloudDevice = intent?.getStringExtra("cloud_device")
         if (gps && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) { stopSelf(); return START_NOT_STICKY }
         if (address != null && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { stopSelf(); return START_NOT_STICKY }
         val stop = PendingIntent.getService(this, 2, Intent(this, TrackingService::class.java).setAction("STOP"), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val open = PendingIntent.getActivity(this, 1, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = Notification.Builder(this, "tracking").setSmallIcon(R.drawable.ic_sfa).setContentTitle("SFA Asistencia")
-            .setContentText(if (gps) "Ubicación activa hacia la PC vinculada" else "Cinturón Bluetooth activo")
+            .setContentText(if (gps && cloudDevice != null) "Ubicación remota activa por internet" else if (gps) "Ubicación activa hacia la PC vinculada" else "Cinturón Bluetooth activo")
             .setOngoing(true).setContentIntent(open).addAction(Notification.Action.Builder(null, "Detener", stop).build()).build()
         val type = (if (gps) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0) or (if (address != null) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0)
         startForeground(1, notification, type)
         binding = SecureBinding(this).load()
-        state { it.copy(running = true, message = "Servicio activo; esperando lecturas") }
+        PhoneRuntime.state.value = PhoneState(running = true, message = "Servicio activo; esperando lecturas")
         if (gps) {
-            if (binding == null) { state { it.copy(message = "Falta vincular la PC") }; stopSelf(); return START_NOT_STICKY }
+            if (linkId == null) { state { it.copy(message = "Falta vincular un destino") }; stopSelf(); return START_NOT_STICKY }
             val cache = filesDir.resolve("zone.json")
-            try { val saved = JSONObject(cache.readText()); if (saved.optString("binding") == binding!!.id) fence = saved.getJSONObject("geofence") } catch (_: Exception) { }
+            try { val saved = JSONObject(cache.readText()); if (saved.optString("binding") == linkId) fence = saved.optJSONObject("geofence") } catch (_: Exception) { }
             val manager = getSystemService(LocationManager::class.java)
             try {
                 for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
@@ -75,49 +78,54 @@ class TrackingService : Service(), LocationListener {
     }
     private fun synchronize() {
         if (closing) return
-        val link = binding ?: return
+        val idBinding = linkId ?: return
         try {
+            val cloud = cloudDevice
+            val token = if (cloud != null) CloudGpsSession.token(api) else null
             if (refreshCounter++ % 3 == 0) {
-                val context = api.deviceContext(link)
-                val updated = context.getJSONObject("geofence")
+                val context = if (cloud != null) api.rpc("sfa_phone_context", token!!, JSONObject().put("p_device", cloud)) else api.deviceContext(binding!!)
+                val updated = context.optJSONObject("geofence")
                 if (fence?.toString() != updated.toString()) engine.reset()
                 fence = updated
-                filesDir.resolve("zone.json").writeText(JSONObject().put("binding", link.id).put("geofence", updated).toString())
+                filesDir.resolve("zone.json").writeText(JSONObject().put("binding", idBinding).put("geofence", updated ?: JSONObject.NULL).toString())
             }
-            for ((id, observed, payload) in database.pending(link.id)) {
+            for ((id, observed, payload) in database.pending(idBinding)) {
                 if (closing) break
                 if (System.currentTimeMillis() - observed > 90000) { database.mark(id, "historical"); continue }
                 try {
-                    api.position(link, payload)
+                    if (cloud != null) {
+                        val result = api.rpc("sfa_ingest_phone", token!!, JSONObject().put("p_device", cloud).put("p_id", id).put("p_sample", JSONObject(payload)))
+                        check(result.optString("accepted") == id)
+                    } else api.position(binding!!, payload)
                     database.mark(id, "sent")
-                    state { it.copy(message = "Ubicación recibida por la PC", lastSent = Instant.now().toString()) }
+                    state { it.copy(message = if (cloud != null) "Ubicación recibida por Supabase" else "Ubicación recibida por la PC", lastSent = Instant.now().toString()) }
                 } catch (error: ApiFailure) {
-                    if (error.status == 409 || error.status == 422) database.mark(id, "historical") else throw error
+                    if (error.status == 400 || error.status == 409 || error.status == 422) database.mark(id, "historical") else throw error
                 }
             }
         } catch (error: ApiFailure) {
-            if (error.status == 401 || error.status == 403) { state { it.copy(message = "Vínculo revocado o servidor no autorizado") }; stopSelf() }
-            else state { it.copy(message = "PC no disponible; posiciones retenidas") }
-        } catch (_: Exception) { state { it.copy(message = "Sin conexión con la PC; posiciones retenidas") } }
+            if (error.status == 401 || error.status == 403) { state { it.copy(message = "Sesión o vínculo no autorizado. Vuelve a iniciar sesión y vincular.") }; stopSelf() }
+            else state { it.copy(message = "Destino no disponible; posiciones retenidas") }
+        } catch (_: Exception) { state { it.copy(message = "Sin conexión con el destino; posiciones retenidas") } }
     }
     override fun onLocationChanged(location: Location) {
         if (closing || !location.hasAccuracy() || location.accuracy <= 0) return
         val now = System.currentTimeMillis()
         if (now - location.time > 90000 || location.time - now > 30000) return
-        val link = binding ?: return
+        val idBinding = linkId ?: return
         val body = JSONObject().put("latitude", location.latitude).put("longitude", location.longitude).put("accuracy_m", location.accuracy.toDouble())
             .put("observed_at", Instant.ofEpochMilli(location.time).toString()).toString()
         executor.execute {
             if (closing) return@execute
-            database.enqueue(link.id, location.time, body)
+            database.enqueue(idBinding, location.time, body)
             val zone = fence
             if (zone != null) {
                 val distance = FloatArray(1)
                 Location.distanceBetween(zone.getDouble("home_lat"), zone.getDouble("home_lng"), location.latitude, location.longitude, distance)
                 val evaluation = engine.evaluate(distance[0].toDouble(), zone.getDouble("radius_m"), location.accuracy.toDouble(), location.time)
-                state { it.copy(accuracy = location.accuracy, zone = evaluation.quality) }
+                state { it.copy(accuracy = location.accuracy, zone = evaluation.quality, lastFix = location.time) }
                 if (evaluation.event == "GEOCERCA_SALIDA") alert("Fuera de la zona de referencia", "Salida detectada por el GPS de este celular")
-            } else state { it.copy(accuracy = location.accuracy, zone = "Sin zona consultada") }
+            } else state { it.copy(accuracy = location.accuracy, zone = "Sin zona consultada", lastFix = location.time) }
         }
     }
     private fun connectBelt(address: String) {

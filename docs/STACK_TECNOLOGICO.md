@@ -1,5 +1,24 @@
 # Stack Tecnológico de SFA Asistencia
 
+## Recorrido actual rc3
+
+```mermaid
+flowchart LR
+  UNO[Arduino + MPU6050] -->|USB o HC06| PC[FastAPI + SQLite]
+  PC --> WEB[Panel React local]
+  PC -->|sesion autorizada| SB[Supabase Auth + PostgreSQL + RLS]
+  GPS[Android Kotlin + GPS sin cinturon] -->|HTTPS por WiFi o datos| SB
+  SB --> PORTAL[Portal React con mapa Leaflet]
+  SB -->|cola privada, RPC v2| PC
+  PC -->|OAuth HTTP v1, clave solo en PC| FCM[Firebase Cloud Messaging]
+  FCM --> APP[Android del cuidador]
+```
+
+GPS remoto y emision FCM son rutas diferentes: la primera no necesita PC; el
+emisor actual si. Cloud no comparte automaticamente la base SQLite local ni
+su configuracion de geocerca. Los alumnos no reciben la clave privada FCM.
+Ver [prueba actual](PRUEBA_GPS_Y_ALARMAS.md) y `ABRIR_AQUI.md` para las carpetas.
+
 Para ver primero cómo encaja todo, empieza por el
 [Mapa maestro de cero al estado actual](MAPA_MAESTRO.md). Esta guía amplía sus
 grupos de herramientas y responsabilidades.

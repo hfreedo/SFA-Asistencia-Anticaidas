@@ -1,5 +1,9 @@
 # Probar la APK Android con FCM (1.2.0-rc2)
 
+Para rc3 existe un boton de prueba remota etiquetada. Usar la guia actual:
+[GPS sin cinturon y pruebas de alarma](PRUEBA_GPS_Y_ALARMAS.md). El procedimiento
+de abajo se conserva como referencia de rc2.
+
 ## Antes de instalar
 
 Android 12+ con Google Play services e internet. APK con firma debug: instalacion

@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal
 title SFA - Servidor de interfaz
 
-set "PROJECT_DIR=%~dp0"
+for %%I in ("%~dp0..\..") do set "PROJECT_DIR=%%~fI\"
 set "VENV_DIR=%PROJECT_DIR%.venv313"
 set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
 set "REQUIREMENTS=%PROJECT_DIR%servidor_pc\requirements.txt"

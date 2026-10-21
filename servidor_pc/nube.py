@@ -42,7 +42,12 @@ class CloudSync:
             from .fcm import FcmSender
             if self.push_sender is None:
                 self.push_sender = FcmSender(path)
-            jobs = self.transport('/rest/v1/rpc/sfa_claim_push', token, {})
+            try:
+                jobs = self.transport('/rest/v1/rpc/sfa_claim_push_v2', token, {})
+            except CloudError as exc:
+                if exc.status != 404:
+                    raise
+                jobs = self.transport('/rest/v1/rpc/sfa_claim_push', token, {})
             if not isinstance(jobs, list) or len(jobs) > 10:
                 raise ValueError('push_response')
             for job in jobs:

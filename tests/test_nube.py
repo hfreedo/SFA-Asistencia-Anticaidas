@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,6 +16,9 @@ DEVICE = '44444444-4444-4444-8444-444444444444'
 
 class CloudSyncTests(unittest.TestCase):
     def setUp(self):
+        environment = patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': ''})
+        environment.start()
+        self.addCleanup(environment.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / 'cloud.sqlite3'
@@ -138,6 +142,30 @@ class CloudSyncTests(unittest.TestCase):
         self.cloud.pause()
         self.cloud.flush()
         self.assertEqual(self.cloud.status()['pending'],1)
+
+    def test_push_v2_and_legacy_fallback_without_real_credentials(self):
+        with patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': 'fixture-not-opened'}):
+            self.cloud.push_sender = Mock()
+            self.cloud.push_sender.send.return_value = 'sent'
+            calls = []
+            def transport(path, token, body):
+                calls.append(path)
+                if path.endswith('sfa_claim_push_v2'):
+                    return [{'id':'job','lease':'lease','is_test':True}]
+                return {}
+            self.cloud.transport = transport
+            self.cloud.flush_push('fixture-token')
+            self.assertTrue(calls[0].endswith('sfa_claim_push_v2'))
+            self.cloud.push_sender.send.assert_called_once_with({'id':'job','lease':'lease','is_test':True})
+            def legacy(path, token, body):
+                calls.append(path)
+                if path.endswith('sfa_claim_push_v2'):
+                    raise CloudError(404)
+                return []
+            self.cloud.transport = legacy
+            self.cloud.flush_push('fixture-token')
+            self.assertTrue(calls[-1].endswith('sfa_claim_push'))
+            self.assertIsNone(self.cloud.push_error)
 
     def test_malformed_acknowledgement_cannot_lose_pending_samples(self):
         self.capture()

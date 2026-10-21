@@ -1,5 +1,26 @@
 # Evidencia de la ampliacion
 
+## rc3: 21 de octubre de 2026
+
+- Android: copia de fuentes con hashes, compilacion, 12 pruebas unitarias y
+  lint sin errores. APK 0.4.0-prototipo (4), misma firma de pruebas que rc2.
+- Python: 73 pruebas; web: 30; SQL aislado PGlite: 34 comprobaciones.
+- Migracion 202610210004 aplicada con autorizacion en SFA Asistencia - Pruebas.
+  GPS exige cuenta, permiso de configuracion y propiedad del dispositivo;
+  posiciones consultadas mediante RLS. No hay ingesta anonima.
+- Prueba push dirigida al solicitante, simulada y limitada a una por minuto.
+  Emisores anteriores no recogen ese tipo de trabajo; emisor v2 lleva etiqueta.
+- UI revisada a nivel de componentes: botones de 52 dp minimos, seleccion
+  con filas completas, navegacion inferior, ancho acotado en pantallas grandes,
+  textos adaptables y logo adaptativo. No hay pruebas visuales en Android fisico
+  ni emulador: no afirmar que la apariencia final ya fue validada en pantalla.
+- No hay validacion fisica de GPS, cambio de red, pantalla bloqueada ni FCM.
+  La aceptacion de cola y las pruebas de servidor no equivalen a entrega Android.
+- El mapa remoto no presenta muestras antiguas como actuales. No hay sincronizacion
+  automatica de geocerca local hacia cloud ni push por sus salidas remotas.
+
+Los resultados de rc2 a continuacion son historicos.
+
 ## Niveles separados
 
 Resultado local rc2: 71 pruebas Python, 26 comprobaciones SQL aisladas y
