@@ -11,8 +11,10 @@
   cola SQLite persistente y reintento idempotente, sin exigir cinturon.
 - Panel remoto de incidentes con consulta periodica, toma de atencion exclusiva,
   resolucion confirmada y control de concurrencia. Pruebas identificadas aparte.
-- Migracion 006 preparada, pendiente de autorizacion y activacion alojada.
-  No confundir una compilacion con una version ya habilitada o publicada.
+- Migracion 006 aplicada con autorizacion en el proyecto de pruebas. Verificacion
+  alojada de los cuatro comandos, consentimiento privado y rechazo sin identidad
+  aprobada con ROLLBACK, sin generar eventos ni enviar avisos.
+  La validacion fisica y la publicacion de binarios se registran por separado.
 - 51 comprobaciones SQL aisladas y 47 pruebas web aprobadas. APK y lint
   aprobados; pruebas fisicas de envio, recepcion y atencion siguen pendientes.
 - FCM todavia requiere el emisor PC autenticado. Geocerca cloud, emisor online

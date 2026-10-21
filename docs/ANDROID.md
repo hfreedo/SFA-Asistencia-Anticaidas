@@ -1,6 +1,18 @@
 # Android: prototipo nativo y limites
 
-## Candidata actual: rc3
+## Candidata actual: Android 0.5.0-prototipo (6)
+
+SOS manual y prueba entre dispositivos desde Compartir > Por internet, con
+guardado local antes de intentar la red. El cuidador debe aceptar pruebas SOS
+explicitamente. El portal incorpora toma de atencion y resolucion compartida.
+Ver [SOS y atencion](PRUEBA_SOS_Y_ATENCION.md). Migracion 006 activa en el
+proyecto de pruebas; recepcion fisica de esta candidata pendiente.
+
+GPS y registro SOS no requieren PC ni red compartida. El emisor FCM actual si
+requiere PC encendida y sincronizacion autorizada. La geocerca cloud y el emisor
+independiente siguen pendientes. Firma debug conservada; no es version productiva.
+
+## Base historica: rc3
 
 APK 0.4.0-prototipo (4). GPS directo a Supabase, sin cinturon ni red compartida,
 con cuenta autorizada, consentimiento y servicio foreground. Modo local preservado.

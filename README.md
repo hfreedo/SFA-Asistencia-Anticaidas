@@ -4,7 +4,18 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### APK corregida 0.4.1-prototipo (5)
+### Candidata Android 0.5.0-prototipo (6): SOS y atencion web
+
+[APK candidata](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.5.0-android-prototipo)
+| [Prueba de SOS y atencion](docs/PRUEBA_SOS_Y_ATENCION.md)
+
+SOS sin cinturon, cola local, pruebas identificadas y atencion compartida en
+el portal. Migracion 006 activada; prueba fisica entre celulares pendiente.
+Para push todavia se necesita el emisor FCM de PC activo. Sin facturacion nueva.
+La geocerca cloud y el emisor independiente de PC aun no estan implementados.
+Esta candidata no reemplaza el Centro Windows rc5 ni es una app productiva.
+
+### Version anterior: APK corregida 0.4.1-prototipo (5)
 
 [Descargar APK actualizada](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.4.1-android-prototipo/SFA-Asistencia-Android-0.4.1-prototipo.apk)
 | [Notas Android](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.4.1-android-prototipo)

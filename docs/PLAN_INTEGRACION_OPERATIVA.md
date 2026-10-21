@@ -1,8 +1,9 @@
 # Plan de integracion operativa SFA
 
 Fecha: 21 de octubre de 2026. Estado: implementacion por etapas en curso,
-con pruebas integrales pendientes. Equipo y permisos activados; SOS y atencion
-preparados, pendientes de activacion de migracion 006. Ver PRUEBA_SOS_Y_ATENCION.md.
+con pruebas integrales pendientes. Equipo, permisos y migracion 006 de SOS y
+atencion activados. Falta prueba fisica entre dispositivos y emisor independiente
+de PC. Ver PRUEBA_SOS_Y_ATENCION.md.
 Este documento reemplaza el orden de trabajo
 anterior; no convierte las funcionalidades propuestas en funcionalidades activas.
 

@@ -1,7 +1,9 @@
 # SOS y atencion compartida
 
-Estado al 21 de octubre de 2026: fuentes preparadas, migracion 006 pendiente
-de activacion autorizada. No es todavia una distribucion nueva publicada.
+Estado al 21 de octubre de 2026: migracion 006 aplicada con autorizacion y
+permisos comprobados en Supabase alojado. Prueba fisica entre celulares pendiente.
+La publicacion de la APK se registra en sus notas de release, no se deduce de
+la activacion SQL.
 
 ## Que depende de que
 
@@ -25,7 +27,8 @@ explicito del navegador; no constituyen Web Push con el navegador cerrado.
 
 ## Preparacion
 
-1. Aplicar las migraciones 001 a 006 en orden, sin repetir las ya aplicadas.
+1. Para otra instalacion Supabase, aplicar las migraciones 001 a 006 en orden,
+   sin repetir las ya aplicadas. En SFA Asistencia - Pruebas ya estan activas.
 2. Desplegar el portal compatible y Android 0.5.0-prototipo (versionCode 6).
 3. Desde Equipo y permisos, el administrador asigna al emisor su residente y
    permiso explicito de compartir ubicacion; no necesita darle administracion.

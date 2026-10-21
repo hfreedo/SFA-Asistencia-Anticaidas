@@ -2,14 +2,17 @@
 
 ## Corte vigente: 21 de octubre de 2026
 
-- Migraciones 001 a 005 aplicadas desde el Dashboard en el proyecto de pruebas.
+- Migraciones 001 a 006 aplicadas desde el Dashboard en el proyecto de pruebas.
 - 005 habilita equipo, invitaciones y permiso explicito de emisor GPS.
 - sfa-team-invite desplegada; filtro JWT legado desactivado solo para esta
   funcion. La funcion verifica identidad con Auth y rol con RPC antes de invitar.
 - Prueba alojada sin correo: sesion ficticia rechazada con HTTP 401 y codigo
   session_invalid. No se enviaron invitaciones durante el despliegue.
-- Migracion 006 (SOS/atencion/consentimiento de pruebas) preparada y probada
-  aisladamente; pendiente de autorizacion y ejecucion alojada.
+- Migracion 006 (SOS/atencion/consentimiento de pruebas) aplicada con autorizacion.
+  Verificacion alojada: cuatro comandos disponibles, sin EXECUTE anonimo,
+  consentimiento privado y rechazo de llamadas sin identidad. Transaccion con
+  ROLLBACK, sin crear incidentes, destinatarios ni trabajos FCM. Consulta reproducible:
+  supabase/validation/verify_incidents_live.sql.
 - Las pruebas aisladas no validan correo entregado, recepcion FCM en Android
   ni GPS fisico. No hay facturacion, suscripciones ni pruebas de pago activadas.
 
