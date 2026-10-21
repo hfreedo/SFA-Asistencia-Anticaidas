@@ -44,8 +44,9 @@ cd ..
 
 La migración crea tablas nuevas sin borrar perfiles existentes. Respaldar la base
 antes de actualizar. No iniciar pruebas con teléfonos, ubicaciones o correos reales
-sin autorización. Las tablas mantienen la última posición y hasta 500 eventos por
-residente, no un historial ilimitado de recorridos.
+sin autorización. Las tablas mantienen la ultima posicion y, desde esta revision,
+tambien cada posicion aceptada en position_history y los eventos sin purga
+automatica. La consulta de historial esta limitada por pagina, no su retencion.
 
 ## 2. Preparar HTTPS de Confianza
 
@@ -164,7 +165,8 @@ dispositivo vinculado. No proporciona detección de ubicaciones simuladas.
 
 La APK aún requiere implementación de permisos Android, ciclo de vida, seguimiento
 visible en segundo plano, emparejamiento y almacenamiento seguro de la credencial.
-El contrato está preparado; esa aplicación nativa todavía no está construida.
+El contrato ya tiene una APK Kotlin/Compose de prototipo; consultar ANDROID.md.
+Las pruebas fisicas de pantalla bloqueada y HC-06 siguen pendientes.
 
 ## 6. Copias y Privacidad
 
@@ -210,3 +212,31 @@ con consentimiento antes de afirmar funcionamiento integral.
 Fuentes técnicas: [Geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API),
 [mkcert](https://github.com/FiloSottile/mkcert),
 [GeographicLib Python](https://geographiclib.sourceforge.io/html/python/).
+# Cambios de vinculacion y geocerca (20/10/2026)
+
+- El historial de actividad se muestra despues del mapa, no antes de sus controles.
+  El QR permanece junto a la vinculacion del celular. Ocultar el QR no
+  desvincula el celular. Cambiar de residente elimina el QR anterior de la vista.
+- El vinculo de ubicacion no tiene caducidad temporal automatica. Reiniciar
+  el servidor con la misma base o perder lecturas no debe revocarlo.
+- Generar un QR de reemplazo exige confirmacion explicita. El endpoint rechaza
+  reemplazos sin `replace_existing: true`, conservando el vinculo vigente.
+- Si se confirma reemplazar o desvincular, el celular debe escanear el QR nuevo.
+  Cambiar de base tambien puede hacer que un vinculo deje de corresponder.
+- El editor unico esta en Ubicacion; Ajustes > Geocerca muestra un resumen y
+  abre ese editor. El nombre, centro y radio pertenecen al residente seleccionado.
+- Radios desde 5 metros, presets 5/10/25/50/100/200/500 y valor personalizado.
+  La regla actual compara distancia menos/mas incertidumbre con el limite y
+  margen; no rechaza una salida concluyente solo porque el radio sea pequeno.
+  El limite absoluto de precision es 50 m y se mantienen dos lecturas y 10 s
+  de permanencia, antiguedad y rechazo de relojes incorrectos.
+- El panel explica intervalos inciertos y permanencia pendiente. Una salida
+  confirmada mantiene un aviso visible; el sonido respeta las preferencias y
+  puede requerir interaccion del usuario por la politica del navegador.
+- position_history conserva cada posicion aceptada. No hay purga automatica
+  de posiciones ni de eventos de ubicacion. El borrado explicito de un perfil
+  o la restauracion sustitutiva siguen siendo operaciones destructivas.
+- GET /api/location/context requiere el token del celular y devuelve solo su
+  residente y geocerca. La APK lo utiliza para evaluar tambien sin conexion.
+- GPS en APK hacia PC requiere la misma red/hotspot y confianza TLS dentro de
+  la app. No confundirlo con el envio remoto de posiciones a Supabase.

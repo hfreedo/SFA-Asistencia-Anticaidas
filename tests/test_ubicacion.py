@@ -45,6 +45,49 @@ class LocationTests(unittest.TestCase):
         _, events = self.send(66)
         self.assertEqual([e["event_type"] for e in events], ["GEOCERCA_REINGRESO"])
 
+    def test_link_survives_staleness_elapsed_time_and_service_restart(self):
+        self.send(0)
+        self.service.mark_stale(self.start + timedelta(days=1))
+        self.service = LocationService(lambda: self.path)
+        self.service.init_db()
+        snapshot, _ = self.send(86401)
+        self.assertTrue(snapshot['paired'])
+
+    def test_accidental_pair_does_not_rotate_existing_token(self):
+        with self.assertRaises(HTTPException) as result:
+            self.service.pair(1, replace_existing=False)
+        self.assertEqual(result.exception.status_code, 409)
+        self.assertTrue(self.send(0)[0]['paired'])
+
+    def test_five_meter_demo_fence_keeps_precision_checks(self):
+        self.service.set_fence(1, FenceInput(home_lat=0, home_lng=0, radius_m=5))
+        self.assertEqual(self.send(0, latitude=0, accuracy=5)[0]['status'], 'uncertain')
+        self.assertEqual(self.send(11, latitude=.001, accuracy=2)[0]['status'], 'pending')
+        self.assertEqual(self.send(22, latitude=.001, accuracy=2)[0]['status'], 'outside')
+        with self.assertRaises(ValidationError):
+            FenceInput(home_lat=0, home_lng=0, radius_m=4)
+
+    def test_small_fence_confirms_outside_when_uncertainty_is_entirely_outside(self):
+        self.service.set_fence(1, FenceInput(home_lat=0, home_lng=0, radius_m=5))
+        self.assertEqual(self.send(0, latitude=.00014, accuracy=9.6)[0]['status'], 'pending')
+        snapshot, events = self.send(11, latitude=.00014, accuracy=9.6)
+        self.assertEqual(snapshot['status'], 'outside')
+        self.assertGreater(snapshot['evaluation']['distance_min_m'], 5.5)
+        self.assertEqual([event['event_type'] for event in events], ['GEOCERCA_SALIDA'])
+
+    def test_very_poor_precision_still_cannot_confirm_exit(self):
+        self.service.set_fence(1, FenceInput(home_lat=0, home_lng=0, radius_m=5))
+        self.send(0, latitude=.01, accuracy=51)
+        snapshot, events = self.send(11, latitude=.01, accuracy=51)
+        self.assertEqual(snapshot['status'], 'imprecise')
+        self.assertEqual(events, [])
+
+    def test_history_is_not_purged_after_500_events(self):
+        with self.service.connection() as conn:
+            for index in range(501):
+                self.service.event(conn, 1, 'FIXTURE', str(index), self.start)
+            self.assertEqual(conn.execute('select count(*) from location_events').fetchone()[0], 501)
+
     def test_precision_and_boundary_do_not_confirm_an_exit(self):
         self.assertEqual(self.send(0, .01, 80)[0]["status"], "imprecise")
         self.send(11, .01)

@@ -10,6 +10,11 @@ de cada sesión de trabajo. Se distingue lo implementado de lo efectivamente pro
 
 ## 1. El Proyecto Completo en un Solo Mapa
 
+La ampliacion actual agrega Supabase/Auth/cola PC, un centro de inicio unico y
+un prototipo Kotlin/Compose. Leer primero PLAN_AMPLIACION.md, ANDROID.md y
+VALIDACION_AMPLIACION.md para distinguir fuentes construidas de pruebas fisicas.
+El recorrido siguiente conserva la explicacion pedagogica de las capas base.
+
 Leer de arriba hacia abajo. Las ramas del dispositivo y de la aplicación se
 construyen por separado y después se integran. No hay que instalar un programa
 por cada casilla: varias casillas son bibliotecas del mismo entorno.
@@ -191,8 +196,8 @@ flowchart TD
     Actual -.-> Tesis["Pendiente documental/experimental: esquema eléctrico final y estudio del detector"]
     Actual -.-> Futuro["Posibles expansiones; no implementadas"]
     Futuro --> GPS["GPS y batería autónomos del cinturón"]
-    Futuro --> App["App Android Kotlin y vinculación de dispositivos"]
-    Futuro --> Nube["Nube y autenticación, por ejemplo Supabase o Firebase"]
+    Futuro --> App["Completar validacion fisica de APK Kotlin y emisores remotos"]
+    Futuro --> Nube["Ampliar Supabase con GPS remoto y FCM; Auth y PC ya existen"]
     Futuro --> Rutas["Rutas, tiempo de llegada y seguimiento autorizado"]
     Futuro --> Radar["Radar 4D fuera del prototipo actual"]
 ```

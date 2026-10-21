@@ -14,7 +14,46 @@ para Kotlin; [Notificaciones](NOTIFICACIONES.md) distingue correo de push.
 Una aplicación web local conectada a un cinturón Arduino. La computadora recibe
 telemetría, conserva eventos y sirve el panel al navegador. El celular abre ese
 mismo panel mediante un QR cuando comparte la red de la computadora.
-No es todavía una app Android nativa ni una plataforma en la nube.
+Ahora se suman un portal Supabase y un prototipo Android nativo; sus alcances
+son diferentes. GPS cloud y notificaciones FCM siguen pendientes.
+
+## Recorrido Ampliado: Herramientas Que Van Juntas
+
+| Paso | Programa o entorno | Tecnologias de esa capa | Resultado concreto |
+| --- | --- | --- | --- |
+| 1. Cinturon | Arduino IDE o Arduino CLI | C/C++, UNO, Wire/I2C, SoftwareSerial, MPU6050, HC-06 | Firmware que produce TEL/EVT; no GPS ni bateria inventados |
+| 2. Recepcion PC | Python 3.13 + venv + pip | PySerial, FastAPI, Uvicorn, Pydantic | Convierte lineas del puerto en registros/API/WebSocket |
+| 3. Datos PC | Visor SQLite opcional; Python es quien opera | sqlite3, transacciones, cola UUID, GeographicLib/WGS84 | Perfiles, evidencia, historial y reintentos |
+| 4. Pantallas web | Node.js + npm + editor | React, TypeScript, Vite, Tailwind/CSS, Lucide, Leaflet, QRCode | Panel, mapa, geocerca y portal de acceso |
+| 5. Acceso local seguro | Iniciador SFA + navegador | TLS, CA por PC, cryptography; OpenSSL si esta instalado | HTTPS LAN sin incluir claves de otra computadora |
+| 6. Entrega PC | PyInstaller | Runtime Python y web compilada dentro del EXE, Tkinter | Centro de inicio/detencion; no requiere Node ni Python instalados |
+| 7. Identidad y consulta remota | Supabase Dashboard + GitHub Pages | Auth, PostgreSQL, RLS, RPC, SDK Supabase JS | Login e intercambio PC-cloud restringido |
+| 8. Celular nativo | Android Studio + JDK + SDK 35 + Gradle Wrapper | Kotlin, Compose, LocationManager, servicio foreground, Keystore, SQLite, ZXing, RFCOMM | APK Android 12+ con GPS local y lectura HC-06 |
+| 9. Validacion | Terminal y GitHub Actions | unittest, Vitest, PGlite, JUnit, Android lint | Evidencias separadas de compilacion, permisos, algoritmos y hardware |
+| 10. Publicacion | Git/GitHub CLI o GitHub Desktop | Commits, Actions, tags, pre-releases y SHA-256 | Fuentes reproducibles; sin .env, perfiles o certificados privados |
+
+```mermaid
+flowchart TD
+    A[Arduino IDE: firmware C++] --> B[USB o Bluetooth serial]
+    B --> C[Python y PySerial]
+    C --> D[FastAPI, SQLite y WebSocket]
+    E[Node y npm: React, TS, Vite] --> F[Web compilada]
+    D --> F
+    D --> G[Cola persistente PC]
+    G --> H[Supabase Auth, RPC y PostgreSQL RLS]
+    H --> I[Portal HTTPS en GitHub Pages]
+    J[Android Studio, Kotlin y Compose] --> K[APK y servicio foreground]
+    K -->|GPS HTTPS en la misma red| D
+    K -->|Consulta remota autorizada| H
+    L[HC-06 emparejado] -->|RFCOMM| K
+    H -.-> M[Pendiente: GPS cloud y push FCM]
+    F --> N[PyInstaller: centro de inicio Windows]
+```
+
+No se instala XAMPP: el servidor es FastAPI/Uvicorn, no Apache/PHP/MySQL.
+Node sirve para construir la web; no es un requisito del EXE. Android Studio
+sirve para construir la APK, no para ejecutar el panel de la PC. Supabase es
+un servicio externo, no reemplaza la base SQLite del modo sin internet.
 
 ## Cómo Leer el Recorrido
 
@@ -299,7 +338,8 @@ SFA no usa PHP, Apache ni MariaDB. No necesita XAMPP.
   aporta por sí solo. No se deben mostrar valores inventados.
 - Una geocerca dibujada no demuestra seguimiento GPS ni cálculo de rutas o llegada.
 - El QR no conecta automáticamente al Wi-Fi ni crea una cuenta: abre una URL.
-- Kotlin, Firebase y Supabase no forman parte de esta implementación.
+- Kotlin/Compose y Supabase forman parte de la ampliacion. Firebase/FCM aun no
+  esta configurado; no equivale a las notificaciones locales de Android.
 - El acceso LAN no tiene autenticación. Usar una red de confianza, sin exponer
   el panel a Internet ni abrir puertos del router.
 - Compilar o simular no demuestra detección física. Es un prototipo educativo,

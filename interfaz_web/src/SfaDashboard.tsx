@@ -1,6 +1,7 @@
 import L from "leaflet";
 import QRCode from "qrcode";
-import { EmailSettings, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
+import { GeofenceRadius } from "./GeofenceRadius";
+import { EmailSettings, LocationHistory, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -92,13 +93,14 @@ class EmergencyAlarmAudio {
   private intervalId: number | null = null;
 
   start() {
-    if (this.ctx) return;
+    if (this.ctx) { void this.ctx.resume().catch(() => {}); return; }
     try {
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext })
           .webkitAudioContext;
       this.ctx = new AudioCtx();
+      void this.ctx.resume().catch(() => {});
       this.gain = this.ctx.createGain();
       this.gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
       this.gain.connect(this.ctx.destination);
@@ -232,6 +234,8 @@ export function SfaDashboardApp() {
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
   const locationSnapshot = useResidentLocation(profile?.id);
+  const [mutedGeofence, setMutedGeofence] = useState("");
+  const geofenceIncident = locationSnapshot?.status === "outside" ? `${profile?.id}:${locationSnapshot.events.find(event => event.event_type === "GEOCERCA_SALIDA")?.id ?? "outside"}` : "";
 
   const [geofence, setGeofence] = useState<GeofenceConfig>({
     home_lat: -34.6037,
@@ -342,13 +346,13 @@ export function SfaDashboardApp() {
 
   // Alarma sonora
   useEffect(() => {
-    if (emergencyStartedAt && notificationConfig.sound_enabled) {
+    if ((emergencyStartedAt || (geofenceIncident && mutedGeofence !== geofenceIncident && notificationConfig.notify_geofence)) && notificationConfig.sound_enabled) {
       emergencyAlarm.start();
     } else {
       emergencyAlarm.stop();
     }
     return () => emergencyAlarm.stop();
-  }, [emergencyStartedAt, notificationConfig.sound_enabled]);
+  }, [emergencyStartedAt, notificationConfig.sound_enabled, notificationConfig.notify_geofence, geofenceIncident, mutedGeofence]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -454,6 +458,11 @@ export function SfaDashboardApp() {
       onSelectResident={selectResident}
       onOpenNewResidentModal={() => setView("settings")}
     >
+      {geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
+        <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona de referencia</strong><p>Salida confirmada con las lecturas recibidas. Requiere comprobar su situación.</p></div>
+        <button type="button" onClick={() => setView("map")}><Icon name="map" size={17} />Ver ubicación</button>
+        {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
+      </section>}
       {view === "home" && (
         <HomeScreen
           profile={profile}
@@ -499,7 +508,7 @@ export function SfaDashboardApp() {
             setResidents(current => current.map(r => r.id === id ? { ...r, photo_url: url } : r));
             setProfile(current => current?.id === id ? { ...current, photo_url: url } : current);
           }}
-          onUpdateGeofence={(updated) => setGeofence(updated)}
+          onOpenMap={() => setView("map")}
           onUpdateNotifications={(updated) => setNotificationConfig(updated)}
         />
       )}
@@ -969,7 +978,7 @@ function FallAlertScreen({
   );
 }
 
-function MapScreen({
+export function MapScreen({
   geofence,
   profile,
   locationSnapshot,
@@ -983,12 +992,14 @@ function MapScreen({
   const [selectedRadius, setSelectedRadius] = useState<number>(geofence.radius_m);
   const [tempLat, setTempLat] = useState<number>(geofence.home_lat);
   const [tempLng, setTempLng] = useState<number>(geofence.home_lng);
+  const [tempName, setTempName] = useState(geofence.address_name);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setSelectedRadius(geofence.radius_m);
     setTempLat(geofence.home_lat);
     setTempLng(geofence.home_lng);
+    setTempName(geofence.address_name);
   }, [geofence]);
 
   async function saveGeofence() {
@@ -998,7 +1009,7 @@ function MapScreen({
         home_lat: tempLat,
         home_lng: tempLng,
         radius_m: selectedRadius,
-        address_name: geofence.address_name,
+        address_name: tempName.trim(),
       };
       await actionRequest(`/api/residents/${profile?.id}/geofence`, {
         method: "PUT",
@@ -1023,18 +1034,18 @@ function MapScreen({
       <LocationPanel key={profile?.id || "none"} residentId={profile?.id} snapshot={locationSnapshot} />
       <div className="location-layout">
         <section className="location-controls">
-          <div className="location-section"><Icon name="scan-line" size={25} className="text-[#0D9488]" /><h2>Zona de referencia</h2><p>{geofence.address_name || "Sin nombre"}</p></div>
-          <div className="location-section"><label id="radius-label">Radio de la geocerca</label><div className="radius-options" role="group" aria-labelledby="radius-label">
-            {[100,200,300,500].map(radius => <button key={radius} aria-pressed={selectedRadius === radius} onClick={() => setSelectedRadius(radius)}>{radius} m</button>)}
-          </div><p className="control-hint">Distancia desde el centro de la zona.</p></div>
-          <div className="location-section"><h3>Centro de la zona</h3><dl className="location-coordinates"><div><dt>Latitud</dt><dd>{tempLat.toFixed(5)}</dd></div><div><dt>Longitud</dt><dd>{tempLng.toFixed(5)}</dd></div></dl><p className="control-hint">Selecciona un punto en el mapa para cambiar el centro.</p></div>
-          <button className="care-action" onClick={saveGeofence} disabled={saving || !profile?.id}><Icon name="save" size={18} />{saving ? "Guardando…" : "Guardar geocerca"}</button>
+          <div className="location-section"><Icon name="scan-line" size={25} className="text-[#0D9488]" /><h2>Zona de referencia</h2><label className="geofence-name">Nombre de la zona<input value={tempName} maxLength={160} onChange={e => setTempName(e.target.value)} /></label></div>
+          <div className="location-section"><GeofenceRadius value={selectedRadius} onChange={setSelectedRadius} /></div>
+          <div className="location-section"><h3>Centro de la zona</h3><dl className="location-coordinates"><div><dt>Latitud</dt><dd>{tempLat.toFixed(5)}</dd></div><div><dt>Longitud</dt><dd>{tempLng.toFixed(5)}</dd></div></dl>
+            <button type="button" className="resident-button link-resident" disabled={!locationSnapshot?.position || ["stale", "unlinked", "awaiting_device"].includes(locationSnapshot.status)} onClick={() => { if (locationSnapshot?.position) { setTempLat(locationSnapshot.position.latitude); setTempLng(locationSnapshot.position.longitude); } }}><Icon name="locate-fixed" size={17} />Usar posición del celular</button>
+          </div>
+          <button className="care-action" onClick={saveGeofence} disabled={saving || !profile?.id || !tempName.trim() || !Number.isInteger(selectedRadius) || selectedRadius < 5 || selectedRadius > 100000}><Icon name="save" size={18} />{saving ? "Guardando…" : "Guardar geocerca"}</button>
           <div className="location-note"><Icon name="info" size={20} /><p>{hasGps ? "Última posición del celular vinculado, no del cinturón." : "Sin posición del celular. Se muestra solo la zona configurada."}</p></div>
         </section>
         <LocationMap
           homeLat={tempLat}
           homeLng={tempLng}
-          radiusM={selectedRadius}
+          radiusM={Number.isFinite(selectedRadius) && selectedRadius >= 5 ? selectedRadius : geofence.radius_m}
           residentLat={locationSnapshot?.position?.latitude ?? tempLat}
           residentLng={locationSnapshot?.position?.longitude ?? tempLng}
           residentName={residentName}
@@ -1043,11 +1054,12 @@ function MapScreen({
           onMapClick={(lat, lng) => { setTempLat(lat); setTempLng(lng); }}
         />
       </div>
+      <LocationHistory events={locationSnapshot?.events ?? []} />
     </div>
   );
 }
 
-function LocationMap({
+export function LocationMap({
   homeLat,
   homeLng,
   radiusM,
@@ -1130,6 +1142,13 @@ function LocationMap({
       fillOpacity: 0.08,
     }).addTo(map);
   }, [homeLat, homeLng, radiusM, residentLat, residentLng, residentName, hasGps, fresh]);
+
+  useEffect(() => {
+    // Circle bounds require the projection of the map it has been added to.
+    if (mapRef.current && circleRef.current) {
+      mapRef.current.fitBounds(circleRef.current.getBounds(), { padding: [32, 32], maxZoom: 19, animate: false });
+    }
+  }, [homeLat, homeLng, radiusM]);
 
   return (
     <div className="location-map-frame relative overflow-hidden">
@@ -1326,7 +1345,7 @@ function SettingsScreen({
   onDeleteResident,
   onUpdateProfile,
   onPhotoChange,
-  onUpdateGeofence,
+  onOpenMap,
   onUpdateNotifications,
 }: {
   initialTab: "residents" | "hardware";
@@ -1343,7 +1362,7 @@ function SettingsScreen({
   onDeleteResident: (id: number) => void;
   onUpdateProfile: (p: ResidentProfile) => void;
   onPhotoChange: (id: number, url: string | null) => void;
-  onUpdateGeofence: (g: GeofenceConfig) => void;
+  onOpenMap: () => void;
   onUpdateNotifications: (n: NotificationConfig) => void;
 }) {
   const [activeTab, setActiveTab] = useState<
@@ -1369,7 +1388,6 @@ function SettingsScreen({
   });
 
   const [showNewModal, setShowNewModal] = useState(false);
-  const [geofenceForm, setGeofenceForm] = useState<GeofenceConfig>(geofence);
   const [notifForm, setNotifForm] =
     useState<NotificationConfig>(notificationConfig);
   const [testingTelegram, setTestingTelegram] = useState(false);
@@ -1385,9 +1403,6 @@ function SettingsScreen({
       : profile);
   }, [profile]);
 
-  useEffect(() => {
-    setGeofenceForm(geofence);
-  }, [geofence]);
 
   useEffect(() => {
     setNotifForm(notificationConfig);
@@ -1434,15 +1449,6 @@ function SettingsScreen({
       setNewResidentForm({ full_name: "", room: "", phone: "", emergency_phone: "112", medical_notes: "" });
       setShowNewModal(false);
     } catch { /* The parent reports the failed action and keeps this form open. */ }
-  }
-  async function handleSaveGeofence(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      if (!profile?.id) throw new Error("Selecciona un residente");
-      await actionRequest(`/api/residents/${profile.id}/geofence`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geofenceForm) });
-      onUpdateGeofence(geofenceForm);
-      notify("Geocerca guardada");
-    } catch (e) { notify(e instanceof Error ? e.message : "No se pudo guardar la geocerca.", "error"); }
   }
   async function handleSaveNotifications() {
     try {
@@ -1887,82 +1893,25 @@ function SettingsScreen({
         )}
 
         {activeTab === "geofence" && (
-          <form onSubmit={handleSaveGeofence} className="sfa-editorial-card p-6 space-y-4">
-            <h3 className="font-serif text-2xl font-light text-[#14201D]">
-              Parámetros de Geocerca
-            </h3>
-            <label className="block text-xs text-[#55625E]">
-              Nombre del lugar seguro
-              <input
-                type="text"
-                value={geofenceForm.address_name}
-                onChange={(e) =>
-                  setGeofenceForm({ ...geofenceForm, address_name: e.target.value })
-                }
-                className="mt-1 w-full border-b border-[#DED8CC] bg-transparent py-1.5 text-sm outline-none focus:border-[#0F766E]"
-                required
-              />
-            </label>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <label className="text-xs text-[#55625E]">
-                Latitud
-                <input
-                  type="number"
-                  step="any"
-                  value={geofenceForm.home_lat}
-                  onChange={(e) =>
-                    setGeofenceForm({
-                      ...geofenceForm,
-                      home_lat: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="mt-1 w-full border-b border-[#DED8CC] bg-transparent py-1 text-xs font-mono outline-none"
-                  required
-                />
-              </label>
-              <label className="text-xs text-[#55625E]">
-                Longitud
-                <input
-                  type="number"
-                  step="any"
-                  value={geofenceForm.home_lng}
-                  onChange={(e) =>
-                    setGeofenceForm({
-                      ...geofenceForm,
-                      home_lng: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="mt-1 w-full border-b border-[#DED8CC] bg-transparent py-1 text-xs font-mono outline-none"
-                  required
-                />
-              </label>
-              <label className="text-xs text-[#55625E]">
-                Radio (metros)
-                <input
-                  type="number"
-                  value={geofenceForm.radius_m}
-                  onChange={(e) =>
-                    setGeofenceForm({
-                      ...geofenceForm,
-                      radius_m: parseInt(e.target.value, 10) || 200,
-                    })
-                  }
-                  className="mt-1 w-full border-b border-[#DED8CC] bg-transparent py-1 text-xs font-mono outline-none"
-                  required
-                />
-              </label>
-            </div>
-            <button
-              type="submit"
-              className="rounded-full bg-[#14201D] text-white px-5 py-2 text-xs font-medium hover:bg-[#0F766E] transition cursor-pointer"
-            >
-              Guardar perímetro
-            </button>
-          </form>
+          <section className="geofence-settings-summary">
+            <div className="geo-section-heading"><Icon name="scan-line" size={21} /><h3>Zona de referencia</h3></div>
+            <div className="geofence-summary-main"><div><span className="care-eyebrow">{profile?.full_name || "Sin residente seleccionado"}</span><h2>{geofence.address_name || "Zona sin nombre"}</h2></div><strong className="geofence-summary-radius">{geofence.radius_m}<span>m de radio</span></strong></div>
+            <dl className="geofence-summary-coordinates"><div><dt>Centro de la zona</dt><dd>{geofence.home_lat.toFixed(5)}, {geofence.home_lng.toFixed(5)}</dd></div><div><dt>Origen de la posición</dt><dd>Celular vinculado</dd></div></dl>
+            <button type="button" className="care-action" disabled={!profile?.id} onClick={onOpenMap}><Icon name="map" size={18} />Editar zona en el mapa<Icon name="arrow-right" size={17} /></button>
+          </section>
         )}
 
         {activeTab === "mobile" && (
-          <MobileAccess initialInfo={networkInfo} />
+          <>
+            <section className="sfa-account-access">
+              <div><h3>Cuenta SFA</h3><p>Autenticación y datos remotos requieren internet.</p></div>
+              <div>
+                <a href="https://hfreedo.github.io/SFA-Asistencia-Anticaidas/acceso.html" target="_blank" rel="noopener noreferrer"><Icon name="external-link" size={18} />Acceso HTTPS</a>
+                <a href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer"><Icon name="laptop" size={18} />Acceso desde esta PC</a>
+              </div>
+            </section>
+            <MobileAccess initialInfo={networkInfo} />
+          </>
         )}
 
         {activeTab === "hardware" && (

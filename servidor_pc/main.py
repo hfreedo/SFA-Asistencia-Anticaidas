@@ -6,6 +6,7 @@ import binascii
 import json
 import os
 import socket
+import secrets
 import sqlite3
 import sys
 import threading
@@ -16,6 +17,7 @@ from html import escape
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import serial
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -27,19 +29,19 @@ from serial.tools import list_ports
 from servidor_pc.red_local import local_addresses
 from servidor_pc.ubicacion import FenceInput, LocationService, PositionInput
 from servidor_pc.correo import EmailChannel
+from servidor_pc.nube import CloudError, CloudSync
+from servidor_pc.rutas import application_home, database_path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv((Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else BASE_DIR) / ".env")
+APP_HOME = application_home(sys.executable, BASE_DIR, getattr(sys, "frozen", False))
+load_dotenv(APP_HOME / ".env")
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR))
 STATIC_DIR = RESOURCE_DIR / "interfaz_web" / "static"
+ACCESS_DIR = RESOURCE_DIR / "interfaz_web" / "dist-acceso"
 
-if getattr(sys, "frozen", False):
-    data_root = Path(sys.executable).resolve().parent / "data"
-    data_root.mkdir(parents=True, exist_ok=True)
-    DB_PATH = data_root / "sfa_eventos.sqlite3"
-else:
-    DB_PATH = BASE_DIR / "servidor_pc" / "sfa_eventos.sqlite3"
+DB_PATH = database_path(APP_HOME)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class SerialConnectRequest(BaseModel):
@@ -98,7 +100,7 @@ def public_resident(row: sqlite3.Row) -> dict[str, Any]:
 class GeofenceConfigRequest(BaseModel):
     home_lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
     home_lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
-    radius_m: int = Field(default=200, ge=25, le=100000)
+    radius_m: int = Field(default=200, ge=5, le=100000)
     address_name: str = "Hogar / Residencia Central"
 
 
@@ -232,6 +234,7 @@ class SerialBridge:
 bridge = SerialBridge()
 location_service = LocationService(lambda: DB_PATH)
 email_channel = EmailChannel(lambda: DB_PATH)
+cloud_sync = CloudSync(lambda: DB_PATH)
 
 
 def utc_now() -> str:
@@ -267,7 +270,7 @@ def send_telegram_notification(text: str) -> bool:
 def check_and_notify_event(payload: dict[str, Any]) -> None:
     event_type = payload.get("event_type")
     # A sustained telemetry state is not a new incident on every sample.
-    if payload.get("type") != "event" or not event_type:
+    if payload.get("type") != "event" or not event_type or payload.get("simulated"):
         return
 
     def _worker():
@@ -376,6 +379,7 @@ def init_db() -> None:
             conn.execute("ALTER TABLE notification_config ADD COLUMN notify_geofence INTEGER NOT NULL DEFAULT 1")
     location_service.init_db()
     email_channel.init_db()
+    cloud_sync.init_db()
 
 
 def save_record(payload: dict[str, Any]) -> None:
@@ -401,6 +405,11 @@ def save_record(payload: dict[str, Any]) -> None:
                 payload.get("fall_count"),
             ),
         )
+        resident_id = payload.get("resident_id")
+        if not resident_id:
+            active = conn.execute("SELECT id FROM residents WHERE is_active=1 LIMIT 1").fetchone()
+            resident_id = active[0] if active else None
+        cloud_sync.capture(conn, payload, resident_id)
     check_and_notify_event(payload)
 
 
@@ -490,12 +499,24 @@ async def lifespan(app: FastAPI):
                 # A temporary database lock must not permanently disable supervision.
                 continue
     task = asyncio.create_task(watchdog())
+    async def synchronize_cloud():
+        while True:
+            await asyncio.sleep(2)
+            try:
+                await asyncio.to_thread(cloud_sync.flush)
+            except (CloudError, sqlite3.OperationalError):
+                continue
+    sync_task = asyncio.create_task(synchronize_cloud())
     try:
         yield
     finally:
         task.cancel()
+        sync_task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+        with suppress(asyncio.CancelledError):
+            await sync_task
+        cloud_sync.pause()
         bridge.disconnect()
 
 
@@ -508,6 +529,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if ACCESS_DIR.is_dir():
+    app.mount("/acceso", StaticFiles(directory=ACCESS_DIR, html=True), name="access")
 
 
 @app.get("/")
@@ -590,6 +613,7 @@ async def simulate_fall() -> dict[str, Any]:
         "type": "event",
         "event_type": "CAIDA_CONFIRMADA",
         "detail": "simulacion_interfaz",
+        "simulated": True,
         "raw": "EVT,0,CAIDA_CONFIRMADA,simulacion_interfaz",
         "received_at": utc_now(),
         "priority": "critical",
@@ -637,6 +661,7 @@ async def simulate_state(req: SimulationStateRequest) -> dict[str, Any]:
             "type": "event",
             "event_type": state,
             "detail": "simulacion_guiada",
+            "simulated": True,
             "raw": f"EVT,0,{state},simulacion_guiada",
             "received_at": utc_now(),
             "priority": "critical" if state == "CAIDA_CONFIRMADA" else "warning",
@@ -986,10 +1011,14 @@ async def private_responses(request: Request, call_next):
     return response
 
 
+class LocationPairRequest(BaseModel):
+    replace_existing: bool = False
+
+
 @app.post("/api/residents/{resident_id}/location-device")
-def pair_location_device(resident_id: int, request: Request):
+def pair_location_device(resident_id: int, request: Request, body: LocationPairRequest | None = None):
     require_local_operator(request)
-    return location_service.pair(resident_id)
+    return location_service.pair(resident_id, replace_existing=bool(body and body.replace_existing))
 
 
 @app.delete("/api/residents/{resident_id}/location-device")
@@ -1007,6 +1036,12 @@ def resident_location(resident_id: int):
 @app.get("/api/residents/{resident_id}/geofence")
 def resident_geofence(resident_id: int):
     return location_service.get_fence(resident_id)
+
+
+@app.get("/api/residents/{resident_id}/location-history")
+def resident_location_history(resident_id: int, request: Request, limit: int = 100):
+    require_local_operator(request)
+    return location_service.history(resident_id, limit)
 
 
 @app.put("/api/residents/{resident_id}/geofence")
@@ -1029,6 +1064,15 @@ async def receive_location(sample: PositionInput, request: Request, authorizatio
     return snapshot
 
 
+@app.get("/api/location/context")
+def location_device_context(request: Request, authorization: str = Header(default="")):
+    if request.url.scheme != 'https' and (not request.client or request.client.host not in {'127.0.0.1', '::1'}):
+        raise HTTPException(403, 'Se requiere HTTPS')
+    if not authorization.startswith('Bearer ') or len(authorization) > 200:
+        raise HTTPException(401, 'Se requiere el vínculo del dispositivo')
+    return location_service.device_context(authorization[7:])
+
+
 @app.get("/api/notifications/email")
 def email_status(request: Request):
     require_local_operator(request)
@@ -1039,6 +1083,73 @@ def email_status(request: Request):
 async def test_email(request: Request):
     require_local_operator(request)
     return await asyncio.to_thread(email_channel.send, "PRUEBA", "Prueba de correo de SFA Asistencia. Confirmar recepción en el buzón; la aceptación SMTP no garantiza la entrega.")
+
+
+class CloudConnectRequest(BaseModel):
+    resident_id: int = Field(gt=0)
+    space_id: UUID
+    consent: bool
+
+
+def require_cloud_operator(request: Request) -> None:
+    require_local_operator(request)
+    if not request.client or request.client.host not in {"127.0.0.1", "::1"}:
+        raise HTTPException(403, "La vinculación cloud se realiza en localhost de esta PC")
+
+
+def cloud_bearer(value: str) -> str:
+    if not value.startswith("Bearer ") or len(value)>16400:
+        raise HTTPException(401, "Inicia sesión con tu cuenta SFA")
+    return value[7:]
+
+
+@app.get("/api/cloud/status")
+def cloud_status(request: Request):
+    require_cloud_operator(request)
+    return cloud_sync.status()
+
+
+@app.post("/api/launcher/stop")
+def launcher_stop(request: Request, authorization: str = Header(default="")):
+    require_cloud_operator(request)
+    control = getattr(app.state, 'local_shutdown', None)
+    if not control or not secrets.compare_digest(authorization, 'Bearer ' + control[0]):
+        raise HTTPException(403, "Se requiere el control local de esta instancia")
+    control[1].should_exit = True
+    return {"status": "stopping"}
+
+
+@app.post("/api/cloud/connect")
+def cloud_connect(body: CloudConnectRequest, request: Request, authorization: str = Header(default="")):
+    require_cloud_operator(request)
+    if not body.consent:
+        raise HTTPException(422, "Se requiere autorizar los datos que se sincronizarán")
+    token = cloud_bearer(authorization)
+    with sqlite3.connect(DB_PATH) as conn:
+        active = conn.execute("SELECT is_active FROM residents WHERE id=?", (body.resident_id,)).fetchone()
+    if not active or not active[0]:
+        raise HTTPException(409, "Solo se vincula el perfil activo del cinturón")
+    try:
+        return cloud_sync.connect(token, body.resident_id, str(body.space_id))
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code, "message": "No se pudo vincular la PC"}) from None
+
+
+@app.post("/api/cloud/session")
+def cloud_session(request: Request, authorization: str = Header(default="")):
+    require_cloud_operator(request)
+    try:
+        cloud_sync.authenticate(cloud_bearer(authorization))
+        return cloud_sync.status()
+    except CloudError as exc:
+        raise HTTPException(exc.status, "La sesión cloud no está disponible") from None
+
+
+@app.post("/api/cloud/pause")
+def cloud_pause(request: Request):
+    require_cloud_operator(request)
+    cloud_sync.pause()
+    return cloud_sync.status()
 
 
 @app.websocket("/ws")

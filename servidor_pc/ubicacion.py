@@ -31,7 +31,7 @@ class FenceInput(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
     home_lat: float = Field(ge=-90, le=90)
     home_lng: float = Field(ge=-180, le=180)
-    radius_m: int = Field(default=200, ge=25, le=100000)
+    radius_m: int = Field(default=200, ge=5, le=100000)
     address_name: str = Field(default="Zona de referencia", max_length=160)
 
 
@@ -77,6 +77,12 @@ class LocationService:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, resident_id INTEGER NOT NULL,
                     event_type TEXT NOT NULL, detail TEXT NOT NULL, received_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS position_history (
+                    id TEXT PRIMARY KEY, resident_id INTEGER NOT NULL,
+                    latitude REAL NOT NULL, longitude REAL NOT NULL, accuracy_m REAL NOT NULL,
+                    observed_at TEXT NOT NULL, received_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS position_history_resident ON position_history(resident_id, observed_at);
             """)
 
     def require_resident(self, conn, resident_id):
@@ -87,10 +93,13 @@ class LocationService:
     def digest(token):
         return hashlib.sha256(token.encode()).hexdigest()
 
-    def pair(self, resident_id):
+    def pair(self, resident_id, replace_existing=True):
         token = secrets.token_urlsafe(32)
         with self.connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             self.require_resident(conn, resident_id)
+            if not replace_existing and conn.execute("SELECT 1 FROM location_devices WHERE resident_id=?", (resident_id,)).fetchone():
+                raise HTTPException(409, "Ya hay un celular vinculado. Confirma Reemplazar vínculo para crear un QR nuevo.")
             if not conn.execute("SELECT 1 FROM resident_geofences WHERE resident_id=?", (resident_id,)).fetchone():
                 fence = self.fence(conn, resident_id)
                 conn.execute("INSERT INTO resident_geofences VALUES (?,?,?,?,?)", (resident_id, fence["home_lat"], fence["home_lng"], fence["radius_m"], fence["address_name"]))
@@ -103,6 +112,14 @@ class LocationService:
         with self.connection() as conn:
             self.require_resident(conn, resident_id)
             conn.execute("DELETE FROM location_devices WHERE resident_id=?", (resident_id,))
+
+    def device_context(self, token):
+        with self.connection() as conn:
+            row = conn.execute("SELECT resident_id FROM location_devices WHERE token_hash=?", (self.digest(token),)).fetchone()
+            if not row:
+                raise HTTPException(401, "Vínculo no válido o revocado")
+            self.require_resident(conn, row['resident_id'])
+            return {'resident_id': row['resident_id'], 'geofence': self.fence(conn, row['resident_id'])}
 
     def fence(self, conn, resident_id):
         row = conn.execute("SELECT home_lat,home_lng,radius_m,address_name FROM resident_geofences WHERE resident_id=?", (resident_id,)).fetchone()
@@ -129,21 +146,27 @@ class LocationService:
         with self.connection() as conn:
             self.require_resident(conn, resident_id)
             row = conn.execute("SELECT * FROM resident_locations WHERE resident_id=?", (resident_id,)).fetchone()
+            fence = self.fence(conn, resident_id)
             paired = bool(conn.execute("SELECT 1 FROM location_devices WHERE resident_id=?", (resident_id,)).fetchone())
             events = [dict(r) for r in conn.execute("SELECT id,event_type,detail,received_at FROM location_events WHERE resident_id=? ORDER BY id DESC LIMIT 12", (resident_id,))]
         position = dict(row) if row else None
         age = max(0, (now - datetime.fromisoformat(row["observed_at"])).total_seconds()) if row else None
         status = "no_fix" if not row else "unlinked" if not paired else "stale" if age > self.stale_seconds else row["quality"]
+        evaluation = None
+        if row:
+            elapsed = (datetime.fromisoformat(row['observed_at']) - datetime.fromisoformat(row['candidate_since'])).total_seconds() if row['candidate_since'] else 0
+            evaluation = {'radius_m': fence['radius_m'], 'distance_min_m': max(0, row['distance_m'] - row['accuracy_m']),
+                          'distance_max_m': row['distance_m'] + row['accuracy_m'], 'samples': row['samples'],
+                          'remaining_seconds': max(0, self.dwell_seconds - elapsed) if row['candidate'] else None,
+                          'candidate': row['candidate'], 'maximum_accuracy_m': 50}
         return {"resident_id": resident_id, "paired": paired, "status": status,
-                "age_seconds": age, "position": position, "events": events}
+                "age_seconds": age, "position": position, "events": events, "evaluation": evaluation}
 
     def event(self, conn, resident_id, kind, detail, now):
         payload = {"type": "event", "resident_id": resident_id, "event_type": kind,
                    "detail": detail, "received_at": now.isoformat(), "raw": "location"}
         conn.execute("INSERT INTO location_events (resident_id,event_type,detail,received_at) VALUES (?,?,?,?)",
                      (resident_id, kind, detail, payload["received_at"]))
-        # Keep only a bounded event log, rather than storing an unlimited movement history.
-        conn.execute("DELETE FROM location_events WHERE resident_id=? AND id NOT IN (SELECT id FROM location_events WHERE resident_id=? ORDER BY id DESC LIMIT 500)", (resident_id, resident_id))
         return payload
 
     def ingest(self, token: str, sample: PositionInput, now=None):
@@ -166,7 +189,8 @@ class LocationService:
             distance = Geodesic.WGS84.Inverse(fence["home_lat"], fence["home_lng"], sample.latitude, sample.longitude)["s12"]
             radius = fence["radius_m"]
             margin = min(10, radius * .1)
-            if sample.accuracy_m > min(50, radius / 2):
+            # Evaluate the entire uncertainty interval; radius alone is not a quality cap.
+            if sample.accuracy_m > 50:
                 target, quality = None, "imprecise"
             elif distance - sample.accuracy_m > radius + margin:
                 target, quality = "outside", "pending"
@@ -197,6 +221,9 @@ class LocationService:
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)""",
                          (resident_id, sample.latitude, sample.longitude, sample.accuracy_m,
                           sample.observed_at.isoformat(), now.isoformat(), distance, quality, stable, target, since, count))
+            evidence_id = self.digest(f'{resident_id}:{sample.observed_at.isoformat()}')
+            conn.execute('INSERT OR IGNORE INTO position_history VALUES (?,?,?,?,?,?,?)',
+                         (evidence_id, resident_id, sample.latitude, sample.longitude, sample.accuracy_m, sample.observed_at.isoformat(), now.isoformat()))
         return self.snapshot(resident_id, now), events
 
     def mark_stale(self, now=None):
@@ -211,8 +238,13 @@ class LocationService:
                     events.append(self.event(conn, row["resident_id"], "UBICACION_PERDIDA", "Sin posición reciente; no se puede confirmar la zona", now))
         return events
 
+    def history(self, resident_id, limit=100):
+        with self.connection() as conn:
+            self.require_resident(conn, resident_id)
+            return [dict(row) for row in conn.execute('SELECT * FROM position_history WHERE resident_id=? ORDER BY observed_at DESC LIMIT ?', (resident_id, max(1, min(limit, 1000))))]
+
     def purge_resident(self, conn, resident_id=None):
-        for table in ("location_devices", "resident_geofences", "resident_locations", "location_events"):
+        for table in ("location_devices", "resident_geofences", "resident_locations", "location_events", "position_history"):
             if resident_id is None:
                 conn.execute(f"DELETE FROM {table}")
             else:

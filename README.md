@@ -4,6 +4,24 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
+### Ampliacion 1.2.0-rc1: PC, Supabase y Android
+
+El estado actual incluye centro de inicio unificado, base compartida entre
+fuentes y EXE del proyecto, HTTPS asistido, geocerca con incertidumbre y aviso
+persistente, historial sin purga automatica y un prototipo Android Kotlin/Compose.
+Supabase aporta Auth, RLS y sincronizacion PC; la APK consulta eventos remotos,
+pero **GPS hacia Supabase y push FCM todavia no estan implementados**.
+
+- [Cambios de esta entrega](CHANGELOG.md).
+- [Plan y estado de las etapas](docs/PLAN_AMPLIACION.md).
+- [Android: construir, instalar y validar](docs/ANDROID.md).
+- [Evidencia y condiciones pendientes](docs/VALIDACION_AMPLIACION.md).
+- [Centro de inicio Windows](docs/INICIADOR.md).
+
+El APK/EXE generado no demuestra que el GPS con pantalla bloqueada, HC-06 o
+las alertas remotas hayan sido probados en un telefono fisico. La entrega es
+un prototipo, no un servicio de emergencia certificado.
+
 Las fuentes del 20 de octubre de 2026 incorporan vínculo de celular por QR,
 recepción HTTPS de posiciones, geocercas por residente y correo SMTP alternativo
 a Telegram. **Esta ampliación no está incluida en los portables anteriores.**
@@ -12,8 +30,9 @@ a Telegram. **Esta ampliación no está incluida en los portables anteriores.**
 - [Preparación HTTPS asistida para PC y Android](docs/HTTPS_ANDROID.md).
 - [Configurar correo y otros avisos](docs/NOTIFICACIONES.md).
 
-La vista web de envío requiere permanecer abierta; todavía no es una app Kotlin
-con seguimiento en segundo plano. Hace falta configurar HTTPS de confianza y,
+La vista web de envio requiere permanecer abierta. La APK nueva implementa un
+servicio foreground hacia la PC de la misma red; falta validarlo fisicamente.
+Hace falta configurar HTTPS de confianza y,
 para correos reales, una cuenta SMTP. El panel general sigue siendo solo para LAN
 de confianza, no para exposición pública en Internet.
 
@@ -41,7 +60,7 @@ flowchart TD
 ## Código Fuente y Guía Para Estudiantes
 
 Ahora se incluye el código fuente del estado actual: firmware Arduino, servidor
-Python, interfaz React y configuración de empaquetado. No se incluyen datos
+Python, interfaz React, Android Kotlin/Compose y configuración de empaquetado. No se incluyen datos
 personales, credenciales ni dependencias instaladas.
 
 - [Empieza aquí: guía paso a paso para alumnos](docs/GUIA_ALUMNOS.md).

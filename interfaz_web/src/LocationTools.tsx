@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, Link2, Mail, MapPin, Pause, RefreshCw, Send, Unlink } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, Clock3, Link2, Mail, MapPin, Pause, QrCode, RefreshCw, Send, ShieldCheck, Unlink, X } from "lucide-react";
 import QRCode from "qrcode";
 
 export type LocationSnapshot = {
@@ -12,6 +12,7 @@ export type LocationSnapshot = {
     distance_m: number; observed_at: string; stable_state: string;
   };
   events: { id: number; event_type: string; detail: string; received_at: string }[];
+  evaluation?: { radius_m: number; distance_min_m: number; distance_max_m: number; samples: number; remaining_seconds: number | null; candidate: string | null; maximum_accuracy_m: number } | null;
 };
 
 const labels: Record<string, string> = {
@@ -23,6 +24,17 @@ const labels: Record<string, string> = {
   error: "No se pudo consultar la ubicación",
 };
 export const locationLabel = (status: string) => labels[status] || "Estado no disponible";
+
+export function locationExplanation(snapshot: LocationSnapshot | null) {
+  const evaluation = snapshot?.evaluation;
+  if (!evaluation) return "Aún no hay una evaluación disponible.";
+  if (snapshot?.status === "stale") return "No llegan posiciones recientes. No se puede confirmar si permanece en la zona.";
+  if (snapshot?.status === "imprecise") return `El GPS supera el límite de ±${evaluation.maximum_accuracy_m} m. No se confirma una entrada ni una salida.`;
+  const interval = `${evaluation.distance_min_m.toFixed(1)}–${evaluation.distance_max_m.toFixed(1)} m`;
+  if (snapshot?.status === "uncertain") return `Distancia estimada con incertidumbre: ${interval}; el intervalo cruza el límite de ${evaluation.radius_m} m.`;
+  if (snapshot?.status === "pending") return `${evaluation.candidate === "outside" ? "Posible salida" : "Posible entrada"}: ${evaluation.samples} lectura(s), ${Math.ceil(evaluation.remaining_seconds ?? 0)} s de permanencia pendientes. Intervalo: ${interval}.`;
+  return `Intervalo estimado: ${interval} desde el centro. Radio guardado: ${evaluation.radius_m} m.`;
+}
 
 async function jsonRequest(url: string, options?: RequestInit) {
   const response = await fetch(url, options);
@@ -62,51 +74,95 @@ export function LocationPanel({ residentId, snapshot }: { residentId?: number; s
   const [qr, setQr] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"success" | "error">("success");
+  const operation = useRef(0);
+  const [confirmRenew, setConfirmRenew] = useState(false);
   const [network, setNetwork] = useState<{ url: string; port: number; addresses: string[] } | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState("");
+  useEffect(() => {
+    operation.current += 1;
+    setQr(""); setMessage(""); setBusy(false); setConfirmRenew(false);
+    return () => { operation.current += 1; };
+  }, [residentId]);
   useEffect(() => {
     let disposed = false;
     jsonRequest("/api/network-info").then(data => { if (!disposed) setNetwork(data); }).catch(() => {});
     return () => { disposed = true; };
   }, []);
   async function pair() {
+    const requestId = ++operation.current;
     setBusy(true); setQr(""); setMessage("");
     try {
       if (window.location.protocol !== "https:") throw new Error("Inicia el modo HTTPS para vincular un celular");
       const network = await jsonRequest("/api/network-info");
-      const result = await jsonRequest(`/api/residents/${residentId}/location-device`, { method: "POST" });
+      if (requestId !== operation.current) return;
       const url = new URL("/compartir-ubicacion", selectedOrigin || network.url);
+      if (!network.lan_available || url.protocol !== "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+        throw new Error("El celular no puede acceder a este modo. Detén el servidor desde SFA Asistencia y activa Celular y ubicación: HTTPS en red local.");
+      }
+      const result = await jsonRequest(`/api/residents/${residentId}/location-device`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ replace_existing: confirmRenew }) });
       url.hash = new URLSearchParams({ token: result.token }).toString();
-      setQr(await QRCode.toDataURL(url.href, { width: 224, margin: 4, errorCorrectionLevel: "M" }));
+      const image = await QRCode.toDataURL(url.href, { width: 224, margin: 4, errorCorrectionLevel: "M" });
+      if (requestId !== operation.current) return;
+      setQr(image);
+      setConfirmRenew(false);
+      setMessageKind("success");
       setMessage("Vínculo nuevo creado; el anterior dejó de funcionar");
       window.dispatchEvent(new Event("sfa-location-refresh"));
-    } catch (error) { setMessage(error instanceof Error ? error.message : "No se pudo vincular"); }
-    finally { setBusy(false); }
+    } catch (error) { if (requestId === operation.current) { setMessageKind("error"); setMessage(error instanceof Error ? error.message : "No se pudo vincular"); } }
+    finally { if (requestId === operation.current) setBusy(false); }
   }
   async function revoke() {
     setBusy(true);
     try {
       await jsonRequest(`/api/residents/${residentId}/location-device`, { method: "DELETE" });
-      setQr(""); setMessage("Vínculo revocado");
+      setQr(""); setMessageKind("success"); setMessage("Vínculo revocado");
       window.dispatchEvent(new Event("sfa-location-refresh"));
-    } catch (error) { setMessage(error instanceof Error ? error.message : "No se pudo desvincular"); }
+    } catch (error) { setMessageKind("error"); setMessage(error instanceof Error ? error.message : "No se pudo desvincular"); }
     finally { setBusy(false); }
   }
   const position = snapshot?.position;
   return <section className="geo-tracking" aria-label="Seguimiento del residente">
-    <div className="geo-tracking-status"><MapPin size={22} /><div>
+    <div className={`geo-tracking-status${["outside", "stale", "imprecise", "error"].includes(snapshot?.status || "") ? " is-warning" : ""}`}><MapPin size={22} /><div>
       <strong>{locationLabel(snapshot?.status || "no_fix")}</strong>
       {position && <p>Precisión ±{Math.round(position.accuracy_m)} m · {Math.round(snapshot?.age_seconds || 0)} s desde la lectura · {Math.round(position.distance_m)} m del centro</p>}
+      {snapshot?.evaluation && <p className="geo-evaluation">{locationExplanation(snapshot)}</p>}
     </div><span className="care-status">{snapshot?.paired ? "Celular vinculado" : "Sin vínculo"}</span></div>
     {network && network.addresses.length > 1 && <label className="geo-network">Red del celular<select value={selectedOrigin || network.url} onChange={event => { setSelectedOrigin(event.target.value); setQr(""); }}>{network.addresses.map(address => <option key={address} value={`${window.location.protocol}//${address}:${network.port}`}>{address.startsWith("192.168.137.") ? "Hotspot de Windows" : "Red local"} · {address}</option>)}</select></label>}
     <div className="geo-actions">
-      <button className="resident-button link-resident" disabled={!residentId || busy} onClick={pair}><Link2 size={17} />{busy ? "Procesando…" : "Vincular celular por QR"}</button>
+      <button className="resident-button link-resident" disabled={!residentId || busy} onClick={() => { if (snapshot?.paired || qr) setConfirmRenew(true); else void pair(); }}><QrCode size={17} />{busy ? "Procesando…" : snapshot?.paired || qr ? "Reemplazar vínculo del celular" : "Vincular celular por QR"}</button>
       <button className="resident-button" disabled={!snapshot?.paired || busy} onClick={revoke}><Unlink size={17} />Desvincular</button>
     </div>
-    {message && <p role="status" className="geo-message">{message}</p>}
-    {qr && <div className="geo-pairing"><img src={qr} width={224} height={224} alt="QR privado para compartir ubicación" /><p>Vínculo privado de ubicación</p></div>}
-    {!!snapshot?.events.length && <div className="geo-event-list">{snapshot.events.slice(0, 4).map(event => <div key={event.id}><span>{event.detail}</span><time dateTime={event.received_at}>{new Date(event.received_at).toLocaleTimeString("es")}</time></div>)}</div>}
+    {confirmRenew && <div className="geo-renew-confirm" role="group" aria-label="Confirmar reemplazo del vínculo">
+      <AlertTriangle size={20} /><div><strong>¿Reemplazar el vínculo actual?</strong><p>El celular dejará de enviar ubicación hasta que escanee el nuevo QR.</p></div>
+      <div className="geo-renew-actions"><button type="button" disabled={busy} onClick={() => setConfirmRenew(false)}>Cancelar</button><button type="button" disabled={busy} onClick={() => void pair()}>Reemplazar vínculo</button></div>
+    </div>}
+    {message && <div role={messageKind === "error" ? "alert" : "status"} className={`geo-feedback ${messageKind}`}>
+      {messageKind === "error" ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} />}<span>{message}</span>
+    </div>}
+    {qr && <div className="geo-support-grid">
+      <section className="geo-pairing" aria-label="Vínculo privado del celular">
+        <div className="geo-section-heading"><QrCode size={18} /><h3>Vínculo del celular</h3><button type="button" className="geo-dismiss" aria-label="Ocultar código QR" title="Ocultar código QR, sin desvincular el celular" onClick={() => setQr("")}><X size={18} /></button></div>
+        <div className="geo-pairing-body"><img src={qr} width={224} height={224} alt="QR privado para compartir ubicación" />
+          <div className="geo-pairing-meta"><span className="geo-private-label"><ShieldCheck size={16} />Acceso privado</span><strong>Ubicación del residente</strong><span>Red local · HTTPS</span><p>El vínculo anterior ya no es válido.</p></div>
+        </div>
+      </section>
+    </div>}
   </section>;
+}
+
+export function LocationHistory({ events }: { events: LocationSnapshot["events"] }) {
+  if (!events.length) return null;
+  return <section className="geo-history" aria-label="Actividad reciente de ubicación">
+        <div className="geo-section-heading"><Clock3 size={18} /><h3>Actividad reciente</h3><span className="geo-history-count">Últimos {Math.min(events.length, 4)}</span></div>
+        <ol className="geo-event-list">{events.slice(0, 4).map(event => {
+          const warning = event.event_type === "GEOCERCA_SALIDA" || event.event_type === "UBICACION_PERDIDA";
+          return <li key={event.id} className={warning ? "is-warning" : ""}>
+            <span className="geo-event-icon">{warning ? <AlertTriangle size={16} /> : <MapPin size={16} />}</span>
+            <span className="geo-event-detail">{event.detail}</span><time dateTime={event.received_at} title={new Date(event.received_at).toLocaleString("es")}>{new Date(event.received_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+          </li>;
+        })}</ol>
+      </section>;
 }
 
 export function EmailSettings() {
@@ -159,7 +215,11 @@ export function PhoneLocationSender() {
         await jsonRequest("/api/location", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy_m: fix.coords.accuracy, observed_at: new Date(fix.timestamp).toISOString() }) });
         sentTimestamp = fix.timestamp;
         if (!disposed) { setStatus("Ubicación enviada"); setLastSent(new Date().toLocaleTimeString("es")); }
-      } catch (error) { if (!disposed) { setStatus(error instanceof Error ? error.message : "Sin comunicación; se reintentará"); if (error instanceof Error && /revocado|no válido/i.test(error.message)) setRunning(false); } }
+      } catch (error) { if (!disposed) {
+        const revoked = error instanceof Error && /revocado|no válido/i.test(error.message);
+        setStatus(revoked ? "Este vínculo fue reemplazado, revocado o no corresponde a este servidor. Escanea el último QR del residente." : error instanceof Error ? error.message : "Sin comunicación; se reintentará");
+        if (revoked) setRunning(false);
+      } }
       finally { sending = false; }
     };
     const watch = navigator.geolocation.watchPosition(position => {

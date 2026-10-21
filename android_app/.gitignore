@@ -1,0 +1,8 @@
+.gradle/
+.jvm-tmp/
+local.properties
+**/build/
+*.jks
+*.keystore
+google-services.json
+artifacts/

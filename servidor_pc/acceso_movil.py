@@ -7,7 +7,8 @@ from pathlib import Path
 
 import uvicorn
 
-from servidor_pc.main import get_local_ip
+from servidor_pc.main import app, get_local_ip
+from servidor_pc.control_local import server_control
 from servidor_pc.red_local import lan_sockets, local_addresses
 
 
@@ -43,7 +44,9 @@ def main() -> None:
     print("Conecta el celular a la misma red. Ctrl+C detiene el servidor.")
     listeners = lan_sockets(["127.0.0.1", *addresses], 8780)
     try:
-        uvicorn.Server(uvicorn.Config("servidor_pc.main:app", port=8780, **tls)).run(sockets=listeners)
+        server = uvicorn.Server(uvicorn.Config(app, port=8780, timeout_graceful_shutdown=5, **tls))
+        with server_control(app, server, 8780, f"{scheme}://localhost:8780"):
+            server.run(sockets=listeners)
     finally:
         for listener in listeners:
             listener.close()

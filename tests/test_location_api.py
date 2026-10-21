@@ -66,6 +66,11 @@ class LocationApiTests(unittest.TestCase):
             with error:
                 return error.code, json.load(error)
 
+    def test_launcher_stop_requires_instance_capability(self):
+        status, _ = self.request('/api/launcher/stop', 'POST', {}, {'Authorization': 'Bearer invalid'})
+        self.assertEqual(status, 403)
+        self.assertEqual(self.request('/api/status')[0], 200)
+
     def setUp(self):
         _, created = self.request("/api/residents", "POST", dict(full_name="Prueba API", room="Prueba", phone=""))
         self.id = created["id"]
@@ -78,6 +83,28 @@ class LocationApiTests(unittest.TestCase):
         return dict(latitude=latitude, longitude=0, accuracy_m=5,
                     observed_at=(datetime.now(timezone.utc) + timedelta(seconds=offset)).isoformat(), **extra)
 
+    def test_cloud_management_requires_local_origin_and_explicit_consent(self):
+        status, data = self.request('/api/cloud/status')
+        self.assertEqual(status, 200)
+        self.assertFalse(data['session_active'])
+        self.assertEqual(self.request('/api/cloud/status', headers={'Origin':'https://example.invalid'})[0],403)
+        body = dict(resident_id=self.id, space_id='11111111-1111-4111-8111-111111111111',consent=False)
+        self.assertEqual(self.request('/api/cloud/connect','POST',body)[0],422)
+        body['consent'] = True
+        self.assertEqual(self.request('/api/cloud/connect','POST',body)[0],401)
+
+    def test_cloud_pause_preserves_queue(self):
+        self.assertEqual(self.request('/api/cloud/pause','POST',{})[0],200)
+        self.assertEqual(self.request('/api/cloud/status')[1]['pending'],0)
+
+    def test_simulations_are_explicitly_labeled(self):
+        status, event = self.request('/api/simulate/fall','POST',{})
+        self.assertEqual(status,200)
+        self.assertTrue(event['simulated'])
+        status, reading = self.request('/api/simulate/state','POST',{'state':'CAIDA_CONFIRMADA'})
+        self.assertEqual(status,200)
+        self.assertTrue(reading['simulated'])
+
     def test_authentication_revocation_and_scope(self):
         self.assertEqual(self.request("/api/location", "POST", self.position())[0], 401)
         status, snapshot = self.request("/api/location", "POST", self.position(resident_id=99999), {"Authorization": "Bearer " + self.token})
@@ -85,6 +112,36 @@ class LocationApiTests(unittest.TestCase):
         self.assertEqual(snapshot["resident_id"], self.id)
         self.request(f"/api/residents/{self.id}/location-device", "DELETE")
         self.assertEqual(self.request("/api/location", "POST", self.position(), {"Authorization": "Bearer " + self.token})[0], 401)
+
+    def test_replacing_phone_link_requires_explicit_confirmation(self):
+        path = f'/api/residents/{self.id}/location-device'
+        self.assertEqual(self.request(path, 'POST', {})[0], 409)
+        self.assertEqual(self.request('/api/location', 'POST', self.position(), {'Authorization': 'Bearer ' + self.token})[0], 200)
+        status, new = self.request(path, 'POST', {'replace_existing': True})
+        self.assertEqual(status, 200)
+        self.assertNotEqual(new['token'], self.token)
+        self.assertEqual(self.request('/api/location', 'POST', self.position(offset=1), {'Authorization': 'Bearer ' + self.token})[0], 401)
+
+    def test_five_meter_fence_round_trips(self):
+        body = dict(home_lat=0, home_lng=0, radius_m=5, address_name='Demostracion')
+        path = f'/api/residents/{self.id}/geofence'
+        self.assertEqual(self.request(path, 'PUT', body)[0], 200)
+        self.assertEqual(self.request(path)[1]['radius_m'], 5)
+        self.assertEqual(self.request(path, 'PUT', {**body, 'radius_m': 4})[0], 422)
+
+    def test_native_device_context_is_scoped_by_the_phone_token(self):
+        self.assertEqual(self.request('/api/location/context')[0], 401)
+        status, data = self.request('/api/location/context', headers={'Authorization': 'Bearer ' + self.token})
+        self.assertEqual(status, 200)
+        self.assertEqual(set(data), {'resident_id', 'geofence'})
+        self.assertEqual(data['resident_id'], self.id)
+
+    def test_position_history_is_retained_and_scoped(self):
+        self.request('/api/location', 'POST', self.position(), {'Authorization': 'Bearer ' + self.token})
+        status, history = self.request(f'/api/residents/{self.id}/location-history')
+        self.assertEqual(status, 200)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]['resident_id'], self.id)
 
     def test_bad_origin_cannot_create_pairing(self):
         self.assertEqual(self.request(f"/api/residents/{self.id}/location-device", "POST", headers={"Origin": "https://example.invalid"})[0], 403)

@@ -14,7 +14,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from servidor_pc.red_local import local_addresses
 
-ROOT = Path(__file__).resolve().parents[1]
+from servidor_pc.rutas import application_home
+import sys
+
+ROOT = application_home(sys.executable, Path(__file__).resolve().parents[1], getattr(sys, 'frozen', False))
 
 
 def find_openssl() -> str:
@@ -34,7 +37,8 @@ def find_openssl() -> str:
 
 
 def run(openssl, *arguments):
-    result = subprocess.run([openssl, *map(str, arguments)], capture_output=True, text=True, errors="replace", timeout=90)
+    result = subprocess.run([openssl, *map(str, arguments)], capture_output=True, text=True, errors="replace", timeout=90,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     if result.returncode:
         raise RuntimeError("OpenSSL no pudo completar la preparación: " + result.stderr[-1000:])
     return result.stdout
@@ -55,7 +59,14 @@ def covers_addresses(openssl, certificate, key, addresses):
 
 
 def prepare(root: Path, addresses: list[str], certificate=None, key=None):
-    openssl = find_openssl()
+    if getattr(sys, 'frozen', False) or os.getenv('SFA_TLS_BACKEND') == 'native':
+        from servidor_pc.tls_nativo import prepare_native
+        return prepare_native(root, addresses, certificate, key)
+    try:
+        openssl = find_openssl()
+    except RuntimeError:
+        from servidor_pc.tls_nativo import prepare_native
+        return prepare_native(root, addresses, certificate, key)
     addresses = list(dict.fromkeys(["127.0.0.1", *[str(ipaddress.ip_address(a)) for a in addresses]]))
     folder = root / "certs"
     certificate = Path(certificate) if certificate else folder / "sfa.pem"
