@@ -1,5 +1,22 @@
 # Versiones
 
+## v1.2.0-rc1 - Candidata de pruebas
+
+Windows portable con centro de inicio, geocerca desde 5 m, historial conservado,
+HTTPS sin OpenSSL externo y controlador CH340/CH341 opcional. APK Android 12+
+con GPS foreground hacia la PC, QR, CA privada de la app y consulta Supabase.
+
+Archivos: `SFA-Asistencia-1.2.0-rc1-Windows.zip`,
+`SFA-Asistencia-1.2.0-rc1-Android-prototipo.apk` y manifiesto `.sha256`.
+
+La APK tiene firma debug. No es una version de produccion: faltan las pruebas
+fisicas, GPS hacia Supabase y push FCM. No reemplaza la version estable anterior.
+
+[Descarga candidata](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc1)
+| [Changelog](CHANGELOG.md)
+| [Pruebas y limites](docs/VALIDACION_AMPLIACION.md)
+| [Guia Android](docs/ANDROID.md)
+
 ## v1.1.0 — Preparada en borrador
 
 Actualización del borrador: acceso LAN en Ethernet y hotspot, selección de red para el QR y reintento de generación. El QR sigue siendo la forma principal de abrir el panel en el celular.
