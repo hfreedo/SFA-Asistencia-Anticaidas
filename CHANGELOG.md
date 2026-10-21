@@ -9,7 +9,8 @@
 - Cambiar de residente o perder la posicion valida retira el mapa anterior.
 - Editor de geocerca por internet preparado: centro por mapa o coordenadas,
   radios desde 5 m, guardado por residente, permisos y revision contra cambios
-  simultaneos. Migracion 007 pendiente de autorizacion y activacion alojada.
+  simultaneos. Migracion 007 activada con autorizacion en el proyecto de pruebas;
+  comandos y rechazo sin identidad comprobados en Supabase sin cambiar zonas.
 - Android 0.5.0 ya consulta ese contexto cada 30 segundos con seguimiento activo;
   no necesita una APK nueva para leer la zona. Validacion fisica pendiente.
 - No se generan todavia incidentes de salida cloud ni avisos a cuidadores;

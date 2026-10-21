@@ -2,7 +2,7 @@
 
 ## Corte vigente: 21 de octubre de 2026
 
-- Migraciones 001 a 006 aplicadas desde el Dashboard en el proyecto de pruebas.
+- Migraciones 001 a 007 aplicadas desde el Dashboard en el proyecto de pruebas.
 - 005 habilita equipo, invitaciones y permiso explicito de emisor GPS.
 - sfa-team-invite desplegada; filtro JWT legado desactivado solo para esta
   funcion. La funcion verifica identidad con Auth y rol con RPC antes de invitar.
@@ -13,6 +13,10 @@
   consentimiento privado y rechazo de llamadas sin identidad. Transaccion con
   ROLLBACK, sin crear incidentes, destinatarios ni trabajos FCM. Consulta reproducible:
   supabase/validation/verify_incidents_live.sql.
+- Migracion 007 (editor remoto de geocerca desde 5 m) aplicada con autorizacion.
+  Comandos disponibles y rechazo sin identidad comprobados en transaccion con
+  ROLLBACK, sin guardar zonas ni enviar alertas. Verificacion reproducible:
+  supabase/validation/verify_geofence_live.sql. Prueba fisica Android pendiente.
 - Las pruebas aisladas no validan correo entregado, recepcion FCM en Android
   ni GPS fisico. No hay facturacion, suscripciones ni pruebas de pago activadas.
 

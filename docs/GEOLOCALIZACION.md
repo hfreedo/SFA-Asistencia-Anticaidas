@@ -3,8 +3,8 @@
 ## Diferencia entre local e internet
 
 La geocerca local se guarda y evalua en la PC (SQLite). GPS por internet
-consulta posiciones de Supabase. El editor remoto esta preparado en fuentes,
-pendiente de activacion autorizada de la migracion 007 y despliegue compatible.
+consulta posiciones de Supabase. La migracion 007 del editor remoto esta
+activada con autorizacion en el proyecto de pruebas; usar portal/Centro actualizado.
 Android consulta su contexto cloud, pero no recibe automaticamente la zona
 guardada en SQLite. No es una limitacion de internet.
 

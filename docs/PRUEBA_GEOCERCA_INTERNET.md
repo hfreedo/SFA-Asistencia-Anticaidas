@@ -1,8 +1,9 @@
 # Geocerca por internet desde 5 metros
 
-Estado: preparada en fuentes, migracion 007 pendiente de autorizacion y
-activacion en el proyecto de pruebas. No equivale a una geocerca ya instalada
-en un celular ni a notificaciones remotas de salida.
+Estado: migracion 007 aplicada con autorizacion en el proyecto de pruebas.
+Comandos y rechazo sin identidad verificados en Supabase, sin cambiar zonas.
+Usar portal/Centro actualizado. Esto no equivale a una geocerca ya recibida
+por un celular ni a notificaciones remotas de salida: prueba fisica pendiente.
 
 ## Que cambia
 

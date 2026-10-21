@@ -2,7 +2,7 @@
 
 ## Recorrido actual y ampliacion en preparacion
 
-Editor remoto de geocerca preparado (migracion 007 pendiente de activacion):
+Editor remoto de geocerca (migracion 007 activada en el proyecto de pruebas):
 React/Leaflet selecciona centro y radio desde 5 m; FastAPI sirve de puente solo
 para localhost o el portal consulta directamente las RPC autorizadas. PostgreSQL
 guarda una zona por residente con revision; la app Kotlin 0.5.0 ya consulta el
