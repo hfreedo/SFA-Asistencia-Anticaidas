@@ -1,5 +1,15 @@
 # Evidencia de la ampliacion
 
+## rc4: lectura cloud desde el panel local
+
+80 pruebas Python y 33 web aprobadas. Nuevo endpoint solo loopback, protegido
+por origen, propietario del vinculo y RLS de Supabase. Pruebas de sesion ausente,
+cambio de cuenta, revocacion, respuesta invalida y cambio de perfil sin datos
+anteriores visibles. Compilacion React y EXE Windows aprobadas; APK sin cambios.
+Revision visual del panel real confirma el selector Por internet / Red local y
+el diagnostico de sesion requerida. No se afirma que el mapa haya mostrado ya
+un GPS real: falta reanudar la sesion de esta PC y comprobarlo con el usuario.
+
 ## rc3: 21 de octubre de 2026
 
 - Android: copia de fuentes con hashes, compilacion, 12 pruebas unitarias y

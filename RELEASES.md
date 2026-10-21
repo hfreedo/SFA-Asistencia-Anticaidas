@@ -1,5 +1,14 @@
 # Versiones
 
+## v1.2.0-rc4 - GPS remoto en el panel local
+
+Windows integra Ubicacion > Por internet con Supabase, permisos RLS, vinculo
+del perfil local y sesion de esta PC. Consulta cada 10 segundos; distingue
+datos antiguos, sesion requerida y falta de vinculo. La APK es identica a rc3.
+
+[Release y descargas](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc4)
+| [Guia de GPS y alarmas](docs/PRUEBA_GPS_Y_ALARMAS.md)
+
 ## v1.2.0-rc3 - GPS remoto y laboratorio de pruebas
 
 APK 0.4.0-prototipo (4), Android 12+, misma firma de pruebas que rc2.

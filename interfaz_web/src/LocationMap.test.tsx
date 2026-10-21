@@ -2,7 +2,7 @@
 import { StrictMode } from "react";
 import L from "leaflet";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { LocationMap, MapScreen } from "./SfaDashboard";
 
 const props = { homeLat: -25.33, homeLng: -57.58, radiusM: 5, residentLat: -25.33, residentLng: -57.58,
@@ -27,6 +27,8 @@ describe("location map lifecycle", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ addresses: [] }) })));
     const { container } = render(<MapScreen geofence={{ home_lat: -25.33, home_lng: -57.58, radius_m: 5, address_name: "Fixture" }} profile={null} onUpdateGeofence={vi.fn()} locationSnapshot={{ resident_id: 1, paired: false, status: "no_fix", position: null, age_seconds: null,
       events: [{ id: 1, event_type: "UBICACION_PERDIDA", detail: "Fixture event", received_at: "2026-10-20T20:00:00Z" }] }} />);
+    expect(screen.getByRole("button", { name: "Por internet" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Red local y geocerca" }));
     const workspace = container.querySelector(".location-layout")!;
     const history = screen.getByRole("region", { name: "Actividad reciente de ubicación" });
     expect(Boolean(workspace.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);

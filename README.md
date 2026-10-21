@@ -4,7 +4,18 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### Candidata actual 1.2.0-rc3: GPS remoto sin cinturon y pruebas de alarmas
+### Correccion actual 1.2.0-rc4: GPS remoto en el panel local
+
+[Descargar Windows actualizado](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc4/SFA-Asistencia-1.2.0-rc4-Windows.zip)
+| [Release rc4](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc4)
+
+En **Ubicacion > Por internet**, el panel local consulta el GPS que la APK ya
+envia a Supabase. Abrir Acceso y vinculo de esta PC, iniciar sesion y reanudar
+envios. El perfil local debe estar vinculado al mismo residente del celular.
+La opcion Red local y geocerca conserva el flujo LAN anterior. La APK no cambia
+respecto de rc3; no necesitas reinstalarla. El editor cloud de geocercas sigue pendiente.
+
+### Base Android 1.2.0-rc3: GPS remoto sin cinturon y pruebas de alarmas
 
 [Descargar APK actual](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc3/SFA-Asistencia-1.2.0-rc3-Android-prototipo.apk)
 | [Windows, APK y SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc3)

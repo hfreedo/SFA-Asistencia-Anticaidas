@@ -658,6 +658,23 @@ header { height: var(--sfa-header-height) !important; min-height: var(--sfa-head
 .project-wordmark-initials { font-family:Geist,sans-serif; font-size:12px; font-weight:700; line-height:1; color:#D9F3EB; }
 .project-wordmark-name { font-family:"Fraunces Variable",Georgia,serif; font-size:25px; font-style:italic; font-weight:500; line-height:1.15; font-variation-settings:"opsz" 24,"SOFT" 80,"WONK" 1; }
 .mobile-project-logo { width:24px; height:26px; object-fit:contain; vertical-align:middle; margin-right:7px; }
+.geo-source-selector { display:flex; flex-wrap:wrap; gap:6px; padding:5px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; width:fit-content; margin-bottom:20px; }
+.geo-source-selector button { display:flex; align-items:center; justify-content:center; gap:9px; min-height:44px; padding:10px 18px; border:1px solid transparent; border-radius:6px; font:inherit; font-size:14px; font-weight:600; background:transparent; color:#526573; cursor:pointer; transition:background .15s,color .15s; }
+.geo-source-selector button[aria-pressed="true"] { background:#f0fdfa; color:#0f766e; border-color:#99e2d8; }
+.geo-source-selector button:hover { background:#f1f5f9; }
+.geo-source-selector button:focus-visible { outline:2px solid #0d9488; outline-offset:2px; }
+.local-remote-gps { min-width:0; }
+.local-remote-gps .geo-section-heading { flex-wrap:wrap; }
+.local-remote-gps .geo-section-heading h3 { flex:1; min-width:160px; }
+.remote-gps-description { color:#526573; font-size:14px; line-height:1.6; margin:10px 0 18px; }
+.local-remote-gps .cloud-location { margin:0 0 14px; padding:0; }
+.local-remote-gps .cloud-location .cloud-section-title { display:none; }
+.local-remote-gps .cloud-location-map { width:100%; height:clamp(300px,52vh,540px); border:1px solid #e2e8f0; border-radius:6px; z-index:0; }
+.local-remote-gps .cloud-signal { color:#526573; font-size:14px; margin-bottom:12px; }
+.local-remote-gps .cloud-signal.fresh { color:#0f766e; font-weight:600; }
+.local-remote-gps .cloud-warning { color:#9a3412; background:#fff7ed; border-left:3px solid #ea580c; padding:12px; }
+.local-remote-gps .cloud-footnote,.remote-gps-footnote { color:#526573; font-size:12px; line-height:1.6; margin-top:12px; }
+@media(max-width:540px) { .geo-source-selector { width:100%; } .geo-source-selector button { flex:1; padding-inline:10px; } .local-remote-gps .geo-actions a { width:100%; justify-content:center; } }
 @media (max-width:767px) {
  .mobile-access.mobile-access-refined { grid-template-columns:1fr; gap:18px; }
  .mobile-access-heading { flex-wrap:wrap; gap:12px; }

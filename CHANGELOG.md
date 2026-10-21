@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0-rc4 - GPS remoto visible en el panel local (pre-release)
+
+- Corregida la separacion de rc3: Ubicacion del panel local ahora ofrece
+  Por internet y Red local y geocerca, como fuentes explicitas distintas.
+- Lectura Supabase del residente vinculado al perfil local y propietario
+  de la sesion; RLS comprobado en cada consulta. No se copian posiciones cloud
+  a SQLite ni se exponen al panel LAN sin autenticacion.
+- Mensajes diferenciados de sesion requerida, falta de vinculo, permisos y red.
+- Consulta cada 10 segundos y reloj de antiguedad; lecturas de mas de 90 segundos
+  se muestran como historicas. Ningun cambio de perfil conserva el mapa anterior.
+- El modo de geocerca local y su QR se conservan en la opcion correspondiente.
+  La geocerca cloud y sus avisos siguen pendientes; no se afirma seguridad de zona
+  por recibir una posicion. La APK 0.4.0-prototipo no cambia.
+
 ## 1.2.0-rc3 - GPS remoto y laboratorio de alarmas (pre-release)
 
 - GPS Android directo a Supabase por internet, sin cinturon ni red compartida.

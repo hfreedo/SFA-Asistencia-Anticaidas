@@ -161,6 +161,42 @@ class CloudSync:
         with self.session_lock:
             self.session = None
 
+    def remote_location(self, local_id):
+        with self.session_lock:
+            session = self.session
+        if not session:
+            raise CloudError(401, 'session_required')
+        owner, token = session
+        with self.connection() as conn:
+            binding = conn.execute('SELECT resident_id FROM cloud_bindings WHERE local_resident_id=? AND owner_id=? AND enabled=1',
+                                   (local_id, owner)).fetchone()
+        if not binding:
+            raise CloudError(404, 'resident_not_linked')
+        resident = str(uuid.UUID(binding[0]))
+        # RLS is checked on every request. Never mirror private GPS into the LAN database.
+        people = self.transport('/rest/v1/sfa_residents?select=id&id=eq.' + resident + '&archived_at=is.null', token)
+        if not isinstance(people, list) or not any(p.get('id') == resident for p in people if isinstance(p, dict)):
+            raise CloudError(403, 'resident_access')
+        rows = self.transport('/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.'
+                              + resident + '&simulated=eq.false&order=observed_at.desc&limit=1', token)
+        with self.session_lock:
+            if self.session != session:
+                raise CloudError(401, 'session_changed')
+        if not isinstance(rows, list):
+            raise CloudError(503, 'position_response')
+        position = None
+        if rows:
+            try:
+                row = rows[0]
+                lat, lng, accuracy = (float(row[k]) for k in ('latitude', 'longitude', 'accuracy_m'))
+                stamp = datetime.fromisoformat(row['observed_at'].replace('Z', '+00:00'))
+                if not all(math.isfinite(v) for v in (lat, lng, accuracy)) or not (-90 <= lat <= 90 and -180 <= lng <= 180 and 0 < accuracy <= 10000) or stamp.tzinfo is None:
+                    raise ValueError()
+                position = dict(latitude=lat, longitude=lng, accuracy_m=accuracy, observed_at=stamp.isoformat())
+            except (ValueError, KeyError, TypeError, AttributeError):
+                raise CloudError(503, 'position_response') from None
+        return {'source': 'supabase', 'resident_id': local_id, 'remote_resident_id': resident, 'position': position}
+
     def status(self):
         with self.session_lock:
             owner = self.session[0] if self.session else None

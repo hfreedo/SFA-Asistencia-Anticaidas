@@ -143,6 +143,45 @@ class CloudSyncTests(unittest.TestCase):
         self.cloud.flush()
         self.assertEqual(self.cloud.status()['pending'],1)
 
+    def test_remote_gps_requires_session_and_mapping_of_current_owner(self):
+        self.cloud.pause()
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.status,401)
+        self.cloud.session=('55555555-5555-4555-8555-555555555555','other-token')
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.status,404)
+
+    def test_remote_gps_uses_rls_and_does_not_persist_positions(self):
+        row={'latitude':-25.3,'longitude':-57.6,'accuracy_m':9,'observed_at':datetime.now(timezone.utc).isoformat()}
+        calls=[]
+        def transport(path, token, body=None):
+            calls.append((path,token))
+            return [{'id':RESIDENT}] if 'sfa_residents?' in path else [row]
+        self.cloud.transport=transport
+        result=self.cloud.remote_location(1)
+        self.assertEqual(result['position'],row)
+        self.assertIn('simulated=eq.false',calls[1][0])
+        self.assertIn('resident_id=eq.'+RESIDENT,calls[1][0])
+        self.assertTrue(all(token=='PRIVATE_JWT' for _,token in calls))
+        self.assertEqual(self.cloud.status()['pending'],0)
+
+    def test_remote_gps_never_exposes_data_after_logout_or_revocation(self):
+        self.cloud.transport=lambda *args: []
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.status,403)
+        def transport(path, token, body=None):
+            if 'sfa_residents?' in path: return [{'id':RESIDENT}]
+            self.cloud.pause()
+            return []
+        self.cloud.transport=transport
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.status,401)
+
+    def test_remote_gps_rejects_malformed_provider_position(self):
+        self.cloud.transport=lambda path,*args: [{'id':RESIDENT}] if 'sfa_residents?' in path else [{'latitude':91}]
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.code,'position_response')
+
     def test_push_v2_and_legacy_fallback_without_real_credentials(self):
         with patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': 'fixture-not-opened'}):
             self.cloud.push_sender = Mock()

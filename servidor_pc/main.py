@@ -1109,6 +1109,15 @@ def cloud_status(request: Request):
     return cloud_sync.status()
 
 
+@app.get("/api/cloud/residents/{resident_id}/location")
+def cloud_resident_location(resident_id: int, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.remote_location(resident_id)
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code, "message": "No se pudo consultar el GPS remoto"}) from None
+
+
 @app.post("/api/launcher/stop")
 def launcher_stop(request: Request, authorization: str = Header(default="")):
     require_cloud_operator(request)

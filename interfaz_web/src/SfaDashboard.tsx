@@ -2,6 +2,7 @@ import L from "leaflet";
 import QRCode from "qrcode";
 import { GeofenceRadius } from "./GeofenceRadius";
 import { EmailSettings, LocationHistory, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
+import { LocalRemoteLocation } from "./LocalRemoteLocation";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -994,6 +995,7 @@ export function MapScreen({
   const [tempLng, setTempLng] = useState<number>(geofence.home_lng);
   const [tempName, setTempName] = useState(geofence.address_name);
   const [saving, setSaving] = useState(false);
+  const [locationSource, setLocationSource] = useState<"remote" | "local">("remote");
 
   useEffect(() => {
     setSelectedRadius(geofence.radius_m);
@@ -1030,7 +1032,9 @@ export function MapScreen({
 
   return (
     <div className="location-workspace">
-      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Configura la zona de referencia de {residentName}.</p></div><span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span></div>
+      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Seguimiento de {residentName}.</p></div>{locationSource === "local" && <span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span>}</div>
+      <div className="geo-source-selector" role="group" aria-label="Fuente de ubicación"><button type="button" aria-pressed={locationSource === "remote"} onClick={() => setLocationSource("remote")}><Icon name="cloud" size={18} />Por internet</button><button type="button" aria-pressed={locationSource === "local"} onClick={() => setLocationSource("local")}><Icon name="wifi" size={18} />Red local y geocerca</button></div>
+      {locationSource === "remote" ? <LocalRemoteLocation key={profile?.id || "none"} residentId={profile?.id} residentName={residentName} /> : <>
       <LocationPanel key={profile?.id || "none"} residentId={profile?.id} snapshot={locationSnapshot} />
       <div className="location-layout">
         <section className="location-controls">
@@ -1055,6 +1059,7 @@ export function MapScreen({
         />
       </div>
       <LocationHistory events={locationSnapshot?.events ?? []} />
+      </>}
     </div>
   );
 }
@@ -1203,7 +1208,7 @@ function MobileAccess({ initialInfo }: { initialInfo: NetworkInfo | null }) {
   }
   return <section className="mobile-access mobile-access-refined">
     <div className="mobile-access-heading">
-      <div><h3>Acceso desde el celular</h3><p>Conecta el celular a la misma red de esta PC y escanea el QR con su cámara.
+      <div><h3>Acceso web por red local</h3><p>Conecta el celular a la misma red de esta PC y escanea el QR con su cámara.
       <span className="connection-help"><button type="button" className="connection-help-button" aria-label="Cómo conectar el celular a la red local" aria-describedby="local-network-help"><Icon name="circle-help" size={18} /></button>
         <span id="local-network-help" role="tooltip" className="connection-help-tooltip"><strong>Conectar ambos equipos</strong><span><b>Mismo Wi-Fi:</b> conecta la PC y el celular al mismo router. Evita la red de invitados, que puede aislar los dispositivos.</span><span><b>Hotspot del celular:</b> activa Compartir Internet o Zona Wi-Fi en el teléfono y conecta la PC a esa red.</span><span><b>Hotspot de la PC:</b> activa Zona con cobertura inalámbrica móvil en Windows y conecta el celular a la red creada.</span><span>Después de cambiar de red, vuelve a iniciar el acceso móvil y pulsa Actualizar para generar el QR con la nueva dirección.</span><span>El panel funciona por red local. Si no abre, revisa el firewall de la PC y el aislamiento de dispositivos de la red.</span></span>
       </span>

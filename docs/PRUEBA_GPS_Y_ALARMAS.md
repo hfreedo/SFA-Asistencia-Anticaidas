@@ -3,6 +3,8 @@
 ## Version necesaria
 
 Windows **1.2.0-rc3** y APK **0.4.0-prototipo (versionCode 4)**, Android 12+.
+Usar Windows **1.2.0-rc4** para ver tambien el GPS remoto en el panel local.
+La APK de rc3 sirve y no necesita reinstalarse para esta correccion de PC.
 La firma de pruebas se conserva para permitir actualizar sobre rc2 sin borrar
 la app. No se realizo todavia la migracion a firma de distribucion.
 
@@ -23,8 +25,10 @@ la app. No se realizo todavia la migracion a firma de distribucion.
 
 El modo GPS remoto no requiere que la PC local este encendida. El **emisor FCM**
 actual si depende de una PC con credencial privada y sesion de envios activa.
-El panel local clasico no se fusiona silenciosamente con los datos cloud:
-consulta el mapa remoto en el portal, que tambien se sirve desde acceso local.
+En Windows rc4 el panel local incluye **Ubicacion > Por internet**: consulta
+Supabase sin fusionar SQLite. Antes abrir **Acceso y vinculo de esta PC**, iniciar
+sesion y reanudar los envios; debe estar vinculado al mismo residente cloud.
+La opcion **Red local y geocerca** conserva el flujo HTTPS/QR anterior.
 
 La sesion Android se renueva en memoria, sin guardar contrasenas ni JWT/refresh
 en disco. Reiniciar el proceso requiere iniciar sesion y seleccionar de nuevo
