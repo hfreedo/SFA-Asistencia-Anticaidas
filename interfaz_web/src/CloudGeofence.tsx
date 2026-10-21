@@ -70,4 +70,3 @@ export function InternetGeofence({ api, position, clock }: { api: ZoneApi; posit
     <p className="cloud-footnote">La zona remota es independiente de la guardada en la PC. La app evalúa su GPS con precisión y permanencia; este mapa no confirma una salida. Los avisos remotos a cuidadores se integrarán en la siguiente etapa.</p>
   </section>;
 }
-
