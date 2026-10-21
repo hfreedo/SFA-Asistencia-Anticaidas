@@ -2,6 +2,14 @@
 
 ## Recorrido actual y ampliacion en preparacion
 
+Editor remoto de geocerca preparado (migracion 007 pendiente de activacion):
+React/Leaflet selecciona centro y radio desde 5 m; FastAPI sirve de puente solo
+para localhost o el portal consulta directamente las RPC autorizadas. PostgreSQL
+guarda una zona por residente con revision; la app Kotlin 0.5.0 ya consulta el
+contexto cada 30 segundos y evalua localmente con su GeofenceEngine.
+Esto no implementa todavia el motor de eventos de geocerca cloud ni avisos FCM
+a cuidadores. Ver PRUEBA_GEOCERCA_INTERNET.md.
+
 El GPS remoto ya no exige compartir red con la PC. El modo LAN es una
 alternativa independiente, no un requisito del seguimiento por internet.
 La ampliacion de equipo incorpora una Edge Function Deno/TypeScript para

@@ -3,7 +3,8 @@ import type { Session } from "@supabase/supabase-js";
 import { Activity, Bell, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
 import { accessDataClient } from "./accessClient";
 import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
-import { RemoteLocation, type RemotePosition } from "./RemoteLocation";
+import { type RemotePosition } from "./RemoteLocation";
+import { RemoteGeofence } from "./RemoteGeofence";
 import { IncidentPanel } from "./IncidentPanel";
 
 type Resident = { id: string; full_name: string; room: string };
@@ -158,7 +159,7 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
         <div className="cloud-metrics"><div><span>Aceleración</span><strong>{metric(sample?.payload.accel_g, " g")}</strong></div><div><span>Inclinación</span><strong>{metric(sample?.payload.tilt_deg, "°")}</strong></div><div><span>Movimiento</span><strong>{metric(sample?.payload.motion)}</strong></div></div>
         <p className="cloud-last"><Clock3 size={16} />{sample ? `Última muestra: ${time(sample.observed_at)} · hace ${Math.floor(age ?? 0)} s` : "Sin muestras del cinturón para este perfil"}</p>
         {positionError && <p role="alert" className="cloud-warning">{positionError}</p>}
-        <RemoteLocation position={position} clock={clock} />
+        <RemoteGeofence key={selected} resident={selected} session={session} position={position} clock={clock} />
         <div className="cloud-section-title"><Bell size={19} /><h3>Eventos recibidos</h3></div>
         {events.length ? <ol className="cloud-events">{events.map(event => <li key={event.id}><div><strong>{event.event_type.replaceAll("_", " ")}</strong><p>{event.detail.text ?? ""}</p></div><div>{event.simulated && <span>Simulado</span>}<time>{time(event.observed_at)}</time></div></li>)}</ol> : <p className="cloud-footnote">No hay eventos recibidos para este perfil.</p>}
       </>}

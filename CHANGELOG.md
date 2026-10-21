@@ -1,5 +1,20 @@
 # Changelog
 
+## Correccion - Vista del mapa remoto
+
+- El mapa remoto ya no se destruye/recrea en cada consulta GPS ni al pasar
+  una posicion de reciente a historica: conserva zoom y centro del operador.
+- Actualiza marcador y precision sin mover la camara. Centrar en el celular
+  permite volver a la ultima posicion deliberadamente, sin cambiar el zoom.
+- Cambiar de residente o perder la posicion valida retira el mapa anterior.
+- Editor de geocerca por internet preparado: centro por mapa o coordenadas,
+  radios desde 5 m, guardado por residente, permisos y revision contra cambios
+  simultaneos. Migracion 007 pendiente de autorizacion y activacion alojada.
+- Android 0.5.0 ya consulta ese contexto cada 30 segundos con seguimiento activo;
+  no necesita una APK nueva para leer la zona. Validacion fisica pendiente.
+- No se generan todavia incidentes de salida cloud ni avisos a cuidadores;
+  esa integracion queda para despues de validar la configuracion del celular.
+
 ## En desarrollo - Equipo, SOS y atencion compartida (21 octubre 2026)
 
 - Equipo y permisos: invitaciones por administrador, acceso por residente,

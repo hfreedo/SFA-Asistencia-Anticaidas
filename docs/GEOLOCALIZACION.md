@@ -1,5 +1,25 @@
 # Geolocalización y Geocerca: Puesta en Marcha
 
+## Diferencia entre local e internet
+
+La geocerca local se guarda y evalua en la PC (SQLite). GPS por internet
+consulta posiciones de Supabase. El editor remoto esta preparado en fuentes,
+pendiente de activacion autorizada de la migracion 007 y despliegue compatible.
+Android consulta su contexto cloud, pero no recibe automaticamente la zona
+guardada en SQLite. No es una limitacion de internet.
+
+Esta etapa agrega comandos autorizados de configuracion por residente,
+editor del mapa remoto y revision de zona. Android 0.5.0 ya consulta el contexto
+por internet cada 30 segundos y evalua localmente precision/permanencia.
+Falta la evaluacion autoritativa cloud que genere incidentes y avise a cuidadores.
+El circulo de precision GPS no debe presentarse como una geocerca.
+
+Ver [prueba de geocerca por internet](PRUEBA_GEOCERCA_INTERNET.md).
+
+Correccion del mapa remoto: GPS nuevo actualiza capas sin reiniciar zoom ni
+centro. Centrar en el celular es una accion explicita; cambiar de residente
+reinicia el mapa para no conservar el encuadre de otra persona.
+
 Ampliación de fuentes del 20 de octubre de 2026. No está incorporada en los
 ejecutables 1.0.0/1.1.0 previamente preparados. No cambia el firmware del cinturón.
 

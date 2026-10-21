@@ -668,6 +668,8 @@ header { height: var(--sfa-header-height) !important; min-height: var(--sfa-head
 .local-remote-gps .geo-section-heading h3 { flex:1; min-width:160px; }
 .remote-gps-description { color:#526573; font-size:14px; line-height:1.6; margin:10px 0 18px; }
 .local-remote-gps .cloud-location { margin:0 0 14px; padding:0; }
+.local-remote-gps .cloud-map-toolbar { display:flex; justify-content:flex-end; margin:10px 0; }
+.local-remote-gps .cloud-map-toolbar button { min-height:44px; }
 .local-remote-gps .cloud-location .cloud-section-title { display:none; }
 .local-remote-gps .cloud-location-map { width:100%; height:clamp(380px,64vh,700px); border:1px solid #e2e8f0; border-radius:6px; z-index:0; }
 .local-remote-gps .cloud-signal { color:#526573; font-size:14px; margin-bottom:12px; }

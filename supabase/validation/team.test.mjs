@@ -167,6 +167,39 @@ try {
     await assert.rejects(()=>rpc('sfa_attend_incident',[id(201),event.updated_at,'false_alarm']),e=>e.code==='22023');
     await login(3); await denied(()=>rpc('sfa_incidents',[id(11)]));
   });
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../migrations/202610210007_cloud_geofence.sql',import.meta.url),'utf8'));
+  let zoneRevision;
+  await check('cloud zone requires explicit configuration permission, not GPS sharing',async()=>{
+    await login(null,'anon'); await denied(()=>rpc('sfa_get_geofence',[id(11)]));
+    await login(3); await denied(()=>rpc('sfa_get_geofence',[id(11)]));
+    await login(11); assert.equal((await rpc('sfa_get_geofence',[id(11)])).can_configure,false);
+    await denied(()=>rpc('sfa_save_geofence',[id(11),0,0,5,'Fixture',null]));
+    await login(2); await denied(()=>rpc('sfa_save_geofence',[id(11),0,0,5,'Fixture',null]));
+  });
+  await check('admin saves a 5 metre zone and the existing Android context receives it',async()=>{
+    await login(1); const result=await rpc('sfa_save_geofence',[id(11),0,0,5,'Fixture',null]);
+    zoneRevision=result.geofence.updated_at; assert.equal(result.geofence.radius_m,5);
+    await login(11); const context=await rpc('sfa_phone_context',[sosPhone]);
+    assert.equal(context.geofence.radius_m,5); assert.equal(context.geofence.updated_at,zoneRevision);
+    assert.equal((await rpc('sfa_incidents',[id(11)])).events.length,2);
+  });
+  await check('invalid coordinates, small radii and stale revisions are rejected',async()=>{
+    await login(1);
+    for(const args of [[91,0,5], [0,181,5], [0,0,4], [0,0,100001], ['NaN',0,5]])
+      await assert.rejects(()=>rpc('sfa_save_geofence',[id(11),...args,'Fixture',zoneRevision]),e=>e.code==='22023');
+    await assert.rejects(()=>rpc('sfa_save_geofence',[id(11),0,0,10,'Fixture',null]),e=>e.code==='40001');
+    assert.equal((await rpc('sfa_get_geofence',[id(11)])).geofence.radius_m,5);
+  });
+  await check('assigned configuring caregiver can change only the permitted resident zone',async()=>{
+    await login(1); await rpc('sfa_set_team_access',[id(10),id(2),[id(11)],true,false]);
+    await login(2); const updated=await rpc('sfa_save_geofence',[id(11),0,0,10,'Fixture',zoneRevision]);
+    assert.equal(updated.geofence.radius_m,10);
+    await denied(()=>rpc('sfa_save_geofence',[id(12),0,0,5,'Fixture',null]));
+    await denied(()=>db.query('update public.sfa_geofences set radius_m=100 where resident_id=$1',[id(11)]));
+    await login(1); await rpc('sfa_set_team_access',[id(10),id(2),[id(11)],false,false]);
+    await login(2); assert.equal((await rpc('sfa_get_geofence',[id(11)])).can_configure,false);
+  });
   await check('revoked emitter stops submitting while incident history remains available to caregivers',async()=>{
     await login(1); await rpc('sfa_revoke_team_member',[id(10),id(11)]);
     await login(11); await denied(()=>rpc('sfa_phone_sos',[sosPhone,id(203),sosStamp,false]));

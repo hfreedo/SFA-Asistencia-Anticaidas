@@ -1,12 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Cloud, LogIn, RefreshCw } from "lucide-react";
-import { RemoteLocation, type RemotePosition } from "./RemoteLocation";
+import { type RemotePosition } from "./RemoteLocation";
+import { InternetGeofence, type ZoneApi } from "./CloudGeofence";
 
 export function LocalRemoteLocation({ residentId, residentName }: { residentId?: number; residentName: string }) {
   const [result, setResult] = useState<{ id: number; position: RemotePosition | null; error: string; reference: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [clock, setClock] = useState(Date.now());
   const [loading, setLoading] = useState(false);
+  const zoneApi = useMemo<ZoneApi>(() => {
+    const request = async (body?: object) => {
+      const response = await fetch(`/api/cloud/residents/${residentId}/geofence`, { cache: "no-store", ...(body ? {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      } : {}) });
+      if (!response.ok) throw new Error("Remote zone unavailable");
+      return response.json();
+    };
+    return { load: () => request(), save: body => request(body) };
+  }, [residentId]);
   useEffect(() => {
     if (!residentId) return;
     let active = true;
@@ -41,9 +52,9 @@ export function LocalRemoteLocation({ residentId, residentName }: { residentId?:
     <p className="remote-gps-description">Ubicación compartida desde la app Android mediante Wi-Fi o datos móviles. No requiere cinturón ni la misma red que esta PC.</p>
     {!residentId ? <p role="status">Selecciona un residente para consultar su ubicación.</p> : current?.error ? <div className="geo-feedback error" role="alert"><Cloud size={19} /><div><strong>{current.error}</strong><p>Referencia: {current.reference}</p></div></div> : <>
       {!current && <p role="status">Consultando la ubicación remota…</p>}
-      {current && <RemoteLocation position={current.position} clock={clock} />}
+      {current && <InternetGeofence key={residentId} api={zoneApi} position={current.position} clock={clock} />}
     </>}
     <div className="geo-actions"><a className="resident-button link-resident" href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer"><LogIn size={17} />Acceso y vínculo de esta PC</a></div>
-    <p className="remote-gps-footnote">La geocerca configurada en el modo local aún no se sincroniza con Android por internet. Este mapa muestra posición y precisión, no confirma entradas ni salidas de zona.</p>
+    <p className="remote-gps-footnote">Guarda la zona remota aquí para que Android la consulte por internet. La zona local de la PC no se copia automáticamente.</p>
   </section>;
 }

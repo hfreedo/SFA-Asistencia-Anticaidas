@@ -161,7 +161,7 @@ class CloudSync:
         with self.session_lock:
             self.session = None
 
-    def remote_location(self, local_id):
+    def _bound_session(self, local_id):
         with self.session_lock:
             session = self.session
         if not session:
@@ -173,6 +173,36 @@ class CloudSync:
         if not binding:
             raise CloudError(404, 'resident_not_linked')
         resident = str(uuid.UUID(binding[0]))
+        return session, resident
+
+    def remote_geofence(self, local_id, values=None):
+        session, resident = self._bound_session(local_id)
+        body = {'p_resident': resident}
+        if values is not None:
+            body.update(values)
+        result = self.transport('/rest/v1/rpc/' + ('sfa_save_geofence' if values is not None else 'sfa_get_geofence'), session[1], body)
+        with self.session_lock:
+            if self.session != session:
+                raise CloudError(401, 'session_changed')
+        if not isinstance(result, dict) or not isinstance(result.get('can_configure'), bool):
+            raise CloudError(503, 'geofence_response')
+        zone = result.get('geofence')
+        if zone is not None:
+            try:
+                zone = {key: zone[key] for key in ('home_lat','home_lng','radius_m','address_name','updated_at')}
+                if not (-90 <= zone['home_lat'] <= 90 and -180 <= zone['home_lng'] <= 180 and 5 <= zone['radius_m'] <= 100000):
+                    raise ValueError()
+                if not isinstance(zone['address_name'], str) or len(zone['address_name']) > 100:
+                    raise ValueError()
+                stamp = datetime.fromisoformat(zone['updated_at'].replace('Z', '+00:00'))
+                if stamp.tzinfo is None: raise ValueError()
+            except (TypeError, KeyError, ValueError, AttributeError):
+                raise CloudError(503, 'geofence_response') from None
+        return {'can_configure': result['can_configure'], 'geofence': zone}
+
+    def remote_location(self, local_id):
+        session, resident = self._bound_session(local_id)
+        owner, token = session
         # RLS is checked on every request. Never mirror private GPS into the LAN database.
         people = self.transport('/rest/v1/sfa_residents?select=id&id=eq.' + resident + '&archived_at=is.null', token)
         if not isinstance(people, list) or not any(p.get('id') == resident for p in people if isinstance(p, dict)):

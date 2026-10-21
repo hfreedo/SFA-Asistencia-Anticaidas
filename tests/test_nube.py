@@ -182,6 +182,26 @@ class CloudSyncTests(unittest.TestCase):
         with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
         self.assertEqual(error.exception.code,'position_response')
 
+    def test_remote_zone_uses_bound_identity_and_preserves_sqlite_independence(self):
+        zone = dict(home_lat=0,home_lng=0,radius_m=5,address_name='Fixture',updated_at=datetime.now(timezone.utc).isoformat())
+        self.cloud.transport = Mock(return_value={'can_configure':True,'geofence':zone,'token':'NEVER_RETURN'})
+        result = self.cloud.remote_geofence(1)
+        self.assertEqual(result,{'can_configure':True,'geofence':zone})
+        self.cloud.transport.assert_called_with('/rest/v1/rpc/sfa_get_geofence','PRIVATE_JWT',{'p_resident':RESIDENT})
+        values = {'p_lat':0,'p_lng':0,'p_radius':5,'p_label':'Fixture','p_expected':None}
+        self.cloud.remote_geofence(1,values)
+        self.cloud.transport.assert_called_with('/rest/v1/rpc/sfa_save_geofence','PRIVATE_JWT',{'p_resident':RESIDENT,**values})
+        self.cloud.pause()
+        with self.assertRaises(CloudError): self.cloud.remote_geofence(1,values)
+
+    def test_remote_zone_discards_results_if_session_changes_in_flight(self):
+        def transport(*args):
+            self.cloud.pause()
+            return {'can_configure':True,'geofence':None}
+        self.cloud.transport=transport
+        with self.assertRaises(CloudError) as error: self.cloud.remote_geofence(1)
+        self.assertEqual(error.exception.code,'session_changed')
+
     def test_push_v2_and_legacy_fallback_without_real_credentials(self):
         with patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': 'fixture-not-opened'}):
             self.cloud.push_sender = Mock()

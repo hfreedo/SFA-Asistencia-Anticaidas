@@ -4,6 +4,9 @@ Fecha: 21 de octubre de 2026. Estado: implementacion por etapas en curso,
 con pruebas integrales pendientes. Equipo, permisos y migracion 006 de SOS y
 atencion activados. Falta prueba fisica entre dispositivos y emisor independiente
 de PC. Ver PRUEBA_SOS_Y_ATENCION.md.
+Prioridad siguiente acordada: editor y entrega de geocerca por internet desde
+5 m, antes del panel de pruebas/notificaciones FCM. Fuentes y migracion 007
+preparadas; activacion alojada y prueba fisica pendientes. Ver PRUEBA_GEOCERCA_INTERNET.md.
 Este documento reemplaza el orden de trabajo
 anterior; no convierte las funcionalidades propuestas en funcionalidades activas.
 

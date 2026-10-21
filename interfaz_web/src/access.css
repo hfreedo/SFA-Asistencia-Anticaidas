@@ -57,6 +57,8 @@ body:has(.sfa-access) { margin:0; }
 .is-account .access-account > ul li { flex:1; min-width:200px; }
 .cloud-monitor { margin-top:26px; }
 .cloud-location { padding:20px 0; border-top:1px solid #e2e8f0; margin-bottom:24px; }
+.cloud-map-toolbar { display:flex; justify-content:flex-end; margin:10px 0; }
+.cloud-map-toolbar .access-secondary { width:auto; min-height:44px; }
 .cloud-location-map { height:clamp(380px,64vh,700px); width:100%; border:1px solid #e2e8f0; border-radius:6px; z-index:0; }
 .portal-navigation { display:flex; gap:8px; flex-wrap:wrap; padding:16px 0; border-bottom:1px solid #e2e8f0; }
 .portal-navigation button { display:flex; align-items:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid transparent; border-radius:6px; background:transparent; color:#526573; font:inherit; font-weight:600; cursor:pointer; }

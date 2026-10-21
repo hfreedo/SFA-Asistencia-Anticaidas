@@ -1128,6 +1128,32 @@ def launcher_stop(request: Request, authorization: str = Header(default="")):
     return {"status": "stopping"}
 
 
+class RemoteGeofenceRequest(BaseModel):
+    p_lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    p_lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    p_radius: int = Field(ge=5, le=100000)
+    p_label: str = Field(min_length=1, max_length=100)
+    p_expected: str | None = Field(default=None, max_length=64)
+
+
+@app.get("/api/cloud/residents/{resident_id}/geofence")
+def get_remote_geofence(resident_id: int, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.remote_geofence(resident_id)
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
+@app.put("/api/cloud/residents/{resident_id}/geofence")
+def save_remote_geofence(resident_id: int, body: RemoteGeofenceRequest, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.remote_geofence(resident_id, body.model_dump())
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
 @app.post("/api/cloud/connect")
 def cloud_connect(body: CloudConnectRequest, request: Request, authorization: str = Header(default="")):
     require_cloud_operator(request)
