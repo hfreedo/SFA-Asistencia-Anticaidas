@@ -1,5 +1,12 @@
 # Changelog
 
+## En desarrollo - Altura del mapa
+
+- Mapa remoto mas alto en panel y portal: 64% de altura de ventana, entre 380
+  y 700 px en escritorio; entre 320 y 480 px en movil con altura adaptable.
+- No cambia el editor ni habilita la geocerca cloud. Ajuste incluido en fuentes
+  y Centro de esta PC; el ZIP Windows rc5 anterior no se reemplaza.
+
 ## Android 0.4.1-prototipo (5) - Diagnostico de vinculacion
 
 - Reemplazado el mensaje ambiguo de permisos/certificado/sesion/conexion por

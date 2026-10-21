@@ -669,12 +669,12 @@ header { height: var(--sfa-header-height) !important; min-height: var(--sfa-head
 .remote-gps-description { color:#526573; font-size:14px; line-height:1.6; margin:10px 0 18px; }
 .local-remote-gps .cloud-location { margin:0 0 14px; padding:0; }
 .local-remote-gps .cloud-location .cloud-section-title { display:none; }
-.local-remote-gps .cloud-location-map { width:100%; height:clamp(300px,52vh,540px); border:1px solid #e2e8f0; border-radius:6px; z-index:0; }
+.local-remote-gps .cloud-location-map { width:100%; height:clamp(380px,64vh,700px); border:1px solid #e2e8f0; border-radius:6px; z-index:0; }
 .local-remote-gps .cloud-signal { color:#526573; font-size:14px; margin-bottom:12px; }
 .local-remote-gps .cloud-signal.fresh { color:#0f766e; font-weight:600; }
 .local-remote-gps .cloud-warning { color:#9a3412; background:#fff7ed; border-left:3px solid #ea580c; padding:12px; }
 .local-remote-gps .cloud-footnote,.remote-gps-footnote { color:#526573; font-size:12px; line-height:1.6; margin-top:12px; }
-@media(max-width:540px) { .geo-source-selector { width:100%; } .geo-source-selector button { flex:1; padding-inline:10px; } .local-remote-gps .geo-actions a { width:100%; justify-content:center; } }
+@media(max-width:540px) { .geo-source-selector { width:100%; } .geo-source-selector button { flex:1; padding-inline:10px; } .local-remote-gps .geo-actions a { width:100%; justify-content:center; } .local-remote-gps .cloud-location-map { height:clamp(320px,60svh,480px); } }
 @media (max-width:767px) {
  .mobile-access.mobile-access-refined { grid-template-columns:1fr; gap:18px; }
  .mobile-access-heading { flex-wrap:wrap; gap:12px; }
