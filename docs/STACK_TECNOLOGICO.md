@@ -1,6 +1,17 @@
 # Stack Tecnológico de SFA Asistencia
 
-## Recorrido actual rc3
+## Recorrido actual y ampliacion en preparacion
+
+El GPS remoto ya no exige compartir red con la PC. El modo LAN es una
+alternativa independiente, no un requisito del seguimiento por internet.
+La ampliacion de equipo incorpora una Edge Function Deno/TypeScript para
+invitar usuarios, Supabase Auth para verificar su identidad y RPC PostgreSQL
+para validar roles y asignaciones. No se ejecuta logica administrativa en
+GitHub Pages: alli se sirve solo React estatico; los permisos viven en Supabase.
+
+La siguiente ampliacion preparada agrega SOS Android con cola SQLite y
+atencion compartida por RPC. Ver [prueba SOS](PRUEBA_SOS_Y_ATENCION.md) para
+los requisitos de activacion y los limites actuales de entrega.
 
 ```mermaid
 flowchart LR

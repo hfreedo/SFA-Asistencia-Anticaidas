@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const mock = vi.hoisted(() => ({
   getSession: vi.fn(), getUser: vi.fn(), signIn: vi.fn(), reset: vi.fn(), from: vi.fn(),
-  dataClient: vi.fn(),
+  dataClient: vi.fn(), rpc: vi.fn(),
 }));
 vi.mock("./accessClient", () => ({
   configurationProblem: null,
@@ -25,7 +25,8 @@ beforeEach(() => {
   mock.getSession.mockResolvedValue({ data: { session: null }, error: null });
   mock.signIn.mockResolvedValue({ error: { message: "INTERNAL_PROVIDER_DETAIL" } });
   mock.reset.mockResolvedValue({ error: null });
-  mock.dataClient.mockReturnValue({ from: mock.from });
+  mock.rpc.mockResolvedValue({ data: { accepted: 0 }, error: null });
+  mock.dataClient.mockReturnValue({ from: mock.from, rpc: mock.rpc });
 });
 afterEach(cleanup);
 
@@ -85,6 +86,25 @@ describe("SFA access screen", () => {
     expect(mock.from).not.toHaveBeenCalled();
     expect(mock.dataClient).not.toHaveBeenCalled();
     expect(screen.queryByText("Identidad y permisos verificados.")).toBeNull();
+  });
+
+  it("accepts pending invitations with the verified identity before reading memberships", async () => {
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user", email: "test@example.invalid" } }, error: null });
+    mock.from.mockReturnValue({ select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [], error: null }) }) }) });
+    render(<AccessApp />);
+    await screen.findByText(/aún no tiene un espacio asignado/);
+    expect(mock.rpc).toHaveBeenCalledWith("sfa_accept_team_invites");
+    expect(mock.getUser.mock.invocationCallOrder[0]).toBeLessThan(mock.rpc.mock.invocationCallOrder[0]);
+    expect(mock.rpc.mock.invocationCallOrder[0]).toBeLessThan(mock.from.mock.invocationCallOrder[0]);
+  });
+
+  it("does not break the previous portal when the team migration has not been applied", async () => {
+    mock.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202" } });
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
+    mock.from.mockReturnValue({ select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [], error: null }) }) }) });
+    render(<AccessApp />); expect(await screen.findByText(/aún no tiene un espacio asignado/)).toBeTruthy();
   });
 
   it("session initialization failures leave a usable error instead of a loading loop", async () => {

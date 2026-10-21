@@ -4,6 +4,7 @@ import { Activity, Bell, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, Us
 import { accessDataClient } from "./accessClient";
 import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
 import { RemoteLocation, type RemotePosition } from "./RemoteLocation";
+import { IncidentPanel } from "./IncidentPanel";
 
 type Resident = { id: string; full_name: string; room: string };
 type Sample = { id: string; observed_at: string; received_at: string; payload: { state?: string; accel_g?: number; tilt_deg?: number; motion?: number; fall_count?: number; simulated?: boolean } };
@@ -153,6 +154,7 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
       {error && <p className="cloud-warning" role="alert">{error}</p>}
       {loading ? <p role="status">Consultando residentes autorizados…</p> : !person ? <div className="cloud-empty"><Link2 size={26} /><strong>Aún no hay un perfil sincronizado</strong><p>Los perfiles locales se conservan en la PC.</p></div> : <>
         <div className="cloud-person"><div><h3>{person.full_name}</h3><p>{person.room}</p></div><span className={fresh ? `cloud-signal ${["CAIDA_CONFIRMADA","POSIBLE_CAIDA"].includes(sample.payload.state ?? "") ? "critical" : "fresh"}` : "cloud-signal"}><Activity size={16} />{fresh ? STATE[sample.payload.state ?? ""] ?? "Lectura reciente" : sample?.payload.simulated ? "Muestra de simulación" : "Sin lecturas recientes"}</span></div>
+        <IncidentPanel resident={selected} session={session} />
         <div className="cloud-metrics"><div><span>Aceleración</span><strong>{metric(sample?.payload.accel_g, " g")}</strong></div><div><span>Inclinación</span><strong>{metric(sample?.payload.tilt_deg, "°")}</strong></div><div><span>Movimiento</span><strong>{metric(sample?.payload.motion)}</strong></div></div>
         <p className="cloud-last"><Clock3 size={16} />{sample ? `Última muestra: ${time(sample.observed_at)} · hace ${Math.floor(age ?? 0)} s` : "Sin muestras del cinturón para este perfil"}</p>
         {positionError && <p role="alert" className="cloud-warning">{positionError}</p>}

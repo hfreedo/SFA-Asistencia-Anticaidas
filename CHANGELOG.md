@@ -1,5 +1,23 @@
 # Changelog
 
+## En desarrollo - Equipo, SOS y atencion compartida (21 octubre 2026)
+
+- Equipo y permisos: invitaciones por administrador, acceso por residente,
+  permiso GPS separado de configuracion y proteccion del ultimo administrador.
+- Migracion 005 y funcion sfa-team-invite activadas en el proyecto de pruebas.
+  La funcion verifica la sesion con Auth y el permiso administrador; no depende
+  del filtro JWT heredado. Peticion ficticia rechazada en vivo con HTTP 401.
+- Android 0.5.0-prototipo (6) preparado: SOS manual o prueba con confirmacion,
+  cola SQLite persistente y reintento idempotente, sin exigir cinturon.
+- Panel remoto de incidentes con consulta periodica, toma de atencion exclusiva,
+  resolucion confirmada y control de concurrencia. Pruebas identificadas aparte.
+- Migracion 006 preparada, pendiente de autorizacion y activacion alojada.
+  No confundir una compilacion con una version ya habilitada o publicada.
+- 51 comprobaciones SQL aisladas y 47 pruebas web aprobadas. APK y lint
+  aprobados; pruebas fisicas de envio, recepcion y atencion siguen pendientes.
+- FCM todavia requiere el emisor PC autenticado. Geocerca cloud, emisor online
+  y seleccion integrada de fuentes siguen pendientes. No se habilita facturacion.
+
 ## En desarrollo - Altura del mapa
 
 - Mapa remoto mas alto en panel y portal: 64% de altura de ventana, entre 380

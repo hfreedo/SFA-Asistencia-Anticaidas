@@ -66,12 +66,27 @@ class NativeApi(private val context: Context) {
     fun position(binding: PhoneBinding, body: String) = JSONObject(request(binding.origin + "/api/location", binding.token, body, local = true))
     fun login(email: String, password: String): String {
         val session = JSONObject(request("https://lxymfaoraayccmxwiubw.supabase.co/auth/v1/token?grant_type=password", body = JSONObject().put("email", email).put("password", password).toString()))
+        val token = session.getString("access_token")
+        try { rpc("sfa_accept_team_invites", token, JSONObject()) }
+        catch (error: ApiFailure) { if (error.status != 404) throw error }
         CloudGpsSession.login(session)
-        return session.getString("access_token")
+        return token
     }
     fun rpc(name: String, token: String, body: JSONObject): JSONObject {
         require(name.matches(Regex("sfa_[a-z_]+")))
         return JSONObject(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/rpc/$name", token, body.toString()))
+    }
+    fun queueSos(device: String, simulated: Boolean) = LocationOutbox(context).use { it.queueSos(device, simulated) }
+    fun flushSos(token: String, device: String): Int = LocationOutbox(context).use { database ->
+        var accepted = 0
+        for (item in database.pendingSos(device)) {
+            if (!SosPolicy.recent(item.observed, System.currentTimeMillis())) { database.markSos(item.id, "historical"); continue }
+            val result = rpc("sfa_phone_sos", token, JSONObject().put("p_device", device).put("p_event", item.id)
+                .put("p_observed", java.time.Instant.ofEpochMilli(item.observed).toString()).put("p_simulated", item.simulated))
+            check(result.optString("accepted") == item.id)
+            database.markSos(item.id, "sent"); accepted++
+        }
+        accepted
     }
     fun remotePositions(token: String, resident: String): JSONArray {
         require(resident.matches(Regex("[0-9a-fA-F-]{36}")))

@@ -11,6 +11,7 @@ function builder(value: unknown) {
   return chain;
 }
 vi.mock("./accessClient", () => ({ accessDataClient: () => ({ from: (table: string) => builder(mock.responses[table]) }) }));
+vi.mock("./IncidentPanel", () => ({ IncidentPanel: () => null }));
 import { RemoteMonitor } from "./RemoteMonitor";
 
 const session = { access_token: "PRIVATE_TEST_SESSION" } as Session;

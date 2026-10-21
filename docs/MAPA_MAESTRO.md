@@ -1,5 +1,9 @@
 # Mapa Maestro: de Cero al Estado Actual
 
+Para la siguiente construccion funcional, consultar el
+[Plan de integracion operativa](PLAN_INTEGRACION_OPERATIVA.md): auditoria actual,
+flujos entre dispositivos, roles, arquitectura, etapas y pruebas de aceptacion.
+
 **Este es el punto de entrada del proyecto completo.** El mapa reúne el problema,
 las herramientas, las piezas construidas, su integración y la entrega. Las otras
 guías amplían sus etapas; no hace falta leerlas todas antes de entenderlo.

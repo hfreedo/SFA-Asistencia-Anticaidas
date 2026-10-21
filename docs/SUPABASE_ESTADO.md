@@ -1,5 +1,21 @@
 # Supabase de SFA: registro de preparacion
 
+## Corte vigente: 21 de octubre de 2026
+
+- Migraciones 001 a 005 aplicadas desde el Dashboard en el proyecto de pruebas.
+- 005 habilita equipo, invitaciones y permiso explicito de emisor GPS.
+- sfa-team-invite desplegada; filtro JWT legado desactivado solo para esta
+  funcion. La funcion verifica identidad con Auth y rol con RPC antes de invitar.
+- Prueba alojada sin correo: sesion ficticia rechazada con HTTP 401 y codigo
+  session_invalid. No se enviaron invitaciones durante el despliegue.
+- Migracion 006 (SOS/atencion/consentimiento de pruebas) preparada y probada
+  aisladamente; pendiente de autorizacion y ejecucion alojada.
+- Las pruebas aisladas no validan correo entregado, recepcion FCM en Android
+  ni GPS fisico. No hay facturacion, suscripciones ni pruebas de pago activadas.
+
+El registro siguiente conserva etapas anteriores. Su estado inicial no describe
+por si solo las funciones disponibles en este corte.
+
 Fecha: 20 de octubre de 2026. Entorno de pruebas, no servicio de emergencias.
 
 Estado actual: login administrador y vinculacion PC comprobados; RPC PC con

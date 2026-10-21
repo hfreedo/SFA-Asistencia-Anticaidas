@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, KeyRound, LoaderCircle, LogOut, Mail, ShieldCheck, WifiOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, KeyRound, LayoutDashboard, LoaderCircle, LogOut, Mail, ShieldCheck, UsersRound, WifiOff } from "lucide-react";
 import { accessClient as client, accessDataClient, configurationProblem } from "./accessClient";
 import { accessFailure, accessUrl, callbackMode, passwordProblem, type AccessMode } from "./authPolicy";
 import "./access.css";
 import projectLogo from "../public/assets/sfa-asistencia-logo.png";
 import { RemoteMonitor } from "./RemoteMonitor";
 import { isLocalPortal } from "./cloudPolicy";
+import { TeamPanel } from "./TeamPanel";
 
 type Membership = { space_id: string; role: string; name: string };
 const INITIAL_MODE = callbackMode(window.location.search, window.location.hash);
@@ -27,6 +28,8 @@ export function AccessApp() {
   const [error, setError] = useState(configurationProblem ?? "");
   const [notice, setNotice] = useState("");
   const [errorReference, setErrorReference] = useState("");
+  const [view, setView] = useState<"monitor" | "team">("monitor");
+  const [permissionRevision, setPermissionRevision] = useState(0);
 
   useEffect(() => {
     if (!client) return;
@@ -61,6 +64,9 @@ export function AccessApp() {
         const { data, error: identityError } = await client.auth.getUser(session.access_token);
         if (identityError || !data.user) throw accessFailure("IDENTITY", identityError);
         const dataClient = accessDataClient(session.access_token);
+        const enrollment = await dataClient.rpc("sfa_accept_team_invites");
+        // Existing deployments remain usable until the restricted team migration is applied.
+        if (enrollment.error && enrollment.error.code !== "PGRST202") throw accessFailure("INVITATION", enrollment.error);
         const { data: links, error: linkError } = await dataClient.from("sfa_memberships")
           .select("space_id,role").eq("user_id", data.user.id).is("revoked_at", null);
         if (linkError) throw accessFailure("MEMBERSHIP", linkError);
@@ -77,7 +83,7 @@ export function AccessApp() {
       } catch (problem) {
         if (active) {
           setUser(null); setMemberships([]);
-          const reference = problem instanceof Error && /^(IDENTITY|MEMBERSHIP|SPACE):[A-Za-z0-9_]+$/.test(problem.message)
+          const reference = problem instanceof Error && /^(IDENTITY|INVITATION|MEMBERSHIP|SPACE):[A-Za-z0-9_]+$/.test(problem.message)
             ? problem.message : "CONNECTION:REQUEST";
           setErrorReference(reference);
           setError("No pudimos verificar tu sesión y permisos. Comprueba la conexión e inicia sesión nuevamente.");
@@ -85,7 +91,7 @@ export function AccessApp() {
       } finally { if (active) setChecking(false); }
     })();
     return () => { active = false; };
-  }, [session]);
+  }, [session, permissionRevision]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -161,7 +167,13 @@ export function AccessApp() {
           signedIn ? <div className="access-account"><p className="access-account-email"><Mail size={18} />{user?.email}</p>
             {memberships.length ? <ul>{memberships.map(link => <li key={link.space_id}><ShieldCheck size={20} /><div><strong>{link.name}</strong><span>{LABELS[link.role] ?? "Acceso autorizado"}</span></div></li>)}</ul> :
               <p className="access-no-membership">Tu cuenta está verificada, pero aún no tiene un espacio asignado. El administrador debe autorizar tu vínculo.</p>}
-            {memberships.length > 0 && session && <RemoteMonitor session={session} spaces={memberships} />}
+            {memberships.length > 0 && session && <>
+              <nav className="portal-navigation" aria-label="Vistas del espacio">
+                <button aria-pressed={view === "monitor"} onClick={() => setView("monitor")}><LayoutDashboard size={18} />Monitoreo</button>
+                {memberships.some(m => m.role === "admin") && <button aria-pressed={view === "team"} onClick={() => setView("team")}><UsersRound size={18} />Equipo y permisos</button>}
+              </nav>
+              {view === "team" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : <RemoteMonitor session={session} spaces={memberships} />}
+            </>}
             <button type="button" className="access-secondary" disabled={busy} onClick={() => void logout()}><LogOut size={18} />Cerrar sesión</button>
           </div> : <form onSubmit={event => void submit(event)}>
             {mode !== "password" && <label htmlFor="access-email">Correo electrónico<div className="access-input"><Mail size={18} /><input id="access-email" name="email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} disabled={busy || !client} /></div></label>}

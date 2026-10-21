@@ -11,8 +11,8 @@ android {
         applicationId = "org.sfa.asistencia"
         minSdk = 31
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.4.1-prototipo"
+        versionCode = 6
+        versionName = "0.5.0-prototipo"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

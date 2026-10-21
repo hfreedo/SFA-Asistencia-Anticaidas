@@ -22,7 +22,14 @@ class PushRegistration(private val context: Context) {
     private val preferences get() = context.getSharedPreferences("push", Context.MODE_PRIVATE)
     val enabled get() = preferences.getBoolean("enabled", false)
     val renewalPending get() = preferences.getBoolean("renewal_pending", false)
+    val acceptsTests get() = preferences.getBoolean("accept_tests", false)
     val configured get() = FirebaseApp.getApps(context).isNotEmpty()
+    suspend fun consentTests(jwt: String, active: Boolean) {
+        check(enabled)
+        val installation = preferences.getString("installation", null) ?: error("Sin registro")
+        withContext(Dispatchers.IO) { NativeApi(context).rpc("sfa_push_test_consent", jwt, JSONObject().put("p_installation", installation).put("p_enabled", active)) }
+        preferences.edit().putBoolean("accept_tests", active).commit()
+    }
     suspend fun test(jwt: String, resident: String) {
         check(enabled) { "Activa los avisos primero" }
         val installation = preferences.getString("installation", null) ?: error("Sin registro")
@@ -47,7 +54,7 @@ class PushRegistration(private val context: Context) {
             if (!active) {
                 messaging.isAutoInitEnabled = false
                 messaging.deleteToken().result()
-                preferences.edit().remove("installation").apply()
+                preferences.edit().remove("installation").remove("accept_tests").apply()
             }
             preferences.edit().putBoolean("enabled", active).putBoolean("renewal_pending", false).commit()
         } catch (error: Exception) {

@@ -1,5 +1,14 @@
 # SFA: ampliacion por etapas
 
+## Prioridad operativa actual
+
+El orden activo de trabajo y sus condiciones de cierre se encuentran en
+[Plan de integracion operativa](PLAN_INTEGRACION_OPERATIVA.md), auditado el
+21 de octubre de 2026. Prioriza flujos reales de SOS/geocerca a cuidadores y web,
+emisor online sin PC obligatoria, permisos y seleccion independiente de fuentes.
+Las secciones siguientes se conservan como registro historico; no son una
+afirmacion de que todas sus funciones ya esten integradas.
+
 ## Actualizacion rc3: 21 de octubre de 2026
 
 Implementados GPS Android directo a Supabase y laboratorio de pruebas, conservando

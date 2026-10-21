@@ -82,6 +82,12 @@ class TrackingService : Service(), LocationListener {
         try {
             val cloud = cloudDevice
             val token = if (cloud != null) CloudGpsSession.token(api) else null
+            if (cloud != null) {
+                // A pending SOS must not block GPS updates; unconfirmed requests remain in the outbox.
+                try { api.flushSos(token!!, cloud) }
+                catch (error: ApiFailure) { if (error.status == 401 || error.status == 403) throw error }
+                catch (_: Exception) { }
+            }
             if (refreshCounter++ % 3 == 0) {
                 val context = if (cloud != null) api.rpc("sfa_phone_context", token!!, JSONObject().put("p_device", cloud)) else api.deviceContext(binding!!)
                 val updated = context.optJSONObject("geofence")

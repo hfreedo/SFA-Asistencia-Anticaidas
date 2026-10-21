@@ -2,6 +2,6 @@
   "name": "sfa-database-validation",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node schema.test.mjs" },
+  "scripts": { "test": "node --test schema.test.mjs team.test.mjs" },
   "devDependencies": { "@electric-sql/pglite": "0.5.10" }
 }

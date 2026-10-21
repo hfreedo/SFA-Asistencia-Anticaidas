@@ -61,13 +61,37 @@ class SecureBinding(private val context: Context) {
     fun clear() { file.delete() }
 }
 
-class LocationOutbox(context: Context) : SQLiteOpenHelper(context, "sfa-history.sqlite3", null, 1) {
+data class PendingSos(val id: String, val observed: Long, val simulated: Boolean)
+
+class LocationOutbox(context: Context) : SQLiteOpenHelper(context, "sfa-history.sqlite3", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE positions(id TEXT PRIMARY KEY,binding TEXT NOT NULL,observed INTEGER NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL)")
         db.execSQL("CREATE INDEX pending_positions ON positions(binding,status,observed)")
         db.execSQL("CREATE TABLE belt_records(id TEXT PRIMARY KEY,observed INTEGER NOT NULL,line TEXT NOT NULL)")
+        createSos(db)
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    private fun createSos(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE phone_sos(id TEXT PRIMARY KEY,device TEXT NOT NULL,observed INTEGER NOT NULL,simulated INTEGER NOT NULL,status TEXT NOT NULL)")
+        db.execSQL("CREATE INDEX pending_sos ON phone_sos(device,status,observed)")
+    }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { if (oldVersion < 2) createSos(db) }
+    fun queueSos(device: String, simulated: Boolean): String {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val now = System.currentTimeMillis()
+            db.update("phone_sos", ContentValues().apply { put("status", "historical") }, "device=? AND status='pending' AND observed<?", arrayOf(device, (now - 300000).toString()))
+            val existing = db.rawQuery("SELECT id FROM phone_sos WHERE device=? AND simulated=? AND status='pending' LIMIT 1", arrayOf(device, if (simulated) "1" else "0")).use { if (it.moveToFirst()) it.getString(0) else null }
+            val id = existing ?: UUID.randomUUID().toString().also { value -> db.insertOrThrow("phone_sos", null, ContentValues().apply {
+                put("id", value); put("device", device); put("observed", now); put("simulated", if (simulated) 1 else 0); put("status", "pending")
+            }) }
+            db.setTransactionSuccessful(); return id
+        } finally { db.endTransaction() }
+    }
+    fun pendingSos(device: String): List<PendingSos> = readableDatabase.rawQuery("SELECT id,observed,simulated FROM phone_sos WHERE device=? AND status='pending' ORDER BY simulated,observed LIMIT 10", arrayOf(device)).use { cursor ->
+        buildList { while (cursor.moveToNext()) add(PendingSos(cursor.getString(0), cursor.getLong(1), cursor.getInt(2) != 0)) }
+    }
+    fun markSos(id: String, status: String) { writableDatabase.update("phone_sos", ContentValues().apply { put("status", status) }, "id=?", arrayOf(id)) }
     fun enqueue(binding: String, observed: Long, payload: String) {
         writableDatabase.insertOrThrow("positions", null, ContentValues().apply {
             put("id", UUID.randomUUID().toString()); put("binding", binding); put("observed", observed); put("payload", payload); put("status", "pending")

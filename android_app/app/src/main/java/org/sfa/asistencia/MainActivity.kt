@@ -54,6 +54,9 @@ class MainActivity : ComponentActivity() {
         val api = remember { NativeApi(this) }
         val push = remember { PushRegistration(this) }
         var pushActive by remember { mutableStateOf(push.enabled) }
+        var acceptsTests by remember { mutableStateOf(push.acceptsTests) }
+        var confirmSos by remember { mutableStateOf<Boolean?>(null) }
+        var sosNotice by remember { mutableStateOf("") }
         val bindingStore = remember { SecureBinding(this) }
         var binding by remember { mutableStateOf(bindingStore.load()) }
         var incoming by remember { mutableStateOf<PhoneBinding?>(null) }
@@ -79,19 +82,29 @@ class MainActivity : ComponentActivity() {
         var showBluetooth by remember { mutableStateOf(false) }
         var showPassword by remember { mutableStateOf(false) }
         var showTrackingHelp by remember { mutableStateOf(false) }
+        LaunchedEffect(cloudDevice, jwt != null) { sosNotice = ""; confirmSos = null }
         val snackbar = remember { SnackbarHostState() }
         var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
         LaunchedEffect(Unit) { while (true) { delay(1000); clock = System.currentTimeMillis() } }
         LaunchedEffect(message) { if (message.isNotBlank()) { snackbar.showSnackbar(message); message = "" } }
-        fun work(block: suspend () -> Unit) {
+        fun work(refreshSession: Boolean = true, block: suspend () -> Unit) {
             if (busy) return
             busy = true
             scope.launch { message = ""; operationError = ""; try {
-                if (jwt != null) jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
+                if (refreshSession && jwt != null) jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
                 block()
             } catch (error: CancellationException) { throw error
             } catch (error: Exception) { operationError = operationErrorMessage(error); message = operationError
-            } finally { pushActive = push.enabled; busy = false } }
+            } finally { pushActive = push.enabled; acceptsTests = push.acceptsTests; busy = false } }
+        }
+        fun sendSos(simulated: Boolean) = work(refreshSession = false) {
+            val device = cloudDevice ?: error("Selecciona la persona primero")
+            withContext(Dispatchers.IO) { api.queueSos(device, simulated) }
+            sosNotice = "Solicitud guardada en este celular; aún no se confirmó el registro remoto."
+            jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
+            val sent = withContext(Dispatchers.IO) { api.flushSos(jwt!!, device) }
+            sosNotice = if (sent > 0) "Registrado en Supabase. Esto no confirma recepción ni atención del cuidador." else "Sin solicitudes recientes pendientes."
+            message = sosNotice
         }
         val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
             if (allowed && jwt != null) work { push.update(jwt!!, true); pushActive = push.enabled; message = "Celular registrado para alertas remotas" }
@@ -131,6 +144,11 @@ class MainActivity : ComponentActivity() {
                 message = "CA importada solo para SFA. Verifica que provenga de tu PC."
             }
         }
+        confirmSos?.let { simulated -> AlertDialog(onDismissRequest = { confirmSos = null },
+            title = { Text(if (simulated) "Enviar prueba SOS" else "Enviar solicitud SOS real") },
+            text = { Text(if (simulated) "Se registrará como PRUEBA y solo enviará push a cuidadores que aceptaron pruebas. No es una emergencia." else "Se solicitará ayuda a los cuidadores autorizados de $cloudPerson. Sin confirmación remota, utiliza otro medio de contacto.") },
+            confirmButton = { TextButton(enabled = !busy, onClick = { confirmSos = null; sendSos(simulated) }) { Text(if (simulated) "Enviar prueba" else "Enviar SOS real") } },
+            dismissButton = { TextButton(onClick = { confirmSos = null }) { Text("Cancelar") } }) }
         incoming?.let { candidate ->
             AlertDialog(onDismissRequest = { incoming = null }, title = { Text("Vincular esta PC") },
                 text = { Text("${candidate.origin}\nEl GPS se enviará a esta PC al iniciar. Los registros pendientes del vínculo anterior no se reasignan.") },
@@ -194,6 +212,16 @@ class MainActivity : ComponentActivity() {
                         SfaButton("Importar certificado de la PC", Icons.Outlined.VerifiedUser, { importCa = true }, !busy && !state.running, secondary = true)
                         SfaButton("Escanear QR de vinculación", Icons.Outlined.QrCodeScanner, { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Vínculo de ubicación SFA").setBeepEnabled(false).setOrientationLocked(false)) }, !busy && !state.running, secondary = true)
                     }
+                    if (remoteGps && cloudDevice != null && jwt != null) {
+                        SfaSection("Solicitar ayuda", Icons.Outlined.Sos)
+                        SfaButton("Enviar SOS", Icons.Outlined.NotificationsActive, { confirmSos = false }, !busy, danger = true)
+                        SfaButton("Probar SOS con mis cuidadores", Icons.Outlined.Science, { confirmSos = true }, !busy, secondary = true)
+                        SfaButton("Reintentar SOS pendientes", Icons.Outlined.Refresh, { work {
+                            val sent = withContext(Dispatchers.IO) { api.flushSos(jwt!!, cloudDevice!!) }
+                            sosNotice = if (sent > 0) "Solicitudes registradas en Supabase; recepción del cuidador aún no confirmada." else "Sin solicitudes recientes pendientes."
+                        } }, !busy, secondary = true)
+                        if (sosNotice.isNotBlank()) Text(sosNotice, style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp), color = SfaBorder)
                     SfaSection("Seguimiento", Icons.Outlined.MyLocation, trailing = { SfaBadge(if (state.running) "Activo" else "Detenido", state.running) })
                     Text(state.message, style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
@@ -225,6 +253,10 @@ class MainActivity : ComponentActivity() {
                     TextButton(onClick = { showTrackingHelp = !showTrackingHelp }, modifier = Modifier.heightIn(min = 48.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Sobre la continuidad del seguimiento") }
                     if (showTrackingHelp) Text(if (remoteGps) "La sesión se renueva mientras el proceso siga activo; al reiniciar debes iniciar sesión otra vez. Android puede detener el servicio por cierre forzado o restricciones de batería." else "El modo local necesita la misma red o hotspot que la PC. El GPS no depende del cinturón.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
                 } else if (tab == 2) {
+                    if (jwt != null && pushActive) Row(verticalAlignment = Alignment.Top) {
+                        Checkbox(checked = acceptsTests, enabled = !busy, onCheckedChange = { enabled -> work { push.consentTests(jwt!!, enabled); message = if (enabled) "Este celular acepta pruebas de cuidadores autorizados" else "Recepción de pruebas desactivada" } })
+                        Text("Aceptar pruebas SOS de las personas a mi cuidado en este celular", Modifier.weight(1f).padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
                     AlarmLab(busy, jwt != null && selected.isNotEmpty() && pushActive,
                         localTest = { message = if (localAlarmTest(this@MainActivity)) "Prueba local publicada. Revisa la bandeja de notificaciones; el sonido depende de Android." else "Activa las notificaciones de SFA y su canal de alertas en Ajustes de Android." },
                         remoteTest = { work { push.test(jwt!!, selected); message = "Prueba en cola para este celular. Esperando a la PC emisora; esto todavía no confirma recepción." } })

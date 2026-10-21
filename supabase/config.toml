@@ -1,0 +1,6 @@
+project_id = "sfa-asistencia"
+
+[functions.sfa-team-invite]
+# The handler verifies the JWT with Supabase Auth, then checks administrator RPC permissions.
+# Legacy gateway validation does not accept this project's ES256 sessions.
+verify_jwt = false
