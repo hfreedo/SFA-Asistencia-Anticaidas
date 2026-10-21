@@ -1,5 +1,19 @@
 # Versiones
 
+## v1.2.0-rc2 - FCM para pruebas
+
+Nueva APK version 0.3.0-prototipo (3) con **Alertas en este celular**, permiso,
+registro voluntario y recepcion FCM. Emisor Windows actualizado, driver CH340
+opcional, fuentes y guias. No contiene claves privadas ni datos personales.
+
+71 pruebas Python, 26 comprobaciones SQL aisladas y 12 pruebas Android; lint
+sin errores. La entrega real de una notificacion en Android sigue pendiente.
+Firma debug; no desinstalar una version con datos si hay conflicto de firma.
+
+[Release y descargas](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc2)
+| [Guia de prueba](docs/PRUEBA_APK_FCM.md)
+| [Configuracion FCM](docs/FIREBASE_FCM.md)
+
 ## v1.2.0-rc1 - Candidata de pruebas
 
 Windows portable con centro de inicio, geocerca desde 5 m, historial conservado,

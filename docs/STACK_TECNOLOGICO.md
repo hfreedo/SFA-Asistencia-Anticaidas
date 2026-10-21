@@ -15,7 +15,9 @@ Una aplicación web local conectada a un cinturón Arduino. La computadora recib
 telemetría, conserva eventos y sirve el panel al navegador. El celular abre ese
 mismo panel mediante un QR cuando comparte la red de la computadora.
 Ahora se suman un portal Supabase y un prototipo Android nativo; sus alcances
-son diferentes. GPS cloud y notificaciones FCM siguen pendientes.
+son diferentes. GPS cloud sigue pendiente. FCM incorpora SDK Android, registro
+privado Supabase y emisor PC HTTP v1; su activacion requiere identidad de envio
+y prueba real. Ver [configuracion FCM](FIREBASE_FCM.md).
 
 ## Recorrido Ampliado: Herramientas Que Van Juntas
 
@@ -338,8 +340,9 @@ SFA no usa PHP, Apache ni MariaDB. No necesita XAMPP.
   aporta por sí solo. No se deben mostrar valores inventados.
 - Una geocerca dibujada no demuestra seguimiento GPS ni cálculo de rutas o llegada.
 - El QR no conecta automáticamente al Wi-Fi ni crea una cuenta: abre una URL.
-- Kotlin/Compose y Supabase forman parte de la ampliacion. Firebase/FCM aun no
-  esta configurado; no equivale a las notificaciones locales de Android.
+- Kotlin/Compose y Supabase forman parte de la ampliacion. FCM tiene integracion
+  cliente y emisor preparado; falta activar su identidad y validar entrega real.
+  No equivale a las notificaciones locales de Android.
 - El acceso LAN no tiene autenticación. Usar una red de confianza, sin exponer
   el panel a Internet ni abrir puertos del router.
 - Compilar o simular no demuestra detección física. Es un prototipo educativo,

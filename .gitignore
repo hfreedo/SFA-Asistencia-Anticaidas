@@ -26,3 +26,5 @@ portability_test/
 *.key
 .DS_Store
 Thumbs.db
+secrets/
+**/*service-account*.json

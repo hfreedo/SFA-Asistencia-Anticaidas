@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[1]
 target = root / 'repositorio_publico_sfa'
 if not (target / '.git').exists():
     raise SystemExit('Public checkout not found; no files copied')
-excluded = {'.git', '.venv', '.venv313', '__pycache__', 'node_modules', 'build', '.gradle', '.jvm-tmp', 'artifacts', 'static', 'dist-acceso', 'certs', 'data', 'copias_privadas'}
+excluded = {'.git', '.venv', '.venv313', '__pycache__', 'node_modules', 'build', '.gradle', '.jvm-tmp', 'artifacts', 'static', 'dist-acceso', 'certs', 'data', 'copias_privadas', 'secrets'}
 source_suffixes = {'.py', '.ts', '.tsx', '.json', '.css', '.html', '.md', '.sql', '.mjs', '.kts', '.kt', '.xml', '.properties', '.bat', '.jar', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.txt', '.yml', '.yaml', '.ino', '.h', '.cpp', '.toml'}
 copied = []
 for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 'scripts', 'docs', '.github'):
@@ -16,6 +16,8 @@ for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 
             continue
         relative = source.relative_to(root)
         if any(part in excluded for part in relative.parts) or source.name in {'.env', 'local.properties', 'google-services.json'}:
+            continue
+        if source.suffix == '.json' and 'service-account' in source.name:
             continue
         if source.name.startswith('.env') and source.name != '.env.example':
             continue

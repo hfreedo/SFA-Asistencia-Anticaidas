@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
 android {
     namespace = "org.sfa.asistencia"
     compileSdk = 35
@@ -10,8 +11,8 @@ android {
         applicationId = "org.sfa.asistencia"
         minSdk = 31
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0-prototipo"
+        versionCode = 3
+        versionName = "0.3.0-prototipo"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
@@ -23,6 +24,8 @@ android {
     buildTypes { release { isMinifyEnabled = false } }
 }
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.material3:material3")

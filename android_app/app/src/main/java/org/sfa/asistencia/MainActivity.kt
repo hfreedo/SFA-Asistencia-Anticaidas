@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         val state by PhoneRuntime.state.collectAsState()
         val api = remember { NativeApi(this) }
+        val push = remember { PushRegistration(this) }
+        var pushActive by remember { mutableStateOf(push.enabled) }
         val bindingStore = remember { SecureBinding(this) }
         var binding by remember { mutableStateOf(bindingStore.load()) }
         var incoming by remember { mutableStateOf<PhoneBinding?>(null) }
@@ -61,7 +63,11 @@ class MainActivity : ComponentActivity() {
         fun work(block: suspend () -> Unit) {
             if (busy) return
             busy = true
-            scope.launch { message = ""; try { block() } catch (_: Exception) { message = "No se pudo completar la operación. Revisa permisos, certificado, sesión y conexión." } finally { busy = false } }
+            scope.launch { message = ""; try { block() } catch (_: Exception) { message = "No se pudo completar la operación. Revisa permisos, certificado, sesión y conexión." } finally { pushActive = push.enabled; busy = false } }
+        }
+        val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+            if (allowed && jwt != null) work { push.update(jwt!!, true); pushActive = push.enabled; message = "Celular registrado para alertas remotas" }
+            else message = "Activa el permiso de notificaciones para recibir avisos"
         }
         fun startTracking() {
             if (binding == null && belt == null) { message = "Vincula la PC o selecciona un cinturón"; return }
@@ -153,6 +159,13 @@ class MainActivity : ComponentActivity() {
                             jwt = result.first; residents = result.second; message = "Sesión verificada; acceso limitado por Supabase"
                         } }, enabled = !busy && email.isNotBlank() && password.isNotBlank()) { Text("Iniciar sesión") }
                     } else {
+                        Text("Alertas en este celular", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(if (!push.configured) "Esta compilación no incluye configuración Firebase" else if (pushActive && push.renewalPending) "El registro necesita actualizarse" else if (pushActive) "Registro activo; el servidor debe estar configurado" else "Desactivadas")
+                        Button(onClick = {
+                            if (pushActive && !push.renewalPending) work { push.update(jwt!!, false); pushActive = push.enabled; message = "Avisos desactivados" }
+                            else if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            else work { push.update(jwt!!, true); pushActive = push.enabled; message = "Celular registrado para alertas remotas" }
+                        }, enabled = !busy && push.configured) { Icon(Icons.Outlined.Notifications, null); Spacer(Modifier.width(8.dp)); Text(if (pushActive && !push.renewalPending) "Desactivar avisos" else "Activar o actualizar avisos") }
                         Text("Residentes autorizados: ${residents.length()}")
                         for (i in 0 until residents.length()) {
                             val resident = residents.getJSONObject(i)
@@ -160,8 +173,11 @@ class MainActivity : ComponentActivity() {
                         }
                         if (selected.isNotEmpty()) TextButton(onClick = { work { events = withContext(Dispatchers.IO) { api.remoteEvents(jwt!!, selected) } } }, enabled = !busy) { Icon(Icons.Outlined.Refresh, null); Text("Actualizar eventos") }
                         for (i in 0 until events.length()) { val event = events.getJSONObject(i); Text("${if (event.optBoolean("simulated")) "Simulado · " else ""}${event.getString("event_type").replace('_', ' ')}\n${event.getString("observed_at")}"); HorizontalDivider() }
-                        TextButton(onClick = { jwt = null; residents = JSONArray(); events = JSONArray(); selected = "" }) { Text("Cerrar sesión") }
-                        Text("Consulta manual de eventos. Push remoto y envío GPS a Supabase aún no están activados en esta APK.", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { work {
+                            if (pushActive) { push.update(jwt!!, false); pushActive = false }
+                            jwt = null; residents = JSONArray(); events = JSONArray(); selected = ""
+                        } }, enabled = !busy) { Text("Cerrar sesión") }
+                        Text("Los avisos requieren permiso, internet y emisor configurado. Si Android fuerza la detención no se garantiza su recepción. GPS hacia Supabase sigue pendiente.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

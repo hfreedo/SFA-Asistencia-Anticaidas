@@ -13,7 +13,7 @@ la interfaz ni los perfiles de la base local. No publica cambios en GitHub.
 | 3 | Puente local, cola persistente, sincronizacion y modos | Vinculacion PC real comprobada; cola y deduplicacion probadas; falta recorrido con cinturon fisico y seleccion global de transporte |
 | 4 | Centro de inicio unico en PC | Implementado y probado: inicio, detencion, instancia unica, HTTPS y base compartida; BAT conservados como herramientas de desarrollo |
 | 5 | App Kotlin / Compose, Android 12+ (minSdk 31) | APK de prototipo en validacion: GPS foreground hacia PC, Bluetooth local y consulta cloud; instalacion/GPS/HC-06 fisicos pendientes |
-| 6 | Seguimiento, historial, geocerca y push | Historial local y reglas con incertidumbre implementados; GPS hacia Supabase, permisos de emisor cloud y FCM pendientes de integracion/credenciales |
+| 6 | Seguimiento, historial, geocerca y push | Historial y geocerca locales implementados; FCM con SDK, registro privado y emisor PC preparados, migracion aplicada; faltan identidad de envio y prueba real. GPS cloud pendiente |
 | 7 | Empaquetado y demostracion integral | Windows y Android se validan por separado; no declarar demostracion integral aprobada sin las pruebas fisicas y remotas |
 
 Ver ANDROID.md y VALIDACION_AMPLIACION.md. Los diagramas siguientes describen

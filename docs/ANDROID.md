@@ -6,8 +6,8 @@ Proyecto `android_app/` para Android Studio: Kotlin, Jetpack Compose y Android
 12 o superior (minSdk 31, target/compile 35). No es una WebView del panel.
 El artefacto de pruebas se construye en `android_app/artifacts/` y no incluye
 credenciales, bases del desarrollador ni certificados privados de la PC.
-La revision paso compilacion, 8 pruebas unitarias y lint sin errores. Persisten
-3 advertencias de versiones de dependencias: se fijaron para reproducibilidad;
+La revision rc2 paso compilacion, 12 pruebas unitarias y lint sin errores. Persisten
+6 advertencias de versiones de dependencias: se fijaron para reproducibilidad;
 antes de una entrega productiva deben revisarse sus actualizaciones y seguridad.
 
 | Funcion | Estado de esta entrega |
@@ -21,8 +21,10 @@ antes de una entrega productiva deben revisarse sus actualizaciones y seguridad.
 | HC-06 | Equipos ya emparejados, permiso BLUETOOTH_CONNECT y lector del protocolo TEL/EVT |
 | Consulta de eventos remotos | Login Supabase, consultas manuales con RLS, JWT solo en memoria |
 | GPS hacia Supabase desde otra red | No implementado en esta APK |
-| Push al cuidador con app cerrada | FCM pendiente; no se simula como entregado |
+| Push al cuidador con app cerrada | Codigo FCM preparado; requiere migracion, emisor y prueba real; ver FIREBASE_FCM.md |
 | Roles completos e invitaciones desde app | Gestion desde Supabase/portal, no desde esta APK |
+
+Para probar la APK rc2 con FCM seguir [Prueba APK FCM](PRUEBA_APK_FCM.md).
 
 ## Prueba en el Android
 

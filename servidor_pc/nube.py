@@ -31,6 +31,28 @@ class CloudSync:
         self.session = None
         self.session_lock = threading.Lock()
         self.send_lock = threading.Lock()
+        self.push_error = None
+        self.push_sender = None
+
+    def flush_push(self, token):
+        path = os.getenv('SFA_FCM_CREDENTIALS_FILE', '')
+        if not path:
+            return
+        try:
+            from .fcm import FcmSender
+            if self.push_sender is None:
+                self.push_sender = FcmSender(path)
+            jobs = self.transport('/rest/v1/rpc/sfa_claim_push', token, {})
+            if not isinstance(jobs, list) or len(jobs) > 10:
+                raise ValueError('push_response')
+            for job in jobs:
+                outcome = self.push_sender.send(job)
+                self.transport('/rest/v1/rpc/sfa_ack_push', token, {
+                    'p_id': job['id'], 'p_lease': job['lease'], 'p_outcome': outcome})
+            self.push_error = None
+        except Exception:
+            # A push failure must never block storage/synchronization of sensor evidence.
+            self.push_error = 'push_unavailable'
 
     @contextmanager
     def connection(self):
@@ -143,7 +165,8 @@ class CloudSync:
             last_error = conn.execute("SELECT last_error FROM cloud_outbox WHERE last_error IS NOT NULL ORDER BY rowid DESC LIMIT 1").fetchone()
         return {'session_active': owner is not None, 'bindings': links,
                 'pending': counts.get('pending',0), 'sent': counts.get('sent',0),
-                'blocked': counts.get('blocked',0), 'last_error': last_error[0] if last_error else None}
+                'blocked': counts.get('blocked',0), 'last_error': last_error[0] if last_error else None,
+                'push': {'configured': bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')), 'last_error': self.push_error}}
 
     def capture(self, conn, payload, local_id):
         kind = payload.get('type')
@@ -186,6 +209,7 @@ class CloudSync:
             if not session:
                 return
             owner, token = session
+            self.flush_push(token)
             with self.connection() as conn:
                 first = conn.execute("SELECT device_id FROM cloud_outbox WHERE status='pending' AND owner_id=? AND next_attempt<=? ORDER BY rowid LIMIT 1", (owner,time.time())).fetchone()
                 if not first:

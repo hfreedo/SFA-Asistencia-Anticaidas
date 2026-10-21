@@ -167,6 +167,62 @@ try {
     await login(null,'anon');
     await assert.rejects(() => ingest([sample]), e => e.code === '42501');
   });
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../migrations/202610210003_push.sql', import.meta.url), 'utf8'));
+  await db.exec(`update public.sfa_memberships set revoked_at=null where user_id='${id(2)}';
+    update public.sfa_resident_access set revoked_at=null where user_id='${id(2)}'`);
+  const register = (installation, token, enabled=true) => db.query('select public.sfa_register_push($1,$2,$3)', [installation,token,enabled]);
+  const claimPush = async () => (await db.query('select public.sfa_claim_push() as jobs')).rows[0].jobs;
+  const ackPush = job => db.query("select public.sfa_ack_push($1,$2,'sent')",[job.id,job.lease]);
+  await check('push registration requires authorized caregiver membership', async () => {
+    await login(4);
+    await assert.rejects(() => register(id(100),'fixture_token_abcdefghijklmnop_1'),e=>e.code==='42501');
+    await login(1); await register(id(100),'fixture_token_abcdefghijklmnop_1');
+    await login(2); await register(id(101),'fixture_token_abcdefghijklmnop_2');
+  });
+  await check('FCM tokens are private even to authenticated users', async () => {
+    await assert.rejects(()=>db.query('select * from sfa_private.push_devices'),e=>e.code==='42501');
+    await assert.rejects(()=>register(id(100),'fixture_token_abcdefghijklmnop_3'),e=>e.code==='42501');
+  });
+  await db.exec('reset role');
+  await db.exec(`insert into public.sfa_events(id,resident_id,device_id,event_type,observed_at)
+    values('${id(90)}','${id(11)}','${id(30)}','CAIDA_CONFIRMADA',now())`);
+  let pushJobs;
+  await check('only admin of event space can claim push deliveries', async () => {
+    await login(3); assert.equal((await claimPush()).length,0);
+    await login(2); assert.equal((await claimPush()).length,0);
+    await login(1); pushJobs=await claimPush(); assert.equal(pushJobs.length,2);
+    assert.equal((await claimPush()).length,0);
+  });
+  await check('ack requires worker identity and unguessable lease', async () => {
+    await login(2); await assert.rejects(()=>ackPush(pushJobs[0]),e=>e.code==='42501');
+    await login(1); await assert.rejects(()=>ackPush({...pushJobs[0],lease:id(999)}),e=>e.code==='42501');
+    for(const job of pushJobs) await ackPush(job);
+    await assert.rejects(()=>ackPush(pushJobs[0]),e=>e.code==='42501');
+  });
+  await db.exec('reset role');
+  await db.exec(`update public.sfa_resident_access set revoked_at=now() where user_id='${id(2)}';
+    insert into public.sfa_events(id,resident_id,device_id,event_type,observed_at)
+    values('${id(91)}','${id(11)}','${id(30)}','SOS',now())`);
+  await check('revoked caregivers receive no new jobs', async () => {
+    await login(1); const jobs=await claimPush(); assert.equal(jobs.length,1);
+    assert.equal(jobs[0].token,'fixture_token_abcdefghijklmnop_1'); await ackPush(jobs[0]);
+  });
+  await db.exec('reset role');
+  await db.exec(`insert into public.sfa_events(id,resident_id,device_id,event_type,observed_at,simulated)
+    values('${id(92)}','${id(11)}','${id(30)}','SOS',now(),true),
+    ('${id(93)}','${id(11)}','${id(30)}','SOS',now()-interval '1 hour',false)`);
+  await check('simulated and stale events do not generate push', async () => {
+    await login(1); assert.equal((await claimPush()).length,0);
+    await register(id(100),null,false);
+  });
+  await db.exec('reset role');
+  await db.exec(`insert into public.sfa_events(id,resident_id,device_id,event_type,observed_at)
+    values('${id(94)}','${id(11)}','${id(30)}','SOS',now())`);
+  await check('disabled devices stop delivery and anonymous cannot register', async () => {
+    await login(1); assert.equal((await claimPush()).length,0);
+    await login(null,'anon'); await assert.rejects(()=>register(id(100),'fixture_token_abcdefghijklmnop_1'),e=>e.code==='42501');
+  });
   console.log(`${checks} database checks passed (isolated PGlite; not hosted Supabase).`);
 } finally {
   await db.close();

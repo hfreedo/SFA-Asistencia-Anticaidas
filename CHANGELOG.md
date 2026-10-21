@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0-rc2 - integracion FCM (pre-release)
+
+- Configuracion Android Firebase validada localmente; SDK Messaging sin Analytics.
+- Registro voluntario del celular, permiso y canal de avisos genericos privados.
+- Renovacion de token requiere actualizar registro desde sesion autenticada.
+- SQL privado con registro propio, destinatarios autorizados, lease y reintentos.
+- Emisor HTTP v1 opcional en PC con OAuth, sin credenciales elevadas en APK.
+- No enviar push por eventos simulados ni historicos; deduplicacion por evento.
+- Migracion aplicada con autorizacion en Supabase Pruebas; permisos comprobados.
+- Pendientes de activacion: identidad de envio y
+  prueba real Android. No se modifico el release 1.2.0-rc1 publicado.
+- Guia completa: docs/FIREBASE_FCM.md. No se activo facturacion ni servicios de pago.
+
 ## 1.2.0-rc1 - ampliacion de software (pre-release)
 
 ### Geocerca y avisos

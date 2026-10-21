@@ -2,9 +2,10 @@
 
 ## Niveles separados
 
-Resultado local de esta revision: 67 pruebas Python, 27 pruebas web,
-19 comprobaciones SQL aisladas y 8 pruebas unitarias Android. La APK se
-compilo en copia ASCII con hashes de fuente; lint: 0 errores y 3 advertencias
+Resultado local rc2: 71 pruebas Python, 26 comprobaciones SQL aisladas y
+12 pruebas unitarias Android. Se conservan las 27 pruebas web de rc1; esta
+ampliacion no modifica la interfaz web. La APK se
+compilo en copia ASCII con hashes de fuente; lint: 0 errores y 6 advertencias
 por versiones fijadas de dependencias. Son advertencias registradas, no
 controles de seguridad desactivados. Las Actions publicadas repetiran las pruebas.
 
@@ -31,7 +32,8 @@ una validacion medica. Conservar la evidencia y repetir el recorrido real.
 
 1. Android fisico conectado y autorizado; registrar modelo, Android y bateria.
 2. Confirmar salida, sonido/aviso, reingreso, permisos denegados y perdida de red.
-3. Configurar Firebase para FCM, registrar destinatarios y validar envios reales.
+3. FCM ya tiene codigo y configuracion en la PC de desarrollo; instalar la APK
+   rc2, registrar destinatarios y validar envios reales. La clave no se distribuye.
 4. Implementar el emisor GPS cloud revocable y su consentimiento; no reutilizar
    la clave del QR local como credencial de Supabase ni usar una service_role en APK.
 5. Validar datos entre redes, renovacion de credenciales y atencion del cuidador.

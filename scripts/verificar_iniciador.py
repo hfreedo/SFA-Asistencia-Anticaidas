@@ -17,6 +17,9 @@ from servidor_pc.control_local import read_control
 folder = Path(tempfile.mkdtemp(prefix='sfa-launcher-check-'))
 exe = folder / 'SFA_Asistencia.exe'
 source = 'dist/corregido/SFA_Asistencia.exe' if '--candidate' in sys.argv else 'dist/SFA_Centro.exe'
+if '--exe' in sys.argv:
+    source = Path(sys.argv[sys.argv.index('--exe') + 1]).resolve()
+    assert source.is_file() and source.suffix.lower() == '.exe'
 if '--archive' in sys.argv:
     archive = Path(sys.argv[sys.argv.index('--archive') + 1]).resolve()
     with zipfile.ZipFile(archive) as package:

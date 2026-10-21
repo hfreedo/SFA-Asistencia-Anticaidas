@@ -4,13 +4,24 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### Ampliacion 1.2.0-rc1: PC, Supabase y Android
+### Ampliacion 1.2.0-rc2: notificaciones FCM para pruebas
+
+[Descargar APK rc2 con FCM](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc2/SFA-Asistencia-1.2.0-rc2-Android-prototipo.apk)
+| [Release completo y SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc2)
+| [Pasos de prueba](docs/PRUEBA_APK_FCM.md)
+
+APK Android 12+, version 0.3.0-prototipo (3), firma debug. En Cuidar, despues
+de iniciar sesion, aparece **Alertas en este celular**. La APK rc1 no tiene
+esa opcion. La entrega incluye fuentes, registro privado Supabase y emisor PC;
+la entrega real en Android sigue pendiente de prueba fisica.
 
 El estado actual incluye centro de inicio unificado, base compartida entre
 fuentes y EXE del proyecto, HTTPS asistido, geocerca con incertidumbre y aviso
 persistente, historial sin purga automatica y un prototipo Android Kotlin/Compose.
 Supabase aporta Auth, RLS y sincronizacion PC; la APK consulta eventos remotos,
-pero **GPS hacia Supabase y push FCM todavia no estan implementados**.
+con FCM integrado en rc2. **GPS hacia Supabase sigue pendiente**.
+El emisor requiere credencial privada propia, nunca incluida en el repositorio
+ni en el paquete; ver [configuracion y limites FCM](docs/FIREBASE_FCM.md).
 
 - [Cambios de esta entrega](CHANGELOG.md).
 - [Plan y estado de las etapas](docs/PLAN_AMPLIACION.md).
