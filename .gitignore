@@ -30,6 +30,9 @@ secrets/
 **/*service-account*.json
 *.jks
 *.keystore
+*.dpapi.xml
+*.p12
+*.pfx
 keystore.properties
 signing.properties
 android_app/app/google-services.json

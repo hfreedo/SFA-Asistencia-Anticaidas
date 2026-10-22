@@ -1,5 +1,23 @@
 # Versiones
 
+## Android 0.6.2-release (9)
+
+Primera candidata con firma propia de distribucion, build no depurable y
+Android 12+. Mantiene los flujos de 0.6.1 y no requiere migraciones cloud.
+La firma cambia respecto a debug: revisar la guia antes de reinstalar.
+Build, pruebas unitarias, lint, firma y manifiesto verificados; pruebas fisicas pendientes.
+
+[APK, SHA-256 y notas](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.6.2-android-release)
+| [Firma y migracion](docs/ANDROID_RELEASE.md)
+| [Verificacion](docs/VALIDACION_ANDROID_0_6_2.md)
+
+## Windows 1.2.0-rc8
+
+El Centro Windows vigente no cambia con esta APK. Incidentes en Panel principal,
+indicador en el menu y prueba protegida FCM desde Ajustes > Notificaciones.
+
+[Portable Windows](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc8)
+
 ## Android 0.4.1-prototipo (5)
 
 Actualizacion independiente de Windows rc5. Diagnostico persistente de errores

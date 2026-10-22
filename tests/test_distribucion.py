@@ -22,7 +22,8 @@ class DistributionTests(unittest.TestCase):
     def test_rejects_private_and_escaping_entries(self):
         names = ['../file.txt', '/file.txt', 'C:/secret.txt', 'SFA/.env',
                  'SFA/secrets/private.json', 'SFA/data/sfa.sqlite3',
-                 'SFA/release.jks', 'SFA/firebase-service-account.json']
+                 'SFA/release.jks', 'SFA/password.dpapi.xml', 'SFA/key.p12',
+                 'SFA/key.pfx', 'SFA/firebase-service-account.json']
         with tempfile.TemporaryDirectory() as folder:
             for name in names:
                 with self.subTest(name=name):
@@ -51,7 +52,7 @@ class DistributionTests(unittest.TestCase):
     def test_signing_files_excluded_from_copy(self):
         for script in ('validar_android.py', 'sincronizar_fuentes_publicas.py'):
             content = (ROOT / 'scripts' / script).read_text(encoding='utf-8')
-            for name in ('keystore.properties', 'signing.properties', '.jks', '.keystore'):
+            for name in ('keystore.properties', 'signing.properties', '.jks', '.keystore', '.dpapi.xml', '.p12', '.pfx'):
                 self.assertIn(name, content)
 
 

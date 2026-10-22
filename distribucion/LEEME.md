@@ -4,8 +4,8 @@
 
 Abre `actual/LEEME.md` para los paquetes vigentes separados por plataforma.
 Se genera con `scripts/preparar_entrega_actual.py`, verifica los hashes y no
-modifica el Centro activo ni las entregas publicadas. Android sigue identificado
-como debug hasta completar la firma propia de `docs/ANDROID_RELEASE.md`.
+modifica el Centro activo ni las entregas publicadas. Android 0.6.2 usa firma
+release propia; consultar la migracion desde debug en `docs/ANDROID_RELEASE.md`.
 Consulta `docs/ORGANIZACION_Y_ENTREGA.md` antes de compartir o mover carpetas.
 
 ## Recursos para empaquetado

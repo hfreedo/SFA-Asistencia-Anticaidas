@@ -4,9 +4,10 @@
 **Para conocer la arquitectura:** `README.md`.
 **Para desarrollar:** `docs/DESARROLLO.md`.
 La preparacion de firma Android esta en `docs/ANDROID_RELEASE.md`; la APK
-actual sigue siendo debug. No se ha reemplazado el Centro de esta PC.
+0.6.2 ya tiene firma propia; requiere revisar la migracion desde debug.
+No se ha reemplazado el Centro de esta PC.
 
-Version actual: **Centro Windows 1.2.0-rc8** y **Android 0.6.1-prototipo (8)**.
+Version actual: **Centro Windows 1.2.0-rc8** y **Android 0.6.2-release (9)**.
 Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores
 se conservan como historial y no fueron reemplazados retroactivamente.
 

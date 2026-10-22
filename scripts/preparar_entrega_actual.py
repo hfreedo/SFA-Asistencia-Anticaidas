@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
     ('SFA-Asistencia-1.2.0-rc8-Windows.zip',
      '1fcb6a0e03f1ad3f7d8c3a222f1f608dfcb904e11635837fda54ca7860ebb051', 'Windows'),
-    ('SFA-Asistencia-Android-0.6.1-prototipo.apk',
-     'ef7c291d6229d696e6115f7330737a4baf4f9844915d1e1f594f95ecee949697', 'Android-debug'),
+    ('SFA-Asistencia-Android-0.6.2-release.apk',
+     '8f6a4753a6a6b353d7d331c3d66527c49a187e3d783a1afdda639b5c4c07930b', 'Android-release'),
 )
 
 
@@ -29,7 +29,7 @@ def validate_archive(path):
                 raise ValueError('Unsafe archive entry')
             name = relative.name.lower()
             parts = {part.lower() for part in relative.parts}
-            if (name == '.env' or name.endswith(('.sqlite3', '.db', '.pem', '.key', '.jks', '.keystore'))
+            if (name == '.env' or name.endswith(('.sqlite3', '.db', '.pem', '.key', '.jks', '.keystore', '.p12', '.pfx', '.dpapi.xml'))
                     or 'service-account' in name or parts & {'secrets', 'certs', '.venv', '.venv313'}):
                 raise ValueError('Private artifact in archive: ' + name)
 
@@ -78,9 +78,10 @@ El ZIP es la candidata 1.2.0-rc8 ya publicada, conservada sin modificar.
 
 ## Android
 
-Android-debug/ contiene la APK 0.6.1 vigente con firma debug, NO la futura
-APK release con firma propia. Conserva su identidad hasta terminar la migracion.
-Consulta Documentacion/ANDROID_RELEASE.md para preparar la nueva firma.
+Android-release/ contiene la APK 0.6.2 con firma propia, no depurable.
+Es una candidata pendiente de instalacion y pruebas fisicas Android.
+La firma es distinta de debug: consulta Documentacion/ANDROID_RELEASE.md
+antes de desinstalar una version anterior y volver a vincular el celular.
 
 ## Antes de compartir
 

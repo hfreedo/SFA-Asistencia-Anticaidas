@@ -17,7 +17,7 @@ for tree in ('servidor_pc', 'interfaz_web', 'tests', 'supabase', 'android_app', 
         relative = source.relative_to(root)
         if any(part in excluded for part in relative.parts) or source.name in {'.env', 'local.properties', 'google-services.json', 'keystore.properties', 'signing.properties'}:
             continue
-        if source.suffix.lower() in {'.jks', '.keystore'}:
+        if source.suffix.lower() in {'.jks', '.keystore', '.p12', '.pfx'} or source.name.endswith('.dpapi.xml'):
             continue
         if source.suffix == '.json' and 'service-account' in source.name:
             continue

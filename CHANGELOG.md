@@ -1,5 +1,17 @@
 # Changelog
 
+## Android 0.6.2 release - Identidad de distribucion (2026-10-22)
+
+- VersionCode 9, build release no depurable y certificado propio de distribucion.
+- La clave se conserva fuera de las fuentes y los paquetes. Contrasena local
+  protegida mediante DPAPI del titular; no se sube a GitHub ni se incluye en APK.
+- Script local para crear o reutilizar la firma sin contrasenas en comandos.
+- Firma distinta a debug: no actualizar encima de 0.6.1 sin revisar la guia de
+  migracion. Los futuros releases deben conservar esta identidad.
+- No modifica los flujos GPS, SOS o FCM ni requiere nuevas migraciones cloud.
+- No promete eliminar avisos de navegador o Play Protect. Instalacion y pruebas
+  fisicas con la nueva firma quedan pendientes.
+
 ## En preparacion - Presentacion y distribucion (2026-10-22)
 
 - Portada orientada a arquitectura e impacto: diagrama Mermaid, aspectos de

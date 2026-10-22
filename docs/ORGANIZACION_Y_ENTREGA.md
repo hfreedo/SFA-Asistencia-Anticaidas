@@ -37,13 +37,13 @@ La entrega de revisión se genera con:
 
 El script verifica hashes conocidos y la integridad del ZIP Windows antes de
 copiar. Se niega a sobrescribir una entrega existente. Sus versiones de entrada
-son explícitas: no escoge el EXE más reciente por fecha. El Android vigente se
-identifica como **debug**, no como una APK release ya firmada.
+son explícitas: no escoge el EXE más reciente por fecha. Android 0.6.2 se
+identifica como **release firmada**, candidata pendiente de prueba fisica.
 
 No abre servidores, no modifica el acceso directo y no importa la base personal.
 La carpeta contiene los paquetes existentes sin alterarlos y una copia de las
 guías actuales. Es una entrega para revisar: no significa que se haya completado
-la firma Android ni la revisión jurídica y de licencias de terceros.
+la prueba fisica Android ni la revisión jurídica y de licencias de terceros.
 
 ## Qué no se mueve en esta etapa
 

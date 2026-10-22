@@ -111,9 +111,10 @@ del mapa; los controles y funciones posteriores se documentan en las guías actu
 4. Para GPS remoto instala la APK publicada, utiliza una cuenta invitada e inicia **Compartir > Por internet**. Vincula la PC al mismo residente desde **Acceso y sincronización** si vas a consultar en el panel local.
 
 Destino de escritorio: Windows 10/11 x64; pruebas realizadas en Windows 11.
-Android requiere **12 o posterior**. La APK publicada actualmente conserva firma
-debug; la [preparación de firma release](docs/ANDROID_RELEASE.md) establece el paso
-a una identidad de distribución propia. Consulta [versiones y validación](docs/VALIDACION_AMPLIACION.md).
+Android requiere **12 o posterior**. La APK **0.6.2 release** usa firma propia;
+la 0.6.1 anterior conserva firma debug. El cambio inicial de firma exige revisar
+la [guía de instalación y continuidad](docs/ANDROID_RELEASE.md) antes de reinstalar.
+La validación física de esta nueva entrega sigue pendiente.
 
 Los perfiles creados en el portable se guardan en `data/` junto al ejecutable.
 No se distribuyen cuentas, bases personales ni claves privadas. Las funciones

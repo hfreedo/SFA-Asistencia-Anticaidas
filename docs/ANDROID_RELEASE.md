@@ -2,9 +2,10 @@
 
 ## Estado de esta preparación
 
-La APK 0.6.1 publicada es debug. Se ha preparado un build `release` no depurable,
-con firma propia obligatoria y sin fallback a la clave debug. No se ha creado
-una clave privada ni se ha publicado una APK con una firma nueva.
+Android 0.6.2 inicia el canal `release` con clave propia y compilacion no
+depurable. La APK 0.6.1 anterior conserva su firma debug; no se reemplaza.
+La prueba de instalacion y de los flujos GPS/FCM en un Android fisico sigue
+pendiente para la nueva firma. Consulta las notas de su release.
 
 Release es un tipo de compilación, no una certificación de seguridad ni una
 garantía de ausencia de avisos. El navegador puede advertir por descargar APK;
@@ -12,6 +13,20 @@ Play Protect puede recomendar analizar una aplicación desconocida. No se deben
 desactivar esas protecciones para instalar SFA.
 
 ## 1. Crear la identidad de firma
+
+En la PC del titular ya se creo una identidad privada de distribucion. No
+generes otra para actualizar ese canal: todas sus versiones deben conservar
+la misma firma. Se guarda fuera del proyecto, en la carpeta del usuario
+`.sfa/android-signing/`, y nunca se incluye en Git o en la APK.
+
+`scripts/firma_android_local.ps1 -Build` reutiliza esa identidad, compila y
+ejecuta pruebas. La contrasena generada se conserva con DPAPI, cifrada para
+el usuario Windows actual; no se muestra ni se envia por chat. En otro equipo
+ese archivo cifrado NO basta para recuperar la contrasena: antes de migrar,
+el titular debe respaldar el keystore y recuperar la contrasena de forma
+privada hacia su gestor de contrasenas. No formatear esta PC sin ese respaldo.
+
+Para un editor nuevo o un proyecto independiente, la alternativa manual es:
 
 1. Abre `android_app/` en Android Studio.
 2. Usa **Build > Generate Signed App Bundle or APK > APK > Create new**.
@@ -75,8 +90,8 @@ ni una licencia y necesita validación independiente.
 5. Publica con número de versión, SHA-256, requisitos y notas. No incluyas el
    keystore, contraseñas o credencial privada FCM en APK, GitHub o ZIP.
 
-El script genera un candidato. La firma final y estas verificaciones todavía
-requieren la clave elegida por el titular y un dispositivo físico.
+El script genera un candidato. Las comprobaciones de instalacion y recepcion
+real todavia requieren un dispositivo fisico; una firma valida no las sustituye.
 
 ## Migración desde la APK debug
 

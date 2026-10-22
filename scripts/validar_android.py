@@ -30,7 +30,7 @@ work = Path(tempfile.mkdtemp(prefix='sfa-android-', dir=parent))
 project = work / 'project'
 shutil.copytree(source, project, ignore=shutil.ignore_patterns(
     'build', '.gradle', '.jvm-tmp', 'local.properties', 'artifacts',
-    '*.jks', '*.keystore', 'keystore.properties', 'signing.properties'))
+    '*.jks', '*.keystore', '*.p12', '*.pfx', '*.dpapi.xml', 'keystore.properties', 'signing.properties'))
 manifest = {}
 for file in project.rglob('*'):
     if file.is_file():
