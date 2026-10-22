@@ -1,9 +1,8 @@
 # Empieza aqui
 
-Android dispone de una correccion independiente **0.4.1-prototipo (5)** para
-diagnosticar errores de conexion y tolerar respuestas lentas. Actualiza la APK
-sin desinstalar. Windows sigue en rc5; los paquetes rc3/rc4/rc5 conservan su APK
-original 0.4.0 y no fueron reemplazados retroactivamente.
+Version actual: **Centro Windows 1.2.0-rc6** y **Android 0.6.0-prototipo (7)**.
+Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores
+se conservan como historial y no fueron reemplazados retroactivamente.
 
 ## Usar el proyecto en esta PC
 
@@ -12,11 +11,11 @@ Inicia el centro general: `dist/SFA_Centro.exe`. Desde alli puedes iniciar o
 detener el servidor y abrir el panel local o el portal remoto. No abras otros
 ejecutables ni necesitas usar BAT para el funcionamiento normal.
 
-La candidata actual es **1.2.0-rc5**; su APK indica **0.4.0-prototipo (4)**,
-sin cambios Android respecto de rc3. La correccion rc4 integra la lectura de
-GPS remoto en el panel local, Ubicacion > Por internet. Requiere sesion de esta
-PC reanudada y perfil local vinculado al mismo residente cloud del celular.
-rc5 corrige el fondo del mapa remoto: OpenStreetMap sin clave CARTO.
+La candidata actual requiere sesion de esta PC reanudada y perfil local
+vinculado al mismo residente cloud del celular. Ubicacion > Por internet no
+necesita hotspot ni red compartida. El mapa permite geocerca desde 5 m; ese
+radio no garantiza que el GPS tenga esa precision. Android muestra la calidad.
+Una salida confirmada queda pendiente hasta que un cuidador la atienda.
 Los ZIP/APK para compartir estan en `release/`; consulta sus sumas SHA-256.
 Las versiones rc1/rc2 no incluyen GPS directo a Supabase ni el nuevo laboratorio.
 
@@ -47,7 +46,7 @@ No comprimir toda la raiz: compartir el ZIP limpio del release.
 
 ## Prueba actual
 
-Seguir [GPS sin cinturon y pruebas de alarma](docs/PRUEBA_GPS_Y_ALARMAS.md).
+Seguir [Geocerca y atencion persistente](docs/PRUEBA_GEOCERCA_INTERNET.md).
 El modo remoto usa internet, no una red compartida. El modo local se conserva.
 
 La proxima etapa sera preparar administraciones propias para alumnos, con
