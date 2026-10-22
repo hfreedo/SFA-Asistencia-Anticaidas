@@ -25,7 +25,7 @@ it("takes attention using the server revision", async () => {
   await waitFor(() => expect(mock.rpc).toHaveBeenCalledWith("sfa_attend_incident", {
     p_event: "event", p_expected: null, p_outcome: "attending",
   }));
-  expect(await screen.findByRole("status")).toBeTruthy();
+  expect(await screen.findByText(/Atención tomada/)).toBeTruthy();
 });
 it("read-only people have no attention commands", async () => {
   mock.rpc.mockResolvedValue({ data: { can_attend: false, events: [incident] }, error: null });
@@ -77,4 +77,39 @@ it("a transient connection failure cannot dismiss a previously received pending 
   await screen.findByText(/No se pudieron actualizar/);
   expect(screen.getByRole("alert",{name:"Atención pendiente"})).toBeTruthy();
   expect(screen.queryByRole("button",{name:"Tomar atención"})).toBeNull();
+});
+it("gives geofence exits the same priority treatment as real SOS and keeps tests secondary", async () => {
+  mock.rpc.mockResolvedValue({data:{can_attend:true,events:[incident,
+    {...incident,id:"exit",event_type:"GEOCERCA_SALIDA",simulated:false},
+    {...incident,id:"sos",event_type:"SOS",simulated:false}]},error:null});
+  const {container}=render(<IncidentPanel resident="person" session={session}/>);
+  const alert=await screen.findByRole("alert",{name:"Atención pendiente"});
+  expect(alert.textContent).toContain("Geocerca 1");
+  expect(alert.textContent).toContain("SOS 1");
+  expect(container.querySelectorAll(".incident-row.is-priority")).toHaveLength(2);
+  expect(container.querySelector(".incident-row")?.classList.contains("is-priority")).toBe(true);
+  expect(container.querySelectorAll(".incident-row.is-test")).toHaveLength(1);
+});
+it("refreshes immediately on focus instead of waiting for the next poll", async () => {
+  render(<IncidentPanel resident="person" session={session}/>);
+  await screen.findByText("Prueba SOS entre dispositivos");
+  const before=mock.rpc.mock.calls.length;
+  fireEvent.focus(window);
+  await waitFor(()=>expect(mock.rpc.mock.calls.length).toBe(before+1));
+});
+it("uses existing browser consent for newly received geofence notifications", async () => {
+  const deliver=vi.fn();
+  class BrowserNotification {
+    static permission="granted";
+    constructor(title:string, options:unknown) {deliver(title,options);}
+  }
+  vi.stubGlobal("Notification",BrowserNotification);
+  vi.stubGlobal("isSecureContext",true);
+  mock.rpc.mockResolvedValue({data:{can_attend:true,events:[]},error:null});
+  render(<IncidentPanel resident="person" session={session}/>);
+  await screen.findByText(/No hay incidentes/);
+  expect(screen.getByRole("button",{name:"Desactivar avisos en esta PC"})).toBeTruthy();
+  mock.rpc.mockResolvedValue({data:{can_attend:true,events:[{...incident,event_type:"GEOCERCA_SALIDA",simulated:false,observed_at:new Date().toISOString()}]},error:null});
+  fireEvent.focus(window);
+  await waitFor(()=>expect(deliver).toHaveBeenCalledWith("SFA · Salida de geocerca",expect.objectContaining({tag:"event"})));
 });

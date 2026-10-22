@@ -81,6 +81,24 @@ confirmada por el cuidador.
 
 ## GPS y pruebas pendientes
 
+### Demora de confirmacion frente a entrega
+
+Hay tramos distintos: el GPS Android solicita posiciones aproximadamente cada
+10 s, el motor exige al menos dos lecturas que abarquen 10 s con precision
+util, la PC consulta su cola FCM cada 2 s y la web consulta incidentes cada 3 s.
+Son intervalos configurados, no una medicion ni una garantia de latencia total.
+La red, el bloqueo de pantalla, el sistema operativo y FCM pueden sumar demora.
+No bajar permanencia ni ignorar precision para hacer parecer instantanea la salida.
+
+La cabecera naranja de incidentes tiene la misma prioridad para geocerca, SOS
+y caidas. Incluye tiempo sin resolver, contadores y Revisar pendientes. La web
+aplica el permiso de escritorio previamente concedido; sin el permiso conserva
+la alerta interna. Navegadores en segundo plano pueden limitar las consultas.
+Si no actualiza, revisar el indicador del canal y, en panel local, reanudar la
+sincronizacion de la PC con el mismo residente que emite desde el celular.
+La web no recibe FCM: consulta los incidentes persistentes en Supabase. FCM y
+las notificaciones del navegador son canales adicionales, no la fuente del estado.
+
 Android evita reemplazar una lectura precisa reciente por otra mucho peor
 durante 30 segundos. No suaviza coordenadas ni inventa precision. Cuando deja
 de disponer de una buena lectura admite la alternativa imprecisa y lo indica.

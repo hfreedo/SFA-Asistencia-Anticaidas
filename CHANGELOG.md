@@ -1,5 +1,20 @@
 # Changelog
 
+## Ajuste web posterior a rc6 - Prioridad de geocerca
+
+- Geocerca, SOS y caidas reales pendientes comparten jerarquia prioritaria:
+  cabecera naranja, contadores por tipo, cronometro y acceso a la atencion.
+- Los pendientes reales se muestran antes de pruebas e historial resuelto.
+- Consulta de incidentes cada 3 s sin peticiones superpuestas; actualizacion
+  inmediata al recuperar foco o visibilidad. Hora de ultima consulta visible.
+- Se respeta el permiso de escritorio ya concedido. Los avisos nuevos de
+  geocerca tienen titulo propio; la alerta interna no requiere ese permiso.
+- 65 pruebas web aprobadas y compilaciones del panel/portal verificadas.
+- No cambia Android ni el motor GPS: confirmar salida requiere precision,
+  dos posiciones y 10 s de permanencia. No se garantiza latencia de entrega.
+- Ajuste del Centro instalado y portal; los releases rc6/Android 0.6.0
+  anteriores conservan sus archivos originales.
+
 ## Android 0.6.0 y alertas persistentes - 21 octubre 2026
 
 - Migracion 008 activada con autorizacion: cada posicion nueva valida alimenta
