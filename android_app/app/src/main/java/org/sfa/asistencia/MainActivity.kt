@@ -168,9 +168,16 @@ class MainActivity : ComponentActivity() {
                     Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
                 }
             } }, bottomBar = {
-                Column { HorizontalDivider(color = SfaBorder)
+                Column {
+                    if (tab == 3 && jwt != null && cloudDevice != null) {
+                        Box(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            SfaButton("Enviar SOS", Icons.Outlined.NotificationsActive, { confirmSos = false }, !busy, danger = true)
+                        }
+                    }
+                    HorizontalDivider(color = SfaBorder)
                     NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                         NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, label = { Text("Compartir") }, icon = { Icon(Icons.Outlined.LocationOn, null) })
+                        NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, label = { Text("Recuerdos") }, icon = { Icon(Icons.Outlined.PhotoLibrary, null) })
                         NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, label = { Text("Cuidar") }, icon = { Icon(Icons.Outlined.FavoriteBorder, null) })
                         NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, label = { Text("Pruebas") }, icon = { Icon(Icons.Outlined.Science, null) })
                     }
@@ -186,9 +193,11 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                val incidentResident = if (tab == 0) cloudResident else selected.ifEmpty { cloudResident }
+                val incidentResident = if (tab == 0 || tab == 3) cloudResident else selected.ifEmpty { cloudResident }
                 if (jwt != null && incidentResident.isNotEmpty()) IncidentFeed(incidentResident, api)
-                if (tab == 0) {
+                if (tab == 3) {
+                    MemoryAlbum { message = it }
+                } else if (tab == 0) {
                     SfaHeading("Comparte tu ubicación", "El cinturón es opcional para el seguimiento GPS.")
                     SfaSection("Conexión", Icons.Outlined.Wifi)
                     SfaChoice("Por internet", "Wi-Fi o datos móviles · sin red compartida", Icons.Outlined.Cloud, remoteGps, !state.running) { remoteGps = true }

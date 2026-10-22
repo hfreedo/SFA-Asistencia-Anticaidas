@@ -3,11 +3,13 @@
 **Para revisar lo que se puede entregar:** `distribucion/actual/LEEME.md`.
 **Para conocer la arquitectura:** `README.md`.
 **Para desarrollar:** `docs/DESARROLLO.md`.
-La preparacion de firma Android esta en `docs/ANDROID_RELEASE.md`; la APK
-0.6.2 ya tiene firma propia; requiere revisar la migracion desde debug.
-No se ha reemplazado el Centro de esta PC.
+La firma Android esta en `docs/ANDROID_RELEASE.md`. Android 0.7.0 conserva
+la firma release de 0.6.2; no desinstalar para actualizar entre ambas.
+Si todavia usas debug, revisa primero la migracion de firma.
 
-Version actual: **Centro Windows 1.2.0-rc9** y **Android 0.6.2-release (9)**.
+Version actual: **Centro Windows 1.2.0-rc9** y **Android 0.7.0-release (10)**.
+Recuerdos esta en la navegacion inferior de Android. Es un album de este celular,
+sin copia en la nube. Guia y limites: `docs/RECUERDOS_ANDROID.md`.
 La rc9 corrige el cierre de alerta del cinturon. No exige nuevo firmware ni APK.
 Prueba fisica pendiente: `docs/PRUEBA_ATENCION_CINTURON.md`.
 Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores

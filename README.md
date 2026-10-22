@@ -22,6 +22,7 @@ SFA integra ese recorrido entre hardware, escritorio, nube y Android.
 - **Geocerca por residente:** zona configurable desde 5 m, evaluada según precisión, antigüedad y permanencia de las posiciones.
 - **Atención compartida:** SOS y salidas confirmadas generan incidentes persistentes; reconectar o reingresar no equivale a resolverlos.
 - **Acceso por roles:** administradores gestionan accesos; cuidadores consultan y atienden según los permisos de su espacio.
+- **Recuerdos en Android:** álbum local de fotos elegidas, títulos y favoritas, sin enviar las imágenes a la nube.
 
 El cinturón aporta la señal inercial y el celular aporta la ubicación: son canales
 independientes que pueden complementarse. La detección de caídas con el acelerómetro
@@ -111,8 +112,8 @@ del mapa; los controles y funciones posteriores se documentan en las guías actu
 4. Para GPS remoto instala la APK publicada, utiliza una cuenta invitada e inicia **Compartir > Por internet**. Vincula la PC al mismo residente desde **Acceso y sincronización** si vas a consultar en el panel local.
 
 Destino de escritorio: Windows 10/11 x64; pruebas realizadas en Windows 11.
-Android requiere **12 o posterior**. La APK **0.6.2 release** usa firma propia;
-la 0.6.1 anterior conserva firma debug. El cambio inicial de firma exige revisar
+Android requiere **12 o posterior**. La APK **0.7.0 release** conserva la firma propia
+de 0.6.2 e incorpora [Recuerdos](docs/RECUERDOS_ANDROID.md). La 0.6.1 anterior conserva firma debug. El cambio inicial de firma exige revisar
 la [guía de instalación y continuidad](docs/ANDROID_RELEASE.md) antes de reinstalar.
 La validación física de esta nueva entrega sigue pendiente.
 

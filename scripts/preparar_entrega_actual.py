@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
     ('SFA-Asistencia-1.2.0-rc9-Windows.zip',
      '4456d472b38820ae43229f54e0049aca291ef30a89acc08844b9437a033d1fda', 'Windows'),
-    ('SFA-Asistencia-Android-0.6.2-release.apk',
-     '8f6a4753a6a6b353d7d331c3d66527c49a187e3d783a1afdda639b5c4c07930b', 'Android-release'),
+    ('SFA-Asistencia-Android-0.7.0-release.apk',
+     'fe5a4b46f1c8d8f86803e477346e2813531ccc87d642fdb2b092d6b34e53bd26', 'Android-release'),
 )
 
 
@@ -78,9 +78,10 @@ El ZIP es la candidata 1.2.0-rc9, con correccion de atencion del cinturon.
 
 ## Android
 
-Android-release/ contiene la APK 0.6.2 con firma propia, no depurable.
+Android-release/ contiene la APK 0.7.0 con Recuerdos y firma propia, no depurable.
 Es una candidata pendiente de instalacion y pruebas fisicas Android.
-La firma es distinta de debug: consulta Documentacion/ANDROID_RELEASE.md
+Se actualiza sobre 0.6.2 sin desinstalar. La firma es distinta de debug:
+consulta Documentacion/ANDROID_RELEASE.md
 antes de desinstalar una version anterior y volver a vincular el celular.
 
 ## Antes de compartir

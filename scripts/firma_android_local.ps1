@@ -14,7 +14,8 @@ $previous = @{}
 foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 
 try {
-    if (-not (Test-Path -LiteralPath $folder)) {
+    $creating = -not (Test-Path -LiteralPath $folder)
+    if ($creating) {
         New-Item -ItemType Directory -Path $folder | Out-Null
     }
     $acl = [Security.AccessControl.DirectorySecurity]::new()
@@ -26,7 +27,19 @@ try {
             $identity, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
         $acl.AddAccessRule($rule)
     }
-    Set-Acl -LiteralPath $folder -AclObject $acl
+    if ($creating) {
+        Set-Acl -LiteralPath $folder -AclObject $acl
+    } else {
+        # Reuse an already private directory without requesting owner/SACL privileges.
+        $existingAcl = Get-Acl -LiteralPath $folder
+        $allowed = @($sid.Value, 'S-1-5-18')
+        if (-not $existingAcl.AreAccessRulesProtected) { throw 'La carpeta de firma hereda permisos; revisa su seguridad antes de continuar' }
+        foreach ($rule in $existingAcl.Access) {
+            if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $allowed) {
+                throw 'La carpeta de firma concede acceso a otras identidades; no se modificaran sus permisos automaticamente'
+            }
+        }
+    }
     $hasKey = Test-Path -LiteralPath $key
     $hasPassword = Test-Path -LiteralPath $passwordFile
     if ($hasKey -xor $hasPassword) { throw 'Firma incompleta: no se reemplazara ningun secreto existente' }

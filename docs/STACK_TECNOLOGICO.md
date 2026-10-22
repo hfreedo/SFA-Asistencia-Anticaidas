@@ -1,5 +1,29 @@
 # Stack Tecnológico de SFA Asistencia
 
+## Album local de Android: Recuerdos
+
+`MemoryAlbum.kt` usa Kotlin y Jetpack Compose con el selector de fotos de
+AndroidX Activity. `MemoryImages.kt` utiliza ImageDecoder y Bitmap del SDK
+Android para guardar copias JPEG reducidas y miniaturas sin los EXIF originales.
+`MemoryCatalog.kt` persiste titulos y favoritas mediante DataInput/OutputStream
+versionado y reemplazo atomico de archivo con java.nio. No agrega servidores,
+cuentas, permisos de galeria ni servicios de pago.
+
+```mermaid
+flowchart LR
+  Selector[Selector Android] -->|Una foto elegida| Decoder[ImageDecoder]
+  Decoder --> Imagen[JPEG optimizado y miniatura]
+  Imagen --> Privado[Almacenamiento privado del celular]
+  Titulo[Titulo y favorita] --> Catalogo[Catalogo local atomico]
+  Catalogo --> Album[Recuerdos / Compose]
+  Privado --> Album
+```
+
+No hay flecha a Supabase o FCM: las imagenes no se sincronizan. El album es
+del dispositivo y no de cada cuenta. [Uso, privacidad y pruebas](RECUERDOS_ANDROID.md).
+
+## Integracion operativa
+
 La navegacion local mantiene una sola instancia React del monitor de incidentes:
 oculta su contenido fuera del panel, pero conserva la consulta y comunica un
 resumen al indicador de la navegacion. No duplica lectores por pantalla.

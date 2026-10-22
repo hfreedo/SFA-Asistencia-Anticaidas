@@ -1,5 +1,16 @@
 # Versiones
 
+## Android 0.7.0-release (10) - Recuerdos
+
+Album local de fotos elegidas, titulos opcionales, favoritas, vista ampliada y
+borrado confirmado. Sin nube ni permisos nuevos de galeria. Misma firma de
+0.6.2 para actualizar sin desinstalar. Windows sigue en rc9.
+37 unitarias, build y lint aprobados; interfaz y flujos fisicos pendientes.
+
+[APK y notas](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.7.0-android-release)
+| [Guia de Recuerdos](docs/RECUERDOS_ANDROID.md)
+| [Validacion](docs/VALIDACION_ANDROID_0_7_0.md)
+
 ## Windows 1.2.0-rc9 - Atencion del cinturon
 
 Atender o registrar falsa alarma envia RESET y espera confirmacion del hardware.

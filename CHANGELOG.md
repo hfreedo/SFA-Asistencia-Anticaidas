@@ -1,5 +1,20 @@
 # Changelog
 
+## Android 0.7.0 release - Recuerdos
+
+- Album local independiente de cuentas y de la telemetria: alta de fotos con
+  selector Android, vista completa, titulo opcional, favoritas y borrado confirmado.
+- Copias optimizadas y miniaturas en almacenamiento interno sin backup automatico;
+  no se suben a Supabase/FCM ni se modifican los originales de la galeria.
+- Sin permisos nuevos de lectura general de imagenes. Hasta 60 fotos y limite
+  de tamano de importacion; catalogo atomico y rechazo de datos corruptos.
+- SOS accesible en Recuerdos con sesion y residente vinculados, sin detener GPS.
+- VersionCode 10 y misma firma release de 0.6.2; no desinstalar para actualizar.
+- Firma local reutilizable sin restablecer permisos Windows ya restringidos.
+- 37 pruebas unitarias Android aprobadas, 10 nuevas de persistencia del album;
+  build release, lint, firma y manifiesto verificados sin permisos nuevos.
+- Prueba fisica de interfaz, selector, GPS y SOS pendiente; ver docs/RECUERDOS_ANDROID.md.
+
 ## Windows rc9 - Confirmacion real de la alerta del cinturon
 
 - Atender o registrar falsa alarma envia RESET al cinturon y espera RSP,RESET,OK.
