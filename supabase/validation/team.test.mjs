@@ -200,10 +200,56 @@ try {
     await login(1); await rpc('sfa_set_team_access',[id(10),id(2),[id(11)],false,false]);
     await login(2); assert.equal((await rpc('sfa_get_geofence',[id(11)])).can_configure,false);
   });
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../migrations/202610210008_persistent_geofence.sql',import.meta.url),'utf8'));
+  let exitId;
+  const fix = async (n, seconds, latitude=0, accuracy=1) => rpc('sfa_ingest_phone',[sosPhone,id(n),{
+    latitude,longitude:0,accuracy_m:accuracy,observed_at:new Date(Date.now()+seconds*1000).toISOString(),
+  }]);
+  await check('imprecise GPS cannot generate a geofence incident',async()=>{
+    await login(11); await fix(300,-89,0,100);
+    assert.equal((await rpc('sfa_incidents',[id(11)])).events.filter(e=>e.event_type==='GEOCERCA_SALIDA').length,0);
+    await fix(301,-78); await fix(302,-67);
+  });
+  await check('two sustained outside samples generate one durable incident and authorized push jobs',async()=>{
+    await login(11); await fix(303,-56,.001); await fix(304,-45,.001);
+    const exits=(await rpc('sfa_incidents',[id(11)])).events.filter(e=>e.event_type==='GEOCERCA_SALIDA');
+    assert.equal(exits.length,1); exitId=exits[0].id;
+    assert.equal(exits[0].outcome,null); assert.equal(exits[0].detail.source,'phone_gps_server');
+    await login(1); const jobs=await rpc('sfa_claim_push_v2'); assert.equal(jobs.filter(j=>j.event_id===exitId).length,2);
+    for(const job of jobs) await rpc('sfa_ack_push',[job.id,job.lease,'sent']);
+  });
+  await check('continued outside, uncertain GPS and reentry do not remove or duplicate pending attention',async()=>{
+    await login(11); await fix(305,-34,.001); await fix(306,-23,.001,100);
+    await fix(307,-12); await fix(308,-1);
+    const exits=(await rpc('sfa_incidents',[id(11)])).events.filter(e=>e.event_type==='GEOCERCA_SALIDA');
+    assert.equal(exits.length,1); assert.equal(exits[0].id,exitId); assert.equal(exits[0].outcome,null);
+  });
+  await check('explicit caregiver resolution followed by a new exit creates a new incident',async()=>{
+    await login(2); await rpc('sfa_attend_incident',[exitId,null,'attending']);
+    const taken=(await rpc('sfa_incidents',[id(11)])).events.find(e=>e.id===exitId);
+    await rpc('sfa_attend_incident',[exitId,taken.updated_at,'attended']);
+    await login(11); await fix(309,10,.001); await fix(310,21,.001);
+    const exits=(await rpc('sfa_incidents',[id(11)])).events.filter(e=>e.event_type==='GEOCERCA_SALIDA');
+    assert.equal(exits.length,2); assert.equal(exits.filter(e=>e.outcome===null).length,1);
+  });
+  await check('unresolved incidents never disappear behind the fifty-item resolved history limit',async()=>{
+    await db.exec('reset role');
+    for(let n=400;n<470;n++) {
+      await db.query("insert into public.sfa_events(id,resident_id,device_id,event_type,observed_at,simulated) values($1,$2,$3,'PRUEBA_NOTIFICACION',now()+($4 * interval '1 second'),true)",[id(n),id(11),sosPhone,n]);
+      await db.query("insert into public.sfa_event_attention values($1,$2,'attended',clock_timestamp())",[id(n),id(2)]);
+    }
+    await login(2); const result=await rpc('sfa_incidents',[id(11)]);
+    assert.equal(result.viewer_id,id(2));
+    assert.equal(result.events.filter(e=>e.outcome==='attended').length,50);
+    assert.equal(result.events.filter(e=>e.event_type==='GEOCERCA_SALIDA' && e.outcome===null).length,1);
+    assert.ok(result.events.some(e=>e.id===id(200)));
+    await denied(()=>db.query('select * from sfa_private.geofence_state'));
+  });
   await check('revoked emitter stops submitting while incident history remains available to caregivers',async()=>{
     await login(1); await rpc('sfa_revoke_team_member',[id(10),id(11)]);
     await login(11); await denied(()=>rpc('sfa_phone_sos',[sosPhone,id(203),sosStamp,false]));
-    await login(2); assert.equal((await rpc('sfa_incidents',[id(11)])).events.length,2);
+    await login(2); assert.ok((await rpc('sfa_incidents',[id(11)])).events.length>2);
   });
   console.log(`${checks} team/incident checks passed (isolated PGlite, not live Auth/email/FCM).`);
 } finally { await db.close(); }

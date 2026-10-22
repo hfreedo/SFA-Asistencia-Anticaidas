@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { GeofenceRadius } from "./GeofenceRadius";
 import { EmailSettings, LocationHistory, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
 import { LocalRemoteLocation } from "./LocalRemoteLocation";
+import { LocalIncidentPanel } from "./LocalIncidentPanel";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -464,6 +465,7 @@ export function SfaDashboardApp() {
         <button type="button" onClick={() => setView("map")}><Icon name="map" size={17} />Ver ubicación</button>
         {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
       </section>}
+      <LocalIncidentPanel residentId={profile?.id} />
       {view === "home" && (
         <HomeScreen
           profile={profile}

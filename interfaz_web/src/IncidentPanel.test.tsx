@@ -13,7 +13,7 @@ beforeEach(() => {
   mock.client.mockReturnValue({ rpc: mock.rpc });
   mock.rpc.mockResolvedValue({ data: { can_attend: true, events: [incident] }, error: null });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it("labels tests explicitly and never exposes the session", async () => {
   const { container } = render(<IncidentPanel resident="person" session={session} />);
   await screen.findByText("PRUEBA · No es una emergencia");
@@ -59,4 +59,22 @@ it("failed refresh clears old actionable data", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Actualizar incidentes" }));
   await screen.findByRole("alert");
   expect(screen.queryByRole("button", { name: "Tomar atención" })).toBeNull();
+});
+it("real pending exits remain visibly actionable without browser notification support", async () => {
+  vi.stubGlobal("Notification",undefined);
+  mock.rpc.mockResolvedValue({data:{can_attend:true,events:[{...incident,event_type:"GEOCERCA_SALIDA",simulated:false}]},error:null});
+  render(<IncidentPanel resident="person" session={session} />);
+  expect(await screen.findByRole("alert",{name:"Atención pendiente"})).toBeTruthy();
+  expect(screen.getByRole("button",{name:"Tomar atención"})).toBeTruthy();
+  expect(screen.queryByRole("button",{name:"Activar avisos en esta PC"})).toBeNull();
+});
+it("a transient connection failure cannot dismiss a previously received pending incident", async () => {
+  mock.rpc.mockResolvedValue({data:{can_attend:true,events:[{...incident,event_type:"GEOCERCA_SALIDA",simulated:false}]},error:null});
+  render(<IncidentPanel resident="person" session={session} />);
+  await screen.findByRole("alert",{name:"Atención pendiente"});
+  mock.rpc.mockResolvedValue({data:null,error:{code:"network"}});
+  fireEvent.click(screen.getByRole("button",{name:"Actualizar incidentes"}));
+  await screen.findByText(/No se pudieron actualizar/);
+  expect(screen.getByRole("alert",{name:"Atención pendiente"})).toBeTruthy();
+  expect(screen.queryByRole("button",{name:"Tomar atención"})).toBeNull();
 });

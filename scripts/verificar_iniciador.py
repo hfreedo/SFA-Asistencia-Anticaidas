@@ -36,7 +36,11 @@ else:
     shutil.copy2(root / source, exe)
 mobile = '--mobile' in sys.argv
 base = ('https' if mobile else 'http') + '://localhost:18786'
-process = subprocess.Popen([str(exe), '--port', '18786', '--no-browser', *(['--lan'] if mobile else [])], cwd=folder)
+startup = subprocess.STARTUPINFO() if sys.platform == 'win32' else None
+if startup is not None:
+    startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = 0
+process = subprocess.Popen([str(exe), '--port', '18786', '--no-browser', *(['--lan'] if mobile else [])], cwd=folder, startupinfo=startup)
 passed = False
 try:
     for _ in range(90):

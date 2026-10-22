@@ -1,5 +1,21 @@
 # Changelog
 
+## Android 0.6.0 y alertas persistentes - 21 octubre 2026
+
+- Migracion 008 activada con autorizacion: cada posicion nueva valida alimenta
+  el motor cloud de geocerca. No se reproducen posiciones antiguas.
+- Una salida confirmada crea un incidente pendiente y encola avisos para los
+  cuidadores autorizados. Reingresar o perder GPS no cierra la atencion.
+- Portal, panel local autenticado y Android muestran los pendientes dentro de
+  la interfaz, sin depender del permiso de notificaciones del sistema.
+- Toma exclusiva de atencion y confirmacion de resolucion; historial conservado.
+- Android 0.6.0-prototipo (7) evita sustituir una lectura reciente precisa por
+  otra mucho peor; muestra fuente, antiguedad, radio y limites de precision.
+- Validacion: 86 pruebas Python, 62 web y 60 comprobaciones SQL aisladas;
+  compilacion, pruebas unitarias y lint Android aprobados. Validacion fisica pendiente.
+- FCM sigue necesitando el emisor PC con su sesion administrativa activa;
+  no se ha desplegado un trabajador FCM independiente en la nube.
+
 ## Correccion - Vista del mapa remoto
 
 - El mapa remoto ya no se destruye/recrea en cada consulta GPS ni al pasar

@@ -186,6 +186,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                val incidentResident = if (tab == 0) cloudResident else selected.ifEmpty { cloudResident }
+                if (jwt != null && incidentResident.isNotEmpty()) IncidentFeed(incidentResident, api)
                 if (tab == 0) {
                     SfaHeading("Comparte tu ubicación", "El cinturón es opcional para el seguimiento GPS.")
                     SfaSection("Conexión", Icons.Outlined.Wifi)
@@ -231,6 +233,9 @@ class MainActivity : ComponentActivity() {
                         SfaMetric("Zona de referencia", if (!freshFix) "Sin posición reciente" else when (state.zone) { "outside" -> "Fuera"; "inside" -> "Dentro"; "pending" -> "Confirmando"; "uncertain" -> "Incierta"; "imprecise" -> "GPS impreciso"; else -> state.zone }, Modifier.weight(1f))
                     }
                     Text(state.lastSent?.let { "Último envío: ${java.time.Instant.parse(it).atZone(java.time.ZoneId.systemDefault()).toLocalTime().withNano(0)}" } ?: "Sin envíos confirmados", style = MaterialTheme.typography.bodySmall, color = SfaMuted)
+                    Text("Fuente: ${state.locationSource} · Lectura: ${state.lastFix?.let { "hace ${((clock - it).coerceAtLeast(0) / 1000)} s" } ?: "pendiente"}", style = MaterialTheme.typography.bodySmall, color = SfaMuted)
+                    state.zoneRadius?.let { radius -> Text("Radio recibido: ${radius.toInt()} m. La precisión GPS no cambia al reducir el radio.", style = MaterialTheme.typography.bodySmall, color = SfaMuted) }
+                    if ((state.accuracy ?: 0f) > 25f) Text("Para comprobar desplazamientos pequeños, revisa que SFA tenga ubicación precisa y prueba al aire libre. Con ±${state.accuracy?.toInt()} m no se puede confirmar un movimiento de 5 m.", style = MaterialTheme.typography.bodySmall, color = SfaOrange)
                     SfaButton(if (state.running) "Detener seguimiento" else "Iniciar seguimiento", if (state.running) Icons.Outlined.StopCircle else Icons.Outlined.PlayCircle, onClick = {
                         if (state.running) stopService(Intent(this@MainActivity, TrackingService::class.java)) else {
                             val permissions = mutableListOf<String>()

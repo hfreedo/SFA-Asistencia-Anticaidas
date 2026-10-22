@@ -14,6 +14,18 @@ def request(host='127.0.0.1', origin=None):
 
 
 class CloudLocationApiTests(unittest.TestCase):
+    def test_cloud_incidents_cannot_be_read_or_resolved_from_lan(self):
+        import uuid
+        with patch.object(main.cloud_sync,'remote_incidents',return_value={'events':[]}) as incidents:
+            main.get_remote_incidents(12,request())
+            incidents.assert_called_once_with(12)
+            body=main.RemoteAttentionRequest(p_outcome='attending')
+            main.attend_remote_incident(12,uuid.UUID('66666666-6666-4666-8666-666666666666'),body,request())
+            incidents.reset_mock()
+            for incoming in (request('203.0.113.9'),request(origin='https://untrusted.invalid')):
+                with self.assertRaises(HTTPException): main.get_remote_incidents(12,incoming)
+                with self.assertRaises(HTTPException): main.attend_remote_incident(12,uuid.uuid4(),body,incoming)
+            incidents.assert_not_called()
     def test_cloud_zone_read_and_write_are_loopback_only(self):
         with patch.object(main.cloud_sync, 'remote_geofence', return_value={'geofence': None, 'can_configure': True}) as zone:
             main.get_remote_geofence(12, request())

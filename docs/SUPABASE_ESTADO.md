@@ -2,7 +2,11 @@
 
 ## Corte vigente: 21 de octubre de 2026
 
-- Migraciones 001 a 007 aplicadas desde el Dashboard en el proyecto de pruebas.
+- Migraciones 001 a 008 aplicadas desde el Dashboard en el proyecto de pruebas.
+- 008 activa el motor persistente de geocerca para posiciones nuevas, sin
+  reproducir historiales. Estado privado con RLS y disparador verificados;
+  anon no puede leer incidentes. Consulta sin datos personales ni escrituras:
+  supabase/validation/verify_persistent_geofence_live.sql.
 - 005 habilita equipo, invitaciones y permiso explicito de emisor GPS.
 - sfa-team-invite desplegada; filtro JWT legado desactivado solo para esta
   funcion. La funcion verifica identidad con Auth y rol con RPC antes de invitar.

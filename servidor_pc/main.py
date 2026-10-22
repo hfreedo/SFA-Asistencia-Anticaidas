@@ -1136,6 +1136,29 @@ class RemoteGeofenceRequest(BaseModel):
     p_expected: str | None = Field(default=None, max_length=64)
 
 
+class RemoteAttentionRequest(BaseModel):
+    p_expected: str | None = Field(default=None, max_length=64)
+    p_outcome: str = Field(pattern="^(attending|attended|false_alarm)$")
+
+
+@app.get("/api/cloud/residents/{resident_id}/incidents")
+def get_remote_incidents(resident_id: int, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.remote_incidents(resident_id)
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
+@app.post("/api/cloud/residents/{resident_id}/incidents/{event_id}/attention")
+def attend_remote_incident(resident_id: int, event_id: UUID, body: RemoteAttentionRequest, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.remote_incidents(resident_id, {**body.model_dump(), 'p_event': str(event_id)})
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
 @app.get("/api/cloud/residents/{resident_id}/geofence")
 def get_remote_geofence(resident_id: int, request: Request):
     require_cloud_operator(request)

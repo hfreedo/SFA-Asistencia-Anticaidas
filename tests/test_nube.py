@@ -202,6 +202,30 @@ class CloudSyncTests(unittest.TestCase):
         with self.assertRaises(CloudError) as error: self.cloud.remote_geofence(1)
         self.assertEqual(error.exception.code,'session_changed')
 
+    def test_incidents_are_sanitized_and_actions_are_bound_to_selected_profile(self):
+        event_id = '66666666-6666-4666-8666-666666666666'
+        event = {'id':event_id,'event_type':'GEOCERCA_SALIDA','observed_at':'2026-10-21T12:00:00Z',
+                 'simulated':False,'detail':{'text':'Outside','token':'PRIVATE'},'actor_id':None,'outcome':None,'updated_at':None}
+        self.cloud.transport=Mock(return_value={'can_attend':True,'viewer_id':OWNER,'events':[event],'token':'PRIVATE'})
+        result=self.cloud.remote_incidents(1)
+        self.assertNotIn('PRIVATE',json.dumps(result))
+        self.assertEqual(result['viewer_id'],OWNER)
+        with self.assertRaises(CloudError) as error:
+            self.cloud.remote_incidents(1,{'p_event':DEVICE,'p_expected':None,'p_outcome':'attending'})
+        self.assertEqual(error.exception.status,404)
+        self.assertFalse(any(call.args[0].endswith('sfa_attend_incident') for call in self.cloud.transport.call_args_list))
+        action={'p_event':event_id,'p_expected':None,'p_outcome':'attending'}
+        self.cloud.remote_incidents(1,action)
+        self.assertTrue(any(call.args==('/rest/v1/rpc/sfa_attend_incident','PRIVATE_JWT',action) for call in self.cloud.transport.call_args_list))
+
+    def test_incident_data_does_not_survive_a_changed_cloud_session(self):
+        def transport(*args):
+            self.cloud.pause()
+            return {'can_attend':True,'events':[]}
+        self.cloud.transport=transport
+        with self.assertRaises(CloudError) as error: self.cloud.remote_incidents(1)
+        self.assertEqual(error.exception.code,'session_changed')
+
     def test_push_v2_and_legacy_fallback_without_real_credentials(self):
         with patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': 'fixture-not-opened'}):
             self.cloud.push_sender = Mock()

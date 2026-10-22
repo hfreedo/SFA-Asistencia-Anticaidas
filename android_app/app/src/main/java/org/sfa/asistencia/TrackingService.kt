@@ -20,7 +20,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 data class PhoneState(val running: Boolean = false, val message: String = "Seguimiento detenido", val accuracy: Float? = null,
-                      val lastSent: String? = null, val belt: BeltReading? = null, val zone: String = "Sin evaluación", val lastFix: Long? = null)
+                      val lastSent: String? = null, val belt: BeltReading? = null, val zone: String = "Sin evaluación", val lastFix: Long? = null,
+                      val locationSource: String = "Sin fuente", val zoneRadius: Double? = null)
 object PhoneRuntime { val state = MutableStateFlow(PhoneState()) }
 
 class TrackingService : Service(), LocationListener {
@@ -36,6 +37,7 @@ class TrackingService : Service(), LocationListener {
     @Volatile private var closing = false
     private var refreshCounter = 0
     private var lastBeltAlert = ""
+    private var acceptedFix: FixQuality? = null
     private fun state(transform: (PhoneState) -> PhoneState) { PhoneRuntime.state.value = transform(PhoneRuntime.state.value) }
     override fun onCreate() {
         super.onCreate()
@@ -123,15 +125,19 @@ class TrackingService : Service(), LocationListener {
             .put("observed_at", Instant.ofEpochMilli(location.time).toString()).toString()
         executor.execute {
             if (closing) return@execute
+            val incoming = FixQuality(location.provider ?: "unknown", location.accuracy.toDouble(), location.time)
+            if (!LocationQualityPolicy.accept(acceptedFix, incoming, System.currentTimeMillis())) return@execute
+            acceptedFix = incoming
+            state { it.copy(locationSource = if (incoming.provider == LocationManager.GPS_PROVIDER) "GPS satelital" else "Red Wi-Fi o móvil") }
             database.enqueue(idBinding, location.time, body)
             val zone = fence
             if (zone != null) {
                 val distance = FloatArray(1)
                 Location.distanceBetween(zone.getDouble("home_lat"), zone.getDouble("home_lng"), location.latitude, location.longitude, distance)
                 val evaluation = engine.evaluate(distance[0].toDouble(), zone.getDouble("radius_m"), location.accuracy.toDouble(), location.time)
-                state { it.copy(accuracy = location.accuracy, zone = evaluation.quality, lastFix = location.time) }
+                state { it.copy(accuracy = location.accuracy, zone = evaluation.quality, lastFix = location.time, zoneRadius = zone.getDouble("radius_m")) }
                 if (evaluation.event == "GEOCERCA_SALIDA") alert("Fuera de la zona de referencia", "Salida detectada por el GPS de este celular")
-            } else state { it.copy(accuracy = location.accuracy, zone = "Sin zona consultada", lastFix = location.time) }
+            } else state { it.copy(accuracy = location.accuracy, zone = "Sin zona consultada", lastFix = location.time, zoneRadius = null) }
         }
     }
     private fun connectBelt(address: String) {

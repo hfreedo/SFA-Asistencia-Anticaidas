@@ -227,6 +227,34 @@ class CloudSync:
                 raise CloudError(503, 'position_response') from None
         return {'source': 'supabase', 'resident_id': local_id, 'remote_resident_id': resident, 'position': position}
 
+    def remote_incidents(self, local_id, action=None):
+        session, resident = self._bound_session(local_id)
+        snapshot = self.transport('/rest/v1/rpc/sfa_incidents', session[1], {'p_resident': resident})
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get('events'), list):
+            raise CloudError(503, 'incident_response')
+        if action is not None:
+            if not any(isinstance(event, dict) and event.get('id') == action['p_event'] for event in snapshot['events']):
+                raise CloudError(404, 'incident_not_linked')
+            with self.session_lock:
+                if self.session != session: raise CloudError(401, 'session_changed')
+            self.transport('/rest/v1/rpc/sfa_attend_incident', session[1], action)
+            snapshot = self.transport('/rest/v1/rpc/sfa_incidents', session[1], {'p_resident': resident})
+        with self.session_lock:
+            if self.session != session: raise CloudError(401, 'session_changed')
+        try:
+            if not isinstance(snapshot.get('can_attend'), bool): raise ValueError()
+            events = []
+            for event in snapshot['events']:
+                events.append({
+                    'id': str(uuid.UUID(event['id'])), 'event_type': str(event['event_type'])[:40],
+                    'observed_at': str(event['observed_at'])[:64], 'simulated': bool(event['simulated']),
+                    'detail': {'text': str(event.get('detail', {}).get('text', ''))[:1000]},
+                    'actor_id': event.get('actor_id'), 'outcome': event.get('outcome'), 'updated_at': event.get('updated_at'),
+                })
+            return {'viewer_id': session[0], 'can_attend': snapshot['can_attend'], 'events': events}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise CloudError(503, 'incident_response') from None
+
     def status(self):
         with self.session_lock:
             owner = self.session[0] if self.session else None

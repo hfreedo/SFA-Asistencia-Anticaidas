@@ -1,9 +1,9 @@
 # Geocerca por internet desde 5 metros
 
-Estado: migracion 007 aplicada con autorizacion en el proyecto de pruebas.
-Comandos y rechazo sin identidad verificados en Supabase, sin cambiar zonas.
-Usar portal/Centro actualizado. Esto no equivale a una geocerca ya recibida
-por un celular ni a notificaciones remotas de salida: prueba fisica pendiente.
+Estado: migraciones 007 y 008 aplicadas con autorizacion en el proyecto de
+pruebas. Configuracion y motor persistente activos para posiciones nuevas.
+Usar portal/Centro actualizado y Android 0.6.0-prototipo para ver la atencion
+persistente en la app. Validacion fisica de esta candidata pendiente.
 
 ## Que cambia
 
@@ -14,6 +14,11 @@ flowchart LR
   S -->|Contexto autenticado cada 30 s| A[Android con seguimiento activo]
   A --> E[Evaluacion local: precision, histeresis y permanencia]
   E --> L[Estado y aviso local del propio celular]
+  A -->|Posiciones nuevas| G[Motor PostgreSQL: precision y permanencia]
+  G --> I[Incidente pendiente y cola de avisos]
+  I --> C[React / Compose: atencion persistente]
+  I --> P[Emisor FCM de la PC con sesion activa]
+  P --> N[Celulares autorizados]
 ```
 
 Esta ruta no necesita red compartida, hotspot, certificados LAN ni ngrok.
@@ -23,7 +28,7 @@ recibio la zona ni que la persona permanezca dentro.
 
 ## Probar despues de la activacion
 
-1. Mantener Android 0.5.0-prototipo en Compartir > Por internet, con la persona
+1. Mantener Android 0.6.0-prototipo en Compartir > Por internet, con la persona
    vinculada, consentimiento y seguimiento activos. Puede usar datos moviles.
 2. Iniciar sesion en el portal; o, para editar desde el panel PC, reanudar la
    sincronizacion de esta PC y usar el mismo perfil vinculado.
@@ -54,11 +59,40 @@ vinculo; no se expone el contexto cloud privado a toda la LAN.
 El mapa conserva zoom y encuadre durante las consultas. Ver zona y Centrar en
 el celular son acciones explicitas. Cambiar de residente elimina el mapa anterior.
 
-## Limites y validacion
+## Atencion persistente y repeticion
 
-- 55 comprobaciones SQL aisladas, 60 pruebas web y 83 pruebas Python aprobadas.
-- Navegador con datos ficticios: seleccion de 5 m, edicion de centro y GPS nuevo
-  sin reiniciar encuadre; sin desbordamiento horizontal al activar edicion.
-- Sin prueba fisica de recepcion/evaluacion en Android todavia.
-- Avisos a cuidadores por salida, centro de pruebas FCM y motor cloud de
-  geocerca quedan para la etapa siguiente. No se activan por guardar la zona.
+Una salida confirmada crea un incidente real. No se crean duplicados mientras
+continua fuera ni mientras ya exista una salida pendiente del residente.
+El reingreso se registra, pero no resuelve el incidente. Tomar atencion y luego
+confirmar Atencion realizada o Falsa alarma es una accion del cuidador autorizado.
+Despues de resolver, una nueva secuencia de reingreso y salida genera otro aviso.
+No hay sirena repetitiva automatica ni recordatorios periodicos en esta version.
+
+La banda naranja aparece en el portal, el panel local autenticado y Android
+0.6.0 aunque no se conceda permiso de notificaciones. Con fallo de red conserva
+el ultimo estado recibido con advertencia y bloquea acciones hasta reconectar.
+Una revocacion de acceso retira los datos protegidos. Reabrir la app con sesion
+autorizada consulta los pendientes del servidor; no depende del aviso descartado.
+
+La entrega FCM a cuidadores requiere que la PC tenga el emisor configurado y
+la sincronizacion administrativa reanudada. Los incidentes se guardan en la nube
+aunque ese emisor no este activo. No confundir cola/aceptacion FCM con lectura
+confirmada por el cuidador.
+
+## GPS y pruebas pendientes
+
+Android evita reemplazar una lectura precisa reciente por otra mucho peor
+durante 30 segundos. No suaviza coordenadas ni inventa precision. Cuando deja
+de disponer de una buena lectura admite la alternativa imprecisa y lo indica.
+Revisar permiso Ubicacion precisa y probar al aire libre. Con +/-100 m no es
+posible comprobar un recorrido de 5 m de manera fiable. Usar un radio mayor
+para una demostracion real, o un escenario simulado claramente identificado.
+
+- 60 comprobaciones SQL aisladas, 62 pruebas web y 86 pruebas Python aprobadas.
+- Compilacion, pruebas unitarias y lint Android aprobados.
+- Motor activado y permisos comprobados sin insertar posiciones de prueba.
+- Navegador con datos ficticios: alerta, toma, confirmacion y cierre comprobados.
+- ZIP Windows rc6 extraido en carpeta limpia: HTTPS LAN, vinculacion, posicion
+  sintetica y cierre autenticado aprobados. Sin usar la base del desarrollador.
+- Pendiente: APK instalada, GPS real, pantalla bloqueada, recepcion FCM y
+  resolucion compartida entre dos cuentas en dispositivos fisicos.
