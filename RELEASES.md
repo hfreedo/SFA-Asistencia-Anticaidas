@@ -1,5 +1,15 @@
 # Versiones
 
+## Windows 1.2.0-rc9 - Atencion del cinturon
+
+Atender o registrar falsa alarma envia RESET y espera confirmacion del hardware.
+Una lectura repetida no reabre la misma cortina, una caida nueva si. Los errores
+permanecen visibles y no se registran como atencion exitosa. No cambia Android.
+82 pruebas web y 101 Python aprobadas; prueba fisica con cinturon pendiente.
+
+[Descarga Windows](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc9)
+| [Guia de prueba](docs/PRUEBA_ATENCION_CINTURON.md)
+
 ## Android 0.6.2-release (9)
 
 Primera candidata con firma propia de distribucion, build no depurable y

@@ -16,7 +16,8 @@ los directorios de versiones antiguas para que archivar entregas no impida crear
 la siguiente. El driver no forma parte del programa Python/Android.
 
 En una clonacion publica, extraer esas dos carpetas del ZIP de un release
-verificado antes de empaquetar. Para rc8 usar `scripts/preparar_release_incidentes.py`
+verificado antes de empaquetar. Para rc9 usar `scripts/preparar_release_cinturon.py`
+con el EXE en `dist/belt-attention/`. Para reproducir rc8 usar `scripts/preparar_release_incidentes.py`
 despues de compilar el EXE en `dist/navigation-push-tests/`; el script anterior
 `preparar_release_actual.py` reproduce exclusivamente rc5. No hacen falta
 para ejecutar pruebas, compilar la APK o compilar el EXE con PyInstaller.

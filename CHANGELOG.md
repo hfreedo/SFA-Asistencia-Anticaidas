@@ -1,5 +1,21 @@
 # Changelog
 
+## Windows rc9 - Confirmacion real de la alerta del cinturon
+
+- Atender o registrar falsa alarma envia RESET al cinturon y espera RSP,RESET,OK.
+  Silenciar usa MUTE y su confirmacion, sin confundirlo con una resolucion.
+- No se registra exito si el dispositivo conectado rechaza la orden o no responde.
+  El error permanece visible en la cortina para poder reintentar.
+- Lecturas repetidas de una misma caida no reabren la cortina ya atendida.
+  Un nuevo contador de caidas o una transicion nueva vuelve a activar la alerta.
+- Se elimina la confirmacion ficticia ante errores HTTP y el estado NORMAL
+  inventado en la web. Se conserva la telemetria real del dispositivo.
+- Confirmacion protegida contra peticiones repetidas, con cancelacion de la
+  pulsacion al salir del boton y limpieza del temporizador al cerrar la pantalla.
+- 82 pruebas web y 101 Python aprobadas. Pendiente prueba fisica con el cinturon.
+- No requiere firmware nuevo: utiliza los comandos existentes RESET y MUTE.
+  Android permanece en 0.6.2-release; no requiere reinstalar la APK.
+
 ## Android 0.6.2 release - Identidad de distribucion (2026-10-22)
 
 - VersionCode 9, build release no depurable y certificado propio de distribucion.

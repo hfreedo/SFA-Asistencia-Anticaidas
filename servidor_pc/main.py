@@ -135,6 +135,8 @@ class SerialBridge:
         self.connected_port: str | None = None
         self.connected_baudrate: int | None = None
         self.last_error: str | None = None
+        self.last_response: dict[str, Any] | None = None
+        self.alert_command_lock = asyncio.Lock()
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
@@ -180,6 +182,25 @@ class SerialBridge:
             "error": self.last_error,
         }
 
+    async def confirm_alert_command(self, command: str, timeout: float = 3.0) -> None:
+        async with self.alert_command_lock:
+            previous_response = self.last_response
+            previous_reading = self.latest
+            self.send_command(command)
+            deadline = asyncio.get_running_loop().time() + timeout
+            while asyncio.get_running_loop().time() < deadline:
+                response = self.last_response
+                if response is not None and response is not previous_response and response.get("command") == command:
+                    if response.get("result") != "OK":
+                        raise RuntimeError("El cinturon no acepto el comando de atencion")
+                    # Do not replay pre-reset telemetry when a browser reconnects.
+                    if (previous_reading and self.latest and self.latest.get("state") == "CAIDA_CONFIRMADA"
+                            and self.latest.get("fall_count") == previous_reading.get("fall_count")):
+                        self.latest = None
+                    return
+                await asyncio.sleep(0.02)
+            raise TimeoutError("El cinturon no confirmo la orden. Revisa la conexion y vuelve a intentar")
+
     async def add_client(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.clients.add(websocket)
@@ -214,6 +235,8 @@ class SerialBridge:
                 if not line:
                     continue
                 payload = parse_serial_line(line)
+                if payload["type"] == "response":
+                    self.last_response = payload
                 if payload["type"] == "telemetry":
                     self.latest = payload
                 if payload["type"] in {"event", "telemetry"}:
@@ -681,7 +704,17 @@ async def alert_action(req: AlertActionRequest) -> dict[str, Any]:
         "mute": ("ALERTA_SILENCIADA", "Alarma silenciada desde la interfaz"),
     }
     if normalized not in labels:
-        return {"type": "error", "message": "Acción no soportada"}
+        raise HTTPException(400, "Accion no soportada")
+
+    device_command = None
+    if bridge.status()["connected"]:
+        device_command = "MUTE" if normalized == "mute" else "RESET"
+        try:
+            await bridge.confirm_alert_command(device_command)
+        except TimeoutError as exc:
+            raise HTTPException(504, str(exc)) from exc
+        except (RuntimeError, serial.SerialException) as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     event_type, detail = labels[normalized]
     if req.note:
@@ -694,6 +727,8 @@ async def alert_action(req: AlertActionRequest) -> dict[str, Any]:
         "raw": f"EVT,0,{event_type},{detail}",
         "received_at": utc_now(),
         "operator_action": True,
+        "device_command": device_command,
+        "device_confirmed": device_command is not None,
     }
     save_record(payload)
     await bridge.broadcast(payload)

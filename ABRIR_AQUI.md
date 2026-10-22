@@ -7,7 +7,9 @@ La preparacion de firma Android esta en `docs/ANDROID_RELEASE.md`; la APK
 0.6.2 ya tiene firma propia; requiere revisar la migracion desde debug.
 No se ha reemplazado el Centro de esta PC.
 
-Version actual: **Centro Windows 1.2.0-rc8** y **Android 0.6.2-release (9)**.
+Version actual: **Centro Windows 1.2.0-rc9** y **Android 0.6.2-release (9)**.
+La rc9 corrige el cierre de alerta del cinturon. No exige nuevo firmware ni APK.
+Prueba fisica pendiente: `docs/PRUEBA_ATENCION_CINTURON.md`.
 Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores
 se conservan como historial y no fueron reemplazados retroactivamente.
 

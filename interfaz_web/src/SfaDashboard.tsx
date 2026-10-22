@@ -43,6 +43,11 @@ type Telemetry = {
 };
 
 type SystemEvent = { id: string; type: string; detail: string; at: string; residentId?: number };
+
+export function isNewConfirmedFall(previous: Telemetry | null, next: Telemetry) {
+  return next.state === "CAIDA_CONFIRMADA" &&
+    (previous?.state !== "CAIDA_CONFIRMADA" || previous.fall_count !== next.fall_count);
+}
 type Port = { device: string; description: string };
 
 type ResidentProfile = {
@@ -229,6 +234,9 @@ export function SfaDashboardApp() {
   const [emergencyStartedAt, setEmergencyStartedAt] = useState<Date | null>(
     null,
   );
+  const lastFallReading = useRef<Telemetry | null>(null);
+  const [confirmingAttention, setConfirmingAttention] = useState(false);
+  const [attentionError, setAttentionError] = useState("");
 
   // Historial de aceleración para la línea de pulso en vivo
   const [accelHistory, setAccelHistory] = useState<number[]>(
@@ -346,7 +354,9 @@ export function SfaDashboardApp() {
 
     if ((payload.motion ?? 0) >= 0.08)
       setFirstMotion((current) => current ?? new Date(payload.received_at));
-    if (payload.state === "CAIDA_CONFIRMADA")
+    const previous = lastFallReading.current;
+    lastFallReading.current = payload;
+    if (isNewConfirmedFall(previous, payload))
       setEmergencyStartedAt(
         (current) => current ?? new Date(payload.received_at),
       );
@@ -389,6 +399,10 @@ export function SfaDashboardApp() {
             payload.received_at || new Date().toISOString(),
             payload.resident_id,
           );
+          if (payload.operator_action && ["ALERTA_ATENDIDA", "FALSA_ALARMA"].includes(payload.event_type)) {
+            setEmergencyStartedAt(null);
+            setAttentionError("");
+          }
           if (payload.event_type === "CAIDA_CONFIRMADA")
             setEmergencyStartedAt(
               (current) => current ?? new Date(payload.received_at),
@@ -400,6 +414,8 @@ export function SfaDashboardApp() {
           } else if (payload.event_type === "CAIDA_CONFIRMADA") {
             showBrowserAlert("SFA Asistencia: caída detectada", payload.detail || "Requiere atención");
           }
+        } else if (payload.type === "boot") {
+          lastFallReading.current = null;
         } else if (payload.type === "serial_error") {
           setConnected(false);
           setConnectionError(payload.message);
@@ -418,7 +434,9 @@ export function SfaDashboardApp() {
   }, [addEvent, applyTelemetry, profile?.id]);
 
   async function confirmAttention() {
-    emergencyAlarm.stop();
+    if (confirmingAttention) return;
+    setConfirmingAttention(true);
+    setAttentionError("");
     try {
       const response = await fetch("/api/alert-action", {
         method: "POST",
@@ -426,23 +444,19 @@ export function SfaDashboardApp() {
         body: JSON.stringify({ action: "attended" }),
       });
       const payload = await response.json();
+      if (!response.ok || payload.type === "error") throw new Error(payload.detail || payload.message || "No se pudo confirmar la atencion");
       addEvent(
         "ALERTA_ATENDIDA",
         payload.detail ?? "Atención confirmada",
         payload.received_at ?? new Date().toISOString(),
       );
-    } catch {
-      addEvent(
-        "ALERTA_ATENDIDA",
-        "Atención confirmada localmente",
-        new Date().toISOString(),
-      );
-    } finally {
+      emergencyAlarm.stop();
       setEmergencyStartedAt(null);
-      setTelemetry((current) =>
-        current ? { ...current, state: "NORMAL" } : current,
-      );
       setView("home");
+    } catch (error) {
+      setAttentionError(error instanceof Error ? error.message : "No se pudo confirmar la atencion. Vuelve a intentar.");
+    } finally {
+      setConfirmingAttention(false);
     }
   }
 
@@ -452,6 +466,8 @@ export function SfaDashboardApp() {
         profile={profile}
         startedAt={emergencyStartedAt}
         onConfirm={confirmAttention}
+        confirming={confirmingAttention}
+        error={attentionError}
       />
     );
   }
@@ -881,14 +897,18 @@ function HomeScreen({
   );
 }
 
-function FallAlertScreen({
+export function FallAlertScreen({
   profile,
   startedAt,
   onConfirm,
+  confirming = false,
+  error = "",
 }: {
   profile: ResidentProfile | null;
   startedAt: Date;
   onConfirm: () => Promise<void>;
+  confirming?: boolean;
+  error?: string;
 }) {
   const [now, setNow] = useState(Date.now());
   const [holdProgress, setHoldProgress] = useState(0);
@@ -896,7 +916,10 @@ function FallAlertScreen({
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+    };
   }, []);
 
   const elapsedSeconds = Math.max(
@@ -909,6 +932,7 @@ function FallAlertScreen({
 
   // Lógica de mantener presionado 1.2 segundos para confirmar
   const startHold = () => {
+    if (confirming || holdTimerRef.current) return;
     const startTime = Date.now();
     holdTimerRef.current = window.setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -916,6 +940,7 @@ function FallAlertScreen({
       setHoldProgress(progress);
       if (progress >= 100) {
         clearInterval(holdTimerRef.current!);
+        holdTimerRef.current = null;
         onConfirm();
       }
     }, 20);
@@ -968,17 +993,22 @@ function FallAlertScreen({
             />
             <button
               type="button"
-              onMouseDown={startHold}
-              onMouseUp={endHold}
-              onTouchStart={startHold}
-              onTouchEnd={endHold}
+              disabled={confirming}
+              onPointerDown={startHold}
+              onPointerUp={endHold}
+              onPointerCancel={endHold}
+              onPointerLeave={endHold}
+              onBlur={endHold}
+              onKeyDown={event => { if ([" ", "Enter"].includes(event.key)) { event.preventDefault(); startHold(); } }}
+              onKeyUp={event => { if ([" ", "Enter"].includes(event.key)) endHold(); }}
               className="relative w-full py-5 px-8 text-base font-medium tracking-wide select-none cursor-pointer"
             >
-              {holdProgress > 0
+              {confirming ? "Confirmando con el cinturón..." : holdProgress > 0
                 ? "Mantén presionado..."
                 : "Mantener para confirmar atención"}
             </button>
           </div>
+          {error && <p role="alert" className="rounded-lg border border-white/40 bg-black/10 p-3 text-sm text-white">{error}</p>}
 
           <a
             href={`tel:${emergencyPhone}`}
