@@ -1,11 +1,17 @@
 """Build an identical Android source copy in an ASCII path on Windows."""
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--variant', choices=('debug', 'release'), default='debug')
+parser.add_argument('--check-release-config', action='store_true')
+args = parser.parse_args()
 
 root = Path(__file__).resolve().parents[1]
 source = root / 'android_app'
@@ -22,7 +28,9 @@ if not java.is_dir() or not sdk.is_dir():
     raise SystemExit('Set JAVA_HOME and ANDROID_HOME before building')
 work = Path(tempfile.mkdtemp(prefix='sfa-android-', dir=parent))
 project = work / 'project'
-shutil.copytree(source, project, ignore=shutil.ignore_patterns('build', '.gradle', '.jvm-tmp', 'local.properties', 'artifacts'))
+shutil.copytree(source, project, ignore=shutil.ignore_patterns(
+    'build', '.gradle', '.jvm-tmp', 'local.properties', 'artifacts',
+    '*.jks', '*.keystore', 'keystore.properties', 'signing.properties'))
 manifest = {}
 for file in project.rglob('*'):
     if file.is_file():
@@ -34,8 +42,14 @@ for file in project.rglob('*'):
 environment.update(JAVA_HOME=str(java), ANDROID_HOME=str(sdk), JAVA_TOOL_OPTIONS=f'-Djdk.net.unixdomain.tmpdir={work / ".jvm-tmp"}')
 wrapper = project / ('gradlew.bat' if os.name == 'nt' else 'gradlew')
 output = source / 'artifacts'
-output.mkdir(exist_ok=True)
-command = [str(wrapper), '--no-daemon', ':app:testDebugUnitTest', ':app:assembleDebug', ':app:lintDebug']
+if args.variant == 'release' or args.check_release_config:
+    output = output / 'release'
+output.mkdir(parents=True, exist_ok=True)
+variant = args.variant.capitalize()
+tasks = [f':app:test{variant}UnitTest', f':app:assemble{variant}', f':app:lint{variant}']
+if args.check_release_config:
+    tasks = [':app:validateReleaseSigning']
+command = [str(wrapper), '--no-daemon', *tasks]
 print('Android isolated build:', work, flush=True)
 with (output / 'build.log').open('w', encoding='utf-8') as log:
     process = subprocess.Popen(command, cwd=project, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
@@ -50,8 +64,12 @@ if reports.exists():
     shutil.copytree(reports, output / 'reports', dirs_exist_ok=True)
 if result:
     raise SystemExit(result)
-apk = project / 'app/build/outputs/apk/debug/app-debug.apk'
-shutil.copy2(apk, output / 'SFA-Asistencia-Android-prototipo.apk')
+if args.check_release_config:
+    print('PASS: release configuration available; no APK built', flush=True)
+    raise SystemExit(0)
+apk = project / f'app/build/outputs/apk/{args.variant}/app-{args.variant}.apk'
+name = 'SFA-Asistencia-Android-release.apk' if args.variant == 'release' else 'SFA-Asistencia-Android-prototipo.apk'
+shutil.copy2(apk, output / name)
 (output / 'source-manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-(output / 'apk.sha256').write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  SFA-Asistencia-Android-prototipo.apk\n', encoding='ascii')
+(output / 'apk.sha256').write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + name + '\n', encoding='ascii')
 print('PASS: APK, unit tests and Android lint; physical device validation remains separate', flush=True)

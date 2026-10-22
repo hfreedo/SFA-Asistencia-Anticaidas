@@ -1,5 +1,22 @@
 # Changelog
 
+## En preparacion - Presentacion y distribucion (2026-10-22)
+
+- Portada orientada a arquitectura e impacto: diagrama Mermaid, aspectos de
+  ingenieria por capa, capturas ficticias y accesos breves a las guias.
+- Android: variante release no depurable con firma privada obligatoria por
+  variables de proceso. Sin clave no se genera APK release; debug se conserva.
+- Keystores y propiedades de firma excluidos de Git, copia publica y copia
+  temporal del build. Script de compilacion con contrasenas de entrada oculta.
+- Guia de firma propia, continuidad de actualizaciones y migracion desde debug;
+  no se promete eliminar advertencias de Play Protect ni se contratan servicios.
+- Entrega de revision separada por plataforma, con comprobacion de hashes de
+  los paquetes vigentes y sin modificar las instalaciones activas.
+- Evaluacion de modelos de publicacion y derechos, sin cambiar la licencia
+  existente, borrar fuentes, privatizar el repositorio o alterar releases.
+- Pendiente: crear la clave con su titular, validar la APK firmada en Android
+  fisico y cerrar inventario de derechos y licencias de terceros.
+
 ## Windows rc8 - Navegacion de incidentes y prueba FCM
 
 - El bloque completo de incidentes se ve solo en Panel principal. Continua

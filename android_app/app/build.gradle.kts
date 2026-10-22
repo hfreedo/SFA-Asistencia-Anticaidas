@@ -4,6 +4,24 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+val releaseEnvironment = listOf(
+    "SFA_ANDROID_KEYSTORE", "SFA_ANDROID_KEY_ALIAS",
+    "SFA_ANDROID_STORE_PASSWORD", "SFA_ANDROID_KEY_PASSWORD"
+).associateWith { providers.environmentVariable(it).orNull }
+
+val validateReleaseSigning = tasks.register("validateReleaseSigning") {
+    doLast {
+        val missing = releaseEnvironment.filterValues { it.isNullOrBlank() }.keys
+        check(missing.isEmpty()) { "Release signing missing: ${missing.joinToString()}. See docs/ANDROID_RELEASE.md" }
+        val keyFile = file(releaseEnvironment.getValue("SFA_ANDROID_KEYSTORE")!!)
+        check(keyFile.isFile) { "Release keystore not found" }
+        check(!keyFile.name.equals("debug.keystore", ignoreCase = true) &&
+            !releaseEnvironment.getValue("SFA_ANDROID_KEY_ALIAS").equals("androiddebugkey", ignoreCase = true)) {
+            "A debug key cannot be used for distribution"
+        }
+        check(file("google-services.json").isFile) { "Firebase Android configuration is required for this release" }
+    }
+}
 android {
     namespace = "org.sfa.asistencia"
     compileSdk = 35
@@ -21,7 +39,25 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildTypes { release { isMinifyEnabled = false } }
+    signingConfigs {
+        create("distribution") {
+            releaseEnvironment["SFA_ANDROID_KEYSTORE"]?.let { storeFile = file(it) }
+            storePassword = releaseEnvironment["SFA_ANDROID_STORE_PASSWORD"]
+            keyAlias = releaseEnvironment["SFA_ANDROID_KEY_ALIAS"]
+            keyPassword = releaseEnvironment["SFA_ANDROID_KEY_PASSWORD"]
+        }
+    }
+    buildTypes {
+        release {
+            isDebuggable = false
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("distribution")
+        }
+    }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseSigning)
 }
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))

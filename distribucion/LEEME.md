@@ -1,5 +1,15 @@
 # Recursos de distribucion
 
+## Entrega de revision actual
+
+Abre `actual/LEEME.md` para los paquetes vigentes separados por plataforma.
+Se genera con `scripts/preparar_entrega_actual.py`, verifica los hashes y no
+modifica el Centro activo ni las entregas publicadas. Android sigue identificado
+como debug hasta completar la firma propia de `docs/ANDROID_RELEASE.md`.
+Consulta `docs/ORGANIZACION_Y_ENTREGA.md` antes de compartir o mover carpetas.
+
+## Recursos para empaquetado
+
 `recursos/Driver_CH340_CH341/` y `recursos/Licencias/` son las copias verificadas
 del driver opcional y licencias del release anterior. Se mantienen fuera de
 los directorios de versiones antiguas para que archivar entregas no impida crear

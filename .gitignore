@@ -28,3 +28,9 @@ portability_test/
 Thumbs.db
 secrets/
 **/*service-account*.json
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+android_app/app/google-services.json
+distribucion/actual/
