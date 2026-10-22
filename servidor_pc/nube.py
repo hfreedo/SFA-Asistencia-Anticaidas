@@ -277,6 +277,40 @@ class CloudSync:
                 'blocked': counts.get('blocked',0), 'last_error': last_error[0] if last_error else None,
                 'push': {'configured': bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')), 'last_error': self.push_error}}
 
+    def push_test(self, local_id, installation=None):
+        session, resident = self._bound_session(local_id)
+        result = self.transport('/rest/v1/rpc/sfa_push_test_targets', session[1], {'p_resident':resident})
+        try:
+            if not isinstance(result,dict) or not isinstance(result.get('devices'),list) or len(result['devices'])>5:
+                raise ValueError()
+            devices=[]
+            for value in result['devices']:
+                stamp=value['updated_at']
+                if not isinstance(stamp,str) or datetime.fromisoformat(stamp.replace('Z','+00:00')).tzinfo is None: raise ValueError()
+                last=value.get('last_test')
+                if last is not None:
+                    if last['state'] not in ('pending','sent','expired','invalid'): raise ValueError()
+                    observed=last['observed_at']
+                    if not isinstance(observed,str) or datetime.fromisoformat(observed.replace('Z','+00:00')).tzinfo is None: raise ValueError()
+                    last={'state':last['state'],'observed_at':observed}
+                devices.append({'installation_id':str(uuid.UUID(value['installation_id'])),'updated_at':stamp,'last_test':last})
+        except (KeyError,ValueError,TypeError,AttributeError):
+            raise CloudError(503,'push_test_response') from None
+        with self.session_lock:
+            if self.session != session: raise CloudError(401,'session_changed')
+        if installation is not None:
+            if not os.getenv('SFA_FCM_CREDENTIALS_FILE'): raise CloudError(409,'push_not_configured')
+            if installation not in [d['installation_id'] for d in devices]: raise CloudError(404,'receiver_unavailable')
+            result=self.transport('/rest/v1/rpc/sfa_request_push_test',session[1],{'p_resident':resident,'p_installation':installation})
+            try:
+                if result.get('queued') is not True: raise ValueError()
+                event=str(uuid.UUID(result['event_id']))
+            except (ValueError,TypeError,KeyError,AttributeError): raise CloudError(503,'push_test_response') from None
+            with self.session_lock:
+                if self.session != session: raise CloudError(401,'session_changed')
+            return {'queued':True,'event_id':event}
+        return {'devices':devices,'emitter_configured':bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')),'emitter_error':self.push_error is not None}
+
     def capture(self, conn, payload, local_id):
         kind = payload.get('type')
         if kind not in ('event','telemetry') or not local_id:

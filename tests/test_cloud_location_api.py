@@ -14,6 +14,21 @@ def request(host='127.0.0.1', origin=None):
 
 
 class CloudLocationApiTests(unittest.TestCase):
+    def test_push_tests_require_loopback_origin_and_explicit_confirmation(self):
+        import uuid
+        device=uuid.UUID('66666666-6666-4666-8666-666666666666')
+        with patch.object(main.cloud_sync,'push_test',return_value={'devices':[]}) as send:
+            main.push_test_targets(12,request())
+            send.assert_called_once_with(12)
+            send.reset_mock()
+            with self.assertRaises(HTTPException): main.send_push_test(12,main.PushTestRequest(installation_id=device),request())
+            for incoming in (request('203.0.113.9'),request(origin='https://untrusted.invalid')):
+                with self.assertRaises(HTTPException): main.push_test_targets(12,incoming)
+                with self.assertRaises(HTTPException): main.send_push_test(12,main.PushTestRequest(installation_id=device,confirmed=True),incoming)
+            send.assert_not_called()
+            main.send_push_test(12,main.PushTestRequest(installation_id=device,confirmed=True),request())
+            send.assert_called_once_with(12,str(device))
+
     def test_cloud_incidents_cannot_be_read_or_resolved_from_lan(self):
         import uuid
         with patch.object(main.cloud_sync,'remote_incidents',return_value={'events':[]}) as incidents:

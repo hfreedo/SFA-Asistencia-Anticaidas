@@ -4,18 +4,21 @@ Sistema educativo de alerta anticaídas: cinturón Arduino con MPU6050 y panel l
 
 ## Ampliación de Fuentes: Ubicación y Correo
 
-### Candidata actual: Android 0.6.1 y Centro Windows rc7
+### Candidata actual: Android 0.6.1 y Centro Windows rc8
 
 [Android 0.6.1](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.6.1-android-prototipo)
-| [Windows rc7](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc7)
+| [Windows rc8](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc8)
 | [Guia de geocerca y atencion](docs/PRUEBA_GEOCERCA_INTERNET.md)
 
 Geocerca cloud desde 5 m e incidentes persistentes en portal, Centro y Android.
 Reingresar no resuelve la alerta: requiere atencion de un cuidador autorizado.
 Android filtra degradaciones grandes de precision GPS y muestra fuente y edad.
-Migraciones 008 y 009 activadas en el proyecto de pruebas. Prueba fisica pendiente.
+Migraciones 008 a 010 activadas en el proyecto de pruebas. Prueba fisica pendiente.
 Cerrar la atencion no oculta que la persona sigue fuera. Un GPS incierto o
 antiguo conserva el aviso de ultimo exterior sin afirmar que haya regresado.
+Los incidentes completos se ven solo en Panel principal, con indicador en el
+menu desde las otras vistas. Ajustes > Notificaciones incluye pruebas FCM
+dirigidas a un celular propio. [Guia de prueba PC a celular](docs/PRUEBA_FCM_DESDE_PC.md).
 FCM sigue requiriendo emisor PC con credencial propia y sesion activa.
 No hay nuevo servicio de pago ni trabajador FCM independiente en la nube.
 Las versiones anteriores se conservan como historial, no como candidata actual.

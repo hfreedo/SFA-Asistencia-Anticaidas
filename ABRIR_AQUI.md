@@ -1,6 +1,6 @@
 # Empieza aqui
 
-Version actual: **Centro Windows 1.2.0-rc7** y **Android 0.6.1-prototipo (8)**.
+Version actual: **Centro Windows 1.2.0-rc8** y **Android 0.6.1-prototipo (8)**.
 Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores
 se conservan como historial y no fueron reemplazados retroactivamente.
 
@@ -18,6 +18,9 @@ radio no garantiza que el GPS tenga esa precision. Android muestra la calidad.
 Una salida confirmada queda pendiente hasta que un cuidador la atienda.
 Cerrar la atencion no confirma el regreso: si continua fuera o no hay GPS
 fiable para confirmar reingreso, el aviso de situacion permanece visible.
+Los incidentes completos se revisan solo en Panel principal; el menu indica
+cuando hay algo por revisar. Para probar avisos al celular: Ajustes >
+Notificaciones > Avisos al celular - Firebase. Ver docs/PRUEBA_FCM_DESDE_PC.md.
 Los ZIP/APK para compartir estan en `release/`; consulta sus sumas SHA-256.
 Las versiones rc1/rc2 no incluyen GPS directo a Supabase ni el nuevo laboratorio.
 

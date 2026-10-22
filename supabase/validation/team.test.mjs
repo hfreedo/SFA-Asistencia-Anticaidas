@@ -203,6 +203,7 @@ try {
   await db.exec('reset role');
   await db.exec(await readFile(new URL('../migrations/202610210008_persistent_geofence.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../migrations/202610210009_zone_situation.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202610210010_push_test_targets.sql',import.meta.url),'utf8'));
   let exitId;
   const fix = async (n, seconds, latitude=0, accuracy=1) => rpc('sfa_ingest_phone',[sosPhone,id(n),{
     latitude,longitude:0,accuracy_m:accuracy,observed_at:new Date(Date.now()+seconds*1000).toISOString(),
@@ -281,6 +282,29 @@ try {
     await login(1); await rpc('sfa_revoke_team_member',[id(10),id(11)]);
     await login(11); await denied(()=>rpc('sfa_phone_sos',[sosPhone,id(203),sosStamp,false]));
     await login(2); assert.ok((await rpc('sfa_incidents',[id(11)])).events.length>2);
+  });
+  await check('test receiver list reveals only the current caregiver own installations, never FCM tokens',async()=>{
+    await login(null,'anon'); await denied(()=>rpc('sfa_push_test_targets',[id(11)]));
+    await login(3); await denied(()=>rpc('sfa_push_test_targets',[id(11)]));
+    await login(2); const result=await rpc('sfa_push_test_targets',[id(11)]);
+    assert.equal(result.devices.length,1); assert.equal(result.devices[0].installation_id,id(102));
+    assert.ok(!JSON.stringify(result).includes('fixture_token'));
+    assert.ok(!JSON.stringify(result).includes(id(101)));
+  });
+  await check('PC-style self-test is simulated, targets only the selected own phone and has a rate limit',async()=>{
+    await login(2); await denied(()=>rpc('sfa_request_push_test',[id(11),id(101)]));
+    const result=await rpc('sfa_request_push_test',[id(11),id(102)]); assert.equal(result.queued,true);
+    const targets=await rpc('sfa_push_test_targets',[id(11)]);
+    assert.equal(targets.devices[0].last_test.state,'pending');
+    const event=(await rpc('sfa_incidents',[id(11)])).events.find(e=>e.id===result.event_id);
+    assert.equal(event.simulated,true); assert.equal(event.event_type,'PRUEBA_NOTIFICACION');
+    await assert.rejects(()=>rpc('sfa_request_push_test',[id(11),id(102)]),e=>e.code==='22023');
+    await db.exec('reset role'); const jobs=(await db.query('select installation_id from sfa_private.push_jobs where event_id=$1',[result.event_id])).rows;
+    assert.deepEqual(jobs.map(j=>j.installation_id),[id(102)]);
+  });
+  await check('disabled phones disappear from the self-test destination list',async()=>{
+    await login(2); await rpc('sfa_register_push',[id(102),null,false]);
+    assert.deepEqual((await rpc('sfa_push_test_targets',[id(11)])).devices,[]);
   });
   console.log(`${checks} team/incident checks passed (isolated PGlite, not live Auth/email/FCM).`);
 } finally { await db.close(); }

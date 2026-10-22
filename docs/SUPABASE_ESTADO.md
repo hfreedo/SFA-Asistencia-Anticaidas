@@ -2,7 +2,10 @@
 
 ## Corte vigente: 21 de octubre de 2026
 
-- Migraciones 001 a 009 aplicadas desde el Dashboard en el proyecto de pruebas.
+- Migraciones 001 a 010 aplicadas desde el Dashboard en el proyecto de pruebas.
+- 010 habilita la consulta de destinos de prueba propios sin exponer tokens.
+  Verificacion de permisos en verify_push_targets_live.sql. No se envio ninguna
+  prueba real durante la activacion; no cambia destinatarios de alertas reales.
 - 009 separa situacion de zona y atencion. Consulta bajo los permisos ya
   existentes, sin nuevos avisos ni reproduccion de ubicaciones. Funcion privada
   no ejecutable directamente por clientes. Ver verify_zone_situation_live.sql.

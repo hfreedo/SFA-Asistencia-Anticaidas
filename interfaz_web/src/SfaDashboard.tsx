@@ -4,6 +4,9 @@ import { GeofenceRadius } from "./GeofenceRadius";
 import { EmailSettings, LocationHistory, LocationPanel, locationLabel, showBrowserAlert, useResidentLocation, type LocationSnapshot } from "./LocationTools";
 import { LocalRemoteLocation } from "./LocalRemoteLocation";
 import { LocalIncidentPanel } from "./LocalIncidentPanel";
+import { IncidentNavIndicator } from "./IncidentNavIndicator";
+import type { IncidentAttention } from "./IncidentWorkspace";
+import { PushTestSettings } from "./PushTestSettings";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -235,6 +238,9 @@ export function SfaDashboardApp() {
   // Lista de residentes registrados y residente activo
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
+  const [cloudAttention,setCloudAttention]=useState<IncidentAttention>({pending:0,followup:false});
+  const reportAttention=useCallback((value:IncidentAttention)=>setCloudAttention(value),[]);
+  useEffect(()=>setCloudAttention({pending:0,followup:false}),[profile?.id]);
   const locationSnapshot = useResidentLocation(profile?.id);
   const [mutedGeofence, setMutedGeofence] = useState("");
   const geofenceIncident = locationSnapshot?.status === "outside" ? `${profile?.id}:${locationSnapshot.events.find(event => event.event_type === "GEOCERCA_SALIDA")?.id ?? "outside"}` : "";
@@ -455,17 +461,18 @@ export function SfaDashboardApp() {
       view={view}
       onViewChange={next => { if (next === "settings") setSettingsEntry("residents"); setView(next); }}
       connected={connected}
+      attention={{pending:cloudAttention.pending,followup:cloudAttention.followup || Boolean(geofenceIncident && notificationConfig.notify_geofence)}}
       residents={residents}
       activeProfile={profile}
       onSelectResident={selectResident}
       onOpenNewResidentModal={() => setView("settings")}
     >
-      {geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
+      {view === "home" && geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
         <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona de referencia</strong><p>Salida confirmada con las lecturas recibidas. Requiere comprobar su situación.</p></div>
         <button type="button" onClick={() => setView("map")}><Icon name="map" size={17} />Ver ubicación</button>
         {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
       </section>}
-      <LocalIncidentPanel residentId={profile?.id} />
+      <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} onAttentionChange={reportAttention}/>
       {view === "home" && (
         <HomeScreen
           profile={profile}
@@ -521,6 +528,7 @@ export function SfaDashboardApp() {
 
 function AppShell({
   view,
+  attention,
   onViewChange,
   connected,
   residents,
@@ -530,6 +538,7 @@ function AppShell({
   children,
 }: {
   view: View;
+  attention: IncidentAttention;
   onViewChange: (view: View) => void;
   connected: boolean;
   residents: ResidentProfile[];
@@ -621,7 +630,8 @@ function AppShell({
                       {item.label}
                     </span>
                   </div>
-                  {active && (
+                  {item.id === "home" && <IncidentNavIndicator attention={attention}/>}
+                  {active && !(item.id === "home" && (attention.pending || attention.followup)) && (
                     <span className="size-1.5 rounded-full bg-[#0F766E]" />
                   )}
                 </button>
@@ -757,6 +767,7 @@ function AppShell({
             >
               <Icon name={item.icon} size={18} />
               <span>{item.id === "home" ? "Panel" : item.label}</span>
+              {item.id === "home" && <IncidentNavIndicator attention={attention}/>}
             </button>
           );
         })}
@@ -1769,7 +1780,7 @@ function SettingsScreen({
                 Reglas y Canales de Notificación
               </h3>
               <p className="text-xs text-[#55625E] mt-1">
-                Alertas locales, correo electrónico y Telegram opcional.
+                Alertas locales, avisos al celular, correo electrónico y Telegram opcional.
               </p>
             </div>
 
@@ -1839,6 +1850,7 @@ function SettingsScreen({
               </div>
             </div>
 
+            <PushTestSettings residentId={profile?.id}/>
             <EmailSettings />
             {/* Telegram */}
             <div className="notification-channel space-y-4">

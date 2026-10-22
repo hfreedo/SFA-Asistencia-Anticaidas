@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Clock3, Hand, MapPin, RefreshCw, ShieldAlert, TestTube2, X } from "lucide-react";
 import "./incidents.css";
-import { ZoneSituation, type ZoneStatus } from "./ZoneSituation";
+import { ZoneSituation, zoneNeedsFollowup, type ZoneStatus } from "./ZoneSituation";
 
 type Incident = { id: string; event_type: string; observed_at: string; simulated: boolean; detail: { text?: string };
   actor_id: string | null; outcome: "attending" | "attended" | "false_alarm" | null; updated_at: string | null };
 const labels: Record<string, string> = { SOS: "Solicitud SOS", PRUEBA_SOS: "Prueba SOS entre dispositivos", PRUEBA_NOTIFICACION: "Prueba de notificación", CAIDA_CONFIRMADA: "Caída informada", GEOCERCA_SALIDA: "Salida de geocerca" };
 export type IncidentSnapshot = { events: Incident[]; can_attend: boolean; viewer_id: string; zone_status?: ZoneStatus|null };
 export type IncidentApi = { load: () => Promise<IncidentSnapshot>; attend: (id: string, expected: string | null, outcome: string) => Promise<void> };
+export type IncidentAttention = { pending:number; followup:boolean };
 const browserAllowed = () => typeof Notification !== "undefined" && window.isSecureContext && Notification.permission === "granted";
 const isPending = (item: Incident) => !item.outcome || item.outcome === "attending";
 function elapsed(stamp: string, now: number) {
@@ -16,7 +17,7 @@ function elapsed(stamp: string, now: number) {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
 
-export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; compact?: boolean }) {
+export function IncidentWorkspace({ api, compact = false, onAttentionChange }: { api: IncidentApi; compact?: boolean; onAttentionChange?:(summary:IncidentAttention)=>void }) {
   const [items, setItems] = useState<Incident[]>([]);
   const [zone, setZone] = useState<ZoneStatus|null>(null);
   const [canAttend, setCanAttend] = useState(false);
@@ -92,6 +93,8 @@ export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; 
   }
   const pending = items.filter(isPending);
   const realPending = pending.filter(item => !item.simulated);
+  const followup = zoneNeedsFollowup(zone,now,!error);
+  useEffect(()=>{ onAttentionChange?.({pending:realPending.length,followup}); },[realPending.length,followup,onAttentionChange]);
   const visible = [...(showHistory ? items : pending)].sort((a,b) =>
     Number(isPending(b) && !b.simulated) - Number(isPending(a) && !a.simulated) || Date.parse(a.observed_at) - Date.parse(b.observed_at));
   const exits = realPending.filter(item => item.event_type === "GEOCERCA_SALIDA").length;

@@ -1141,6 +1141,30 @@ class RemoteAttentionRequest(BaseModel):
     p_outcome: str = Field(pattern="^(attending|attended|false_alarm)$")
 
 
+class PushTestRequest(BaseModel):
+    installation_id: UUID
+    confirmed: bool = False
+
+
+@app.get("/api/cloud/residents/{resident_id}/push-test")
+def push_test_targets(resident_id: int, request: Request):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.push_test(resident_id)
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code":exc.code}) from None
+
+
+@app.post("/api/cloud/residents/{resident_id}/push-test")
+def send_push_test(resident_id: int, body: PushTestRequest, request: Request):
+    require_cloud_operator(request)
+    if not body.confirmed: raise HTTPException(422, {"code":"confirmation_required"})
+    try:
+        return cloud_sync.push_test(resident_id,str(body.installation_id))
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code":exc.code}) from None
+
+
 @app.get("/api/cloud/residents/{resident_id}/incidents")
 def get_remote_incidents(resident_id: int, request: Request):
     require_cloud_operator(request)

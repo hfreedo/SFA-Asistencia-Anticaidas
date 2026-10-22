@@ -1,5 +1,13 @@
 # Stack Tecnológico de SFA Asistencia
 
+La navegacion local mantiene una sola instancia React del monitor de incidentes:
+oculta su contenido fuera del panel, pero conserva la consulta y comunica un
+resumen al indicador de la navegacion. No duplica lectores por pantalla.
+La prueba FCM desde Ajustes pasa por FastAPI con la sesion vinculada, consulta
+RPC 010 para listar instalaciones propias y usa sfa_request_push_test. El emisor
+PC entrega la cola mediante FCM; la interfaz distingue cola de aceptacion y
+no afirma recepcion fisica. Ver PRUEBA_FCM_DESDE_PC.md.
+
 ## Recorrido actual y ampliacion en preparacion
 
 Editor remoto de geocerca (migracion 007 activada en el proyecto de pruebas):

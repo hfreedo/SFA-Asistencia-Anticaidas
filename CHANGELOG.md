@@ -1,5 +1,20 @@
 # Changelog
 
+## Windows rc8 - Navegacion de incidentes y prueba FCM
+
+- El bloque completo de incidentes se ve solo en Panel principal. Continua
+  consultando en segundo plano y muestra un indicador en el menu del panel
+  cuando hay atenciones reales pendientes o una geocerca por revisar.
+- Ajustes > Notificaciones incorpora Firebase/FCM: consulta los celulares
+  propios, seleccion de destino, confirmacion y envio de prueba identificada.
+- Muestra cola, aceptacion FCM o fallo sin confundir aceptacion con recepcion.
+- Migracion 010: solo metadatos de los dispositivos del usuario conectado;
+  tokens privados, sin acceso anonimo ni envios al consultar la lista.
+- Peticiones PC restringidas a localhost, mismo origen y sesion vinculada.
+  La prueba conserva el limite de una solicitud por minuto del servidor.
+- 78 pruebas web, 90 Python y 66 comprobaciones SQL aisladas aprobadas.
+- No requiere una APK nueva: Android permanece en 0.6.1-prototipo (8).
+
 ## Windows rc7 y Android 0.6.1 - Situacion de zona independiente
 
 - Cerrar la atencion no oculta la situacion GPS: continua fuera, ultimo estado

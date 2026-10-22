@@ -3,6 +3,13 @@ import { MapPin } from "lucide-react";
 export type ZoneStatus = { state:"inside"|"outside"|"uncertain"|"imprecise"|"stale"|"unknown"|"unconfigured";
   last_confirmed:"inside"|"outside"|"unknown"; observed_at:string|null };
 
+export function zoneNeedsFollowup(zone:ZoneStatus|null, now:number, connected:boolean) {
+  if (!zone || zone.state === "unconfigured") return false;
+  const age=zone.observed_at ? now-Date.parse(zone.observed_at) : Infinity;
+  const recent=connected && Number.isFinite(age) && age>=-30000 && age<=90000;
+  return recent && zone.state === "outside" || zone.last_confirmed === "outside" && !(recent && zone.state === "inside");
+}
+
 export function ZoneSituation({ zone, now, connected, closedExit }: { zone:ZoneStatus|null; now:number; connected:boolean; closedExit:boolean }) {
   if (!zone || zone.state === "unconfigured") return null;
   const age = zone.observed_at ? now-Date.parse(zone.observed_at) : Infinity;

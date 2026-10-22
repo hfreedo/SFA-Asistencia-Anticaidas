@@ -259,6 +259,25 @@ class CloudSyncTests(unittest.TestCase):
             self.assertTrue(calls[-1].endswith('sfa_claim_push'))
             self.assertIsNone(self.cloud.push_error)
 
+    def test_push_tests_only_use_owned_targets_without_exposing_tokens(self):
+        target={'installation_id':DEVICE,'updated_at':datetime.now(timezone.utc).isoformat(),'last_test':None,'token':'PRIVATE'}
+        self.cloud.transport=Mock(side_effect=lambda path,*args: {'devices':[target]} if path.endswith('sfa_push_test_targets') else {'queued':True,'event_id':RESIDENT})
+        with patch.dict('os.environ',{'SFA_FCM_CREDENTIALS_FILE':'fixture-not-opened'}):
+            self.assertNotIn('PRIVATE',json.dumps(self.cloud.push_test(1)))
+            self.assertEqual(self.cloud.push_test(1,DEVICE),{'queued':True,'event_id':RESIDENT})
+            with self.assertRaises(CloudError): self.cloud.push_test(1,OWNER)
+        requests=[call for call in self.cloud.transport.call_args_list if call.args[0].endswith('sfa_request_push_test')]
+        self.assertEqual(len(requests),1)
+        self.assertEqual(requests[0].args[2],{'p_resident':RESIDENT,'p_installation':DEVICE})
+
+    def test_changed_session_cannot_use_a_previously_loaded_test_target(self):
+        def read(*args):
+            self.cloud.pause()
+            return {'devices':[]}
+        self.cloud.transport=read
+        with self.assertRaises(CloudError) as error: self.cloud.push_test(1)
+        self.assertEqual(error.exception.code,'session_changed')
+
     def test_malformed_acknowledgement_cannot_lose_pending_samples(self):
         self.capture()
         self.cloud.transport = lambda *args: {'accepted':[{}]}
