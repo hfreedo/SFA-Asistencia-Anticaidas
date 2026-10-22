@@ -1,8 +1,8 @@
 # Geocerca por internet desde 5 metros
 
-Estado: migraciones 007 y 008 aplicadas con autorizacion en el proyecto de
+Estado: migraciones 007, 008 y 009 aplicadas en el proyecto de
 pruebas. Configuracion y motor persistente activos para posiciones nuevas.
-Usar portal/Centro actualizado y Android 0.6.0-prototipo para ver la atencion
+Usar portal/Centro actualizado y Android 0.6.1-prototipo para ver la atencion
 persistente en la app. Validacion fisica de esta candidata pendiente.
 
 ## Que cambia
@@ -28,7 +28,7 @@ recibio la zona ni que la persona permanezca dentro.
 
 ## Probar despues de la activacion
 
-1. Mantener Android 0.6.0-prototipo en Compartir > Por internet, con la persona
+1. Mantener Android 0.6.1-prototipo en Compartir > Por internet, con la persona
    vinculada, consentimiento y seguimiento activos. Puede usar datos moviles.
 2. Iniciar sesion en el portal; o, para editar desde el panel PC, reanudar la
    sincronizacion de esta PC y usar el mismo perfil vinculado.
@@ -60,6 +60,15 @@ El mapa conserva zoom y encuadre durante las consultas. Ver zona y Centrar en
 el celular son acciones explicitas. Cambiar de residente elimina el mapa anterior.
 
 ## Atencion persistente y repeticion
+
+La situacion de zona se muestra separada de los incidentes: despues de cerrar
+la atencion, una salida confirmada mantiene "Atencion cerrada, pero continua
+fuera". Si la precision se degrada o pasan 90 s sin posicion evaluada, cambia a
+"Ultima salida confirmada; reingreso no confirmado", no a un estado seguro.
+Solo posiciones fiables con permanencia confirman el reingreso. Cambiar la zona
+invalida la evaluacion de su revision anterior. No se elimina el historial.
+Si hay varios emisores recientes, un estado exterior confirmado mantiene la
+advertencia; el estado de un emisor revocado no se usa como evaluacion vigente.
 
 Una salida confirmada crea un incidente real. No se crean duplicados mientras
 continua fuera ni mientras ya exista una salida pendiente del residente.
@@ -106,7 +115,7 @@ Revisar permiso Ubicacion precisa y probar al aire libre. Con +/-100 m no es
 posible comprobar un recorrido de 5 m de manera fiable. Usar un radio mayor
 para una demostracion real, o un escenario simulado claramente identificado.
 
-- 60 comprobaciones SQL aisladas, 62 pruebas web y 86 pruebas Python aprobadas.
+- 63 comprobaciones SQL aisladas, 72 pruebas web y 87 pruebas Python aprobadas.
 - Compilacion, pruebas unitarias y lint Android aprobados.
 - Motor activado y permisos comprobados sin insertar posiciones de prueba.
 - Navegador con datos ficticios: alerta, toma, confirmacion y cierre comprobados.

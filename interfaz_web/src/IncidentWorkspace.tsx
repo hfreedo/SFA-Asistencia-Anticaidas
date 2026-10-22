@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Clock3, Hand, MapPin, RefreshCw, ShieldAlert, TestTube2, X } from "lucide-react";
 import "./incidents.css";
+import { ZoneSituation, type ZoneStatus } from "./ZoneSituation";
 
 type Incident = { id: string; event_type: string; observed_at: string; simulated: boolean; detail: { text?: string };
   actor_id: string | null; outcome: "attending" | "attended" | "false_alarm" | null; updated_at: string | null };
 const labels: Record<string, string> = { SOS: "Solicitud SOS", PRUEBA_SOS: "Prueba SOS entre dispositivos", PRUEBA_NOTIFICACION: "Prueba de notificación", CAIDA_CONFIRMADA: "Caída informada", GEOCERCA_SALIDA: "Salida de geocerca" };
-export type IncidentSnapshot = { events: Incident[]; can_attend: boolean; viewer_id: string };
+export type IncidentSnapshot = { events: Incident[]; can_attend: boolean; viewer_id: string; zone_status?: ZoneStatus|null };
 export type IncidentApi = { load: () => Promise<IncidentSnapshot>; attend: (id: string, expected: string | null, outcome: string) => Promise<void> };
 const browserAllowed = () => typeof Notification !== "undefined" && window.isSecureContext && Notification.permission === "granted";
 const isPending = (item: Incident) => !item.outcome || item.outcome === "attending";
@@ -17,6 +18,7 @@ function elapsed(stamp: string, now: number) {
 
 export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; compact?: boolean }) {
   const [items, setItems] = useState<Incident[]>([]);
+  const [zone, setZone] = useState<ZoneStatus|null>(null);
   const [canAttend, setCanAttend] = useState(false);
   const [viewer, setViewer] = useState("");
   const [error, setError] = useState("");
@@ -53,10 +55,10 @@ export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; 
           }
         }
         seen.current = new Set(events.map(e => e.id));
-        setItems(events); setCanAttend(Boolean(result.can_attend)); setViewer(result.viewer_id); setError(""); setCheckedAt(Date.now());
+        setItems(events); setZone(result.zone_status ?? null); setCanAttend(Boolean(result.can_attend)); setViewer(result.viewer_id); setError(""); setCheckedAt(Date.now());
       } catch (failure) { if (active) {
         const code = (failure as {code?: string; status?: number})?.code;
-        if (code === "42501" || code === "PGRST301" || (failure as {status?:number})?.status === 401 || (failure as {status?:number})?.status === 403) setItems([]);
+        if (code === "42501" || code === "PGRST301" || (failure as {status?:number})?.status === 401 || (failure as {status?:number})?.status === 403) { setItems([]); setZone(null); }
         const status = (failure as {status?:number})?.status;
         setCanAttend(false); setError(status === 401 || status === 403
           ? "No se pudieron actualizar los incidentes. Abre Acceso y sincronización, inicia sesión y reanuda los envíos de esta PC; verifica el perfil vinculado y sus permisos."
@@ -95,6 +97,7 @@ export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; 
   const exits = realPending.filter(item => item.event_type === "GEOCERCA_SALIDA").length;
   const oldest = realPending.reduce<Incident | null>((first,item) => !first || Date.parse(item.observed_at) < Date.parse(first.observed_at) ? item : first, null);
   return <section className="incident-workspace" aria-labelledby="incidents-title">
+    <ZoneSituation zone={zone} now={now} connected={!error} closedExit={!realPending.some(item=>item.event_type==="GEOCERCA_SALIDA") && items.some(item=>!item.simulated && item.event_type==="GEOCERCA_SALIDA" && !isPending(item))}/>
     {realPending.length > 0 && <div className="persistent-incident-alert" role="alert" aria-label="Atención pendiente">
       <span className="incident-priority-icon">{exits ? <MapPin size={28} /> : <ShieldAlert size={28} />}</span><div className="incident-priority-copy"><span className="incident-eyebrow">Requiere atención del cuidador</span>
         <strong>{exits && exits === realPending.length ? "Salida de geocerca pendiente de atención" : "Hay solicitudes de asistencia pendientes"}</strong>
@@ -138,6 +141,7 @@ export function IncidentWorkspace({ api, compact = false }: { api: IncidentApi; 
     }}>
       <h3 id="incident-confirm-title">{confirmation.outcome === "attended" ? "Confirmar atención realizada" : "Confirmar falsa alarma"}</h3>
       <p>El cambio se compartirá con los cuidadores autorizados. El incidente no se borra.</p>
+      {confirmation.item.event_type === "GEOCERCA_SALIDA" && <p>Cerrar la atención no confirma que la persona haya regresado. Si sigue fuera o el GPS es incierto, la advertencia de zona permanecerá visible.</p>}
       <div className="cloud-actions"><button autoFocus className="access-secondary" disabled={busy} onClick={() => setConfirmation(null)}>Cancelar</button><button className="access-primary" disabled={busy} onClick={() => void act(confirmation.item, confirmation.outcome)}>Confirmar resolución</button></div>
     </section></div>}
   </section>;

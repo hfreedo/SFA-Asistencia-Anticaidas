@@ -251,7 +251,17 @@ class CloudSync:
                     'detail': {'text': str(event.get('detail', {}).get('text', ''))[:1000]},
                     'actor_id': event.get('actor_id'), 'outcome': event.get('outcome'), 'updated_at': event.get('updated_at'),
                 })
-            return {'viewer_id': session[0], 'can_attend': snapshot['can_attend'], 'events': events}
+            zone = snapshot.get('zone_status')
+            if zone is not None:
+                if (not isinstance(zone, dict) or zone.get('state') not in
+                        ('inside','outside','uncertain','imprecise','stale','unknown','unconfigured')
+                        or zone.get('last_confirmed') not in ('inside','outside','unknown')):
+                    raise ValueError()
+                stamp = zone.get('observed_at')
+                if stamp is not None and (not isinstance(stamp, str) or datetime.fromisoformat(stamp.replace('Z','+00:00')).tzinfo is None):
+                    raise ValueError()
+                zone = {'state':zone['state'], 'last_confirmed':zone['last_confirmed'], 'observed_at':stamp}
+            return {'viewer_id': session[0], 'can_attend': snapshot['can_attend'], 'events': events, 'zone_status':zone}
         except (ValueError, KeyError, TypeError, AttributeError):
             raise CloudError(503, 'incident_response') from None
 

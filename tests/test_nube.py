@@ -226,6 +226,15 @@ class CloudSyncTests(unittest.TestCase):
         with self.assertRaises(CloudError) as error: self.cloud.remote_incidents(1)
         self.assertEqual(error.exception.code,'session_changed')
 
+    def test_zone_situation_is_sanitized_and_invalid_status_rejected(self):
+        zone={'state':'outside','last_confirmed':'outside','observed_at':datetime.now(timezone.utc).isoformat(),'token':'PRIVATE'}
+        self.cloud.transport=Mock(return_value={'can_attend':True,'events':[],'zone_status':zone})
+        result=self.cloud.remote_incidents(1)
+        self.assertEqual(result['zone_status']['state'],'outside')
+        self.assertNotIn('PRIVATE',json.dumps(result))
+        zone['state']='safe_even_without_gps'
+        with self.assertRaises(CloudError): self.cloud.remote_incidents(1)
+
     def test_push_v2_and_legacy_fallback_without_real_credentials(self):
         with patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': 'fixture-not-opened'}):
             self.cloud.push_sender = Mock()

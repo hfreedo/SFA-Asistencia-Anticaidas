@@ -2,7 +2,10 @@
 
 ## Corte vigente: 21 de octubre de 2026
 
-- Migraciones 001 a 008 aplicadas desde el Dashboard en el proyecto de pruebas.
+- Migraciones 001 a 009 aplicadas desde el Dashboard en el proyecto de pruebas.
+- 009 separa situacion de zona y atencion. Consulta bajo los permisos ya
+  existentes, sin nuevos avisos ni reproduccion de ubicaciones. Funcion privada
+  no ejecutable directamente por clientes. Ver verify_zone_situation_live.sql.
 - 008 activa el motor persistente de geocerca para posiciones nuevas, sin
   reproducir historiales. Estado privado con RLS y disparador verificados;
   anon no puede leer incidentes. Consulta sin datos personales ni escrituras:

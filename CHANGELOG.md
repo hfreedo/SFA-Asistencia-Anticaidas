@@ -1,5 +1,20 @@
 # Changelog
 
+## Windows rc7 y Android 0.6.1 - Situacion de zona independiente
+
+- Cerrar la atencion no oculta la situacion GPS: continua fuera, ultimo estado
+  exterior sin reingreso confirmado, o interior confirmado.
+- Migracion 009: la consulta autorizada de incidentes incluye un resumen del
+  motor de zona, sin coordenadas adicionales ni nuevos destinatarios.
+- Se descartan estados de una zona anterior o de emisores sin acceso vigente.
+  GPS antiguo/impreciso nunca se interpreta como reingreso confirmado.
+- Portal, Centro y Android mantienen el aviso aunque no haya atencion pendiente.
+- No se crean incidentes duplicados ni recordatorios FCM por cada posicion.
+- Android 0.6.1-prototipo (8), actualizable sobre 0.6.0 con la misma firma.
+- 72 pruebas web, 87 Python y 63 comprobaciones SQL aisladas aprobadas.
+- Compilacion/lint Android y prueba de empaquetado se verifican por separado;
+  pruebas fisicas con la candidata actual pendientes.
+
 ## Ajuste web posterior a rc6 - Prioridad de geocerca
 
 - Geocerca, SOS y caidas reales pendientes comparten jerarquia prioritaria:

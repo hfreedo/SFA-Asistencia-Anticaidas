@@ -202,6 +202,7 @@ try {
   });
   await db.exec('reset role');
   await db.exec(await readFile(new URL('../migrations/202610210008_persistent_geofence.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202610210009_zone_situation.sql',import.meta.url),'utf8'));
   let exitId;
   const fix = async (n, seconds, latitude=0, accuracy=1) => rpc('sfa_ingest_phone',[sosPhone,id(n),{
     latitude,longitude:0,accuracy_m:accuracy,observed_at:new Date(Date.now()+seconds*1000).toISOString(),
@@ -245,6 +246,36 @@ try {
     assert.equal(result.events.filter(e=>e.event_type==='GEOCERCA_SALIDA' && e.outcome===null).length,1);
     assert.ok(result.events.some(e=>e.id===id(200)));
     await denied(()=>db.query('select * from sfa_private.geofence_state'));
+  });
+  await check('closing attention while still outside retains the zone warning without duplicate alerts',async()=>{
+    await login(2); const current=(await rpc('sfa_incidents',[id(11)])).events.find(e=>e.event_type==='GEOCERCA_SALIDA' && e.outcome===null);
+    await rpc('sfa_attend_incident',[current.id,null,'attending']);
+    const taken=(await rpc('sfa_incidents',[id(11)])).events.find(e=>e.id===current.id);
+    await rpc('sfa_attend_incident',[current.id,taken.updated_at,'attended']);
+    const snapshot=await rpc('sfa_incidents',[id(11)]);
+    assert.equal(snapshot.zone_status.state,'outside'); assert.equal(snapshot.zone_status.last_confirmed,'outside');
+    assert.equal(snapshot.events.filter(e=>e.event_type==='GEOCERCA_SALIDA' && !e.outcome).length,0);
+    await denied(()=>db.query('select sfa_private.resident_zone_status($1)',[id(11)]));
+  });
+  await check('imprecise or stale GPS cannot dismiss a previously confirmed exit',async()=>{
+    await db.exec('reset role');
+    const saved=(await db.query('select previous_at,quality from sfa_private.geofence_state where device_id=$1',[sosPhone])).rows[0];
+    await db.query("update sfa_private.geofence_state set quality='imprecise' where device_id=$1",[sosPhone]);
+    await login(2); let status=(await rpc('sfa_incidents',[id(11)])).zone_status;
+    assert.equal(status.state,'imprecise'); assert.equal(status.last_confirmed,'outside');
+    await db.exec('reset role');
+    await db.query("update sfa_private.geofence_state set previous_at=now()-interval '100 seconds' where device_id=$1",[sosPhone]);
+    await login(2); status=(await rpc('sfa_incidents',[id(11)])).zone_status;
+    assert.equal(status.state,'stale'); assert.equal(status.last_confirmed,'outside');
+    await db.exec('reset role'); await db.query('update sfa_private.geofence_state set previous_at=$2,quality=$3 where device_id=$1',[sosPhone,saved.previous_at,saved.quality]);
+  });
+  await check('zone revision changes cannot label the previous perimeter as the current state',async()=>{
+    await db.exec('reset role');
+    await db.query("update public.sfa_geofences set updated_at=updated_at+interval '1 second' where resident_id=$1",[id(11)]);
+    await login(2); const status=(await rpc('sfa_incidents',[id(11)])).zone_status;
+    assert.equal(status.state,'unknown'); assert.equal(status.last_confirmed,'unknown');
+    await login(null,'anon'); await denied(()=>rpc('sfa_incidents',[id(11)]));
+    await login(3); await denied(()=>rpc('sfa_incidents',[id(11)]));
   });
   await check('revoked emitter stops submitting while incident history remains available to caregivers',async()=>{
     await login(1); await rpc('sfa_revoke_team_member',[id(10),id(11)]);

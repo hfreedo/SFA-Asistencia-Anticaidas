@@ -14,6 +14,12 @@ el puente local con la sesion de sincronizacion; no expone JWT en la LAN.
 La cola de avisos se entrega mediante el emisor FCM de la PC, no mediante un
 trabajador online independiente. Ver PRUEBA_GEOCERCA_INTERNET.md.
 
+La migracion 009 separa la situacion de zona de la resolucion del incidente.
+PostgreSQL entrega solo estado, ultimo estado confirmado y hora de evaluacion
+por el mismo comando autorizado; FastAPI sanea esos campos para el panel local.
+React y Kotlin muestran la advertencia incluso cuando la atencion se cerro.
+Ambos vencen la evaluacion a los 90 s, sin inventar un reingreso ni repetir FCM.
+
 El GPS remoto ya no exige compartir red con la PC. El modo LAN es una
 alternativa independiente, no un requisito del seguimiento por internet.
 La ampliacion de equipo incorpora una Edge Function Deno/TypeScript para
