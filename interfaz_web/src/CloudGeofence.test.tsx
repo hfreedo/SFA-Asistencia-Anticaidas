@@ -24,6 +24,15 @@ it("GPS polling cannot overwrite a draft radius or reload the zone", async () =>
   expect(screen.getByRole("button",{name:/^5 m$/}).getAttribute("aria-pressed")).toBe("true");
   expect(api.load).toHaveBeenCalledTimes(1);
 });
+it("cannot use an administrator test point as the real zone center", async () => {
+  render(<InternetGeofence api={api} position={{latitude:1,longitude:2,accuracy_m:8,observed_at:new Date().toISOString(),simulated:true,source:"admin_test"}} clock={Date.now()} />);
+  await screen.findByDisplayValue("Hogar");
+  const button=screen.getByRole("button",{name:"Usar posición recibida como centro"});
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(button);
+  expect((screen.getByLabelText("Latitud del centro") as HTMLInputElement).value).toBe("0");
+  expect(api.save).not.toHaveBeenCalled();
+});
 it("read-only viewers cannot edit or save a zone", async () => {
   vi.mocked(api.load).mockResolvedValue({can_configure:false,geofence:zone});
   render(<InternetGeofence api={api} position={null} clock={Date.now()} />);

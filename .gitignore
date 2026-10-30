@@ -9,6 +9,7 @@ build/
 dist/
 release/
 interfaz_web/static/
+interfaz_web/dist-acceso/
 *.log
 # Personal data and secrets
 *.sqlite*

@@ -18,6 +18,14 @@ it("missing GPS does not manufacture a position or require a belt", () => {
   expect(screen.getByText(/Sin ubicación recibida/)).toBeTruthy();
   expect(screen.queryByLabelText("Mapa de la última ubicación del celular")).toBeNull();
 });
+it("shows a persistent administrator test warning instead of a real fresh position", () => {
+  const now=Date.now();
+  render(<RemoteLocation position={{latitude:1,longitude:2,accuracy_m:8,observed_at:new Date(now).toISOString(),simulated:true,source:"admin_test"}} clock={now} />);
+  expect(screen.getByRole("status").textContent).toContain("PRUEBA");
+  expect(screen.getByText(/Lectura de prueba/)).toBeTruthy();
+  expect(screen.queryByText(/Posición reciente/)).toBeNull();
+  expect(mocks.marker.setStyle).toHaveBeenLastCalledWith({color:"#b7791f"});
+});
 it("old GPS remains clearly historical", () => {
   render(<RemoteLocation position={{latitude:0,longitude:0,accuracy_m:20,observed_at:"2020-01-01T00:00:00Z"}} clock={Date.now()} />);
   expect(screen.getByText(/Última posición conocida, no actual/)).toBeTruthy();

@@ -8,7 +8,7 @@ from preparar_entrega_actual import digest, validate_archive
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14'), default='1.2.0-rc14')
+parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14', '1.2.0-rc15'), default='1.2.0-rc15')
 version = parser.parse_args().version
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 archive = root / 'release' / f'SFA-Asistencia-{version}-Windows.zip'
@@ -38,12 +38,18 @@ if captures.is_dir():
 (folder / 'VERSION.txt').write_text(
     f'SFA Asistencia Windows {version}\n'
     f'EXE SHA-256: {digest(source_exe)}\n'
-    'Android compatible: 0.7.1-release (APK no incluida en este ZIP)\n', encoding='utf-8')
+    'Android recomendado: 0.7.3-release (APK no incluida en este ZIP)\n', encoding='utf-8')
 (folder / 'LEEME.txt').write_text(f'''SFA Asistencia {version} - Candidata local Windows x64
 
 Extraer TODO el ZIP en una carpeta con permiso de escritura.
 Abrir SFA_Asistencia.exe. No requiere Python ni Node.js instalados.
 No abrir esta copia junto al Centro habitual: cada copia aislada tiene sus datos.
+
+Novedad rc15: el GPS de prueba confirmado por un administrador se ve en el mapa
+habitual con aviso PRUEBA. No borra GPS real ni genera incidentes de geocerca.
+Una nueva lectura real puede sustituirlo; detener o caducar devuelve el GPS real.
+Requiere Android 0.7.3 para emitir la prueba y la migracion de roles activada.
+Guia: Documentacion/FLUJO_ROLES_ANDROID.md. Los permisos antiguos se conservan.
 
 Novedad rc14: monitoreo por cuenta de una ficha existente, separado del emisor PC.
 Tabla de relaciones de cuidado y referencia de ficha visible en el mapa.

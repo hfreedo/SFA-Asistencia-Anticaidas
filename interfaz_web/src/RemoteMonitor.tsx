@@ -6,6 +6,7 @@ import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
 import { type RemotePosition } from "./RemoteLocation";
 import { RemoteGeofence } from "./RemoteGeofence";
 import { IncidentPanel } from "./IncidentPanel";
+import { loadMapPosition } from "./mapPosition";
 
 type Resident = { id: string; full_name: string; room: string };
 type Sample = { id: string; observed_at: string; received_at: string; payload: { state?: string; accel_g?: number; tilt_deg?: number; motion?: number; fall_count?: number; simulated?: boolean } };
@@ -160,11 +161,8 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
     if (!selected) return;
     const load = async () => {
       try {
-        const result = await accessDataClient(session.access_token).from("sfa_positions")
-          .select("latitude,longitude,accuracy_m,observed_at").eq("resident_id", selected).eq("simulated", false)
-          .order("observed_at", { ascending: false }).limit(1);
-        if (result.error) throw new Error();
-        if (active) { setPosition(result.data?.[0] ?? null); setPositionError(""); }
+        const result = await loadMapPosition(session.access_token, selected);
+        if (active) { setPosition(result); setPositionError(""); }
       } catch { if (active) { setPosition(null); setPositionError("No se pudo consultar la ubicación remota."); } }
     };
     void load();

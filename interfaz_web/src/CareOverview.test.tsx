@@ -8,6 +8,12 @@ const position={latitude:-25.3,longitude:-57.6,accuracy_m:8,observed_at:new Date
 const feed:IncidentFeed={events:[{id:"remote",event_type:"GEOCERCA_SALIDA",observed_at:position.observed_at,simulated:false,detail:{text:"Salida remota"},actor_id:null,outcome:null,updated_at:null}],zone:{state:"outside",last_confirmed:"outside",observed_at:position.observed_at},checkedAt:now,error:""};
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 describe("person-first overview",()=>{
+  it("never attributes a real zone evaluation to an administrator test coordinate",()=>{
+    render(<CareLocationSummary residentId={7} source="remote" onSourceChange={vi.fn()} local={null} remote={{id:7,position:{...position,simulated:true,source:"admin_test"},error:""}} feed={feed} now={now} onMap={vi.fn()} onPrepare={vi.fn()} onRefresh={vi.fn()}/>);
+    expect(screen.getByText("PRUEBA · GPS del celular administrador")).toBeTruthy();
+    expect(screen.queryByText("Fuera de la zona")).toBeNull();
+    expect(screen.queryByText("Ubicación reciente recibida")).toBeNull();
+  });
   it("removes the duplicate remedy only for remote GPS with a confirmed paused session",()=>{
     const props={residentId:7,source:"remote" as const,onSourceChange:vi.fn(),local:null,remote:{id:7,position:null,error:"Sin sesión"},feed,now,onMap:vi.fn(),onPrepare:vi.fn(),onRefresh:vi.fn()};
     const {rerender}=render(<CareLocationSummary {...props} connectionPaused/>);

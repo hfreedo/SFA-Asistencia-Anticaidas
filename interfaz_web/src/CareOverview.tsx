@@ -67,20 +67,21 @@ export function CareLocationSummary({ residentId,source,onSourceChange,local,rem
   remote:GpsReading|null; feed:IncidentFeed|null; now:number; onMap:()=>void; onPrepare:()=>void; onRefresh:()=>void; connectionPaused?:boolean;
 }) {
   const position = source === "remote" ? remote?.position ?? null : local?.position ?? null;
+  const simulated = source === "remote" && remote?.position?.simulated === true;
   const fresh = recentPosition(position,now);
   const age = positionAge(position,now);
   const zoneFresh = !!feed && !feed.error && recentStamp(feed.zone?.observed_at,now);
   const zone = source === "remote" ? zoneFresh && feed?.zone ? locationLabel(feed.zone.state) : "Zona sin evaluación reciente"
     : local && fresh ? locationLabel(local.status) : "Zona sin evaluación reciente";
   const error = source === "remote" ? remote?.error : local?.status === "error" ? "No se pudo consultar el GPS local." : "";
-  const title = !residentId ? "Selecciona a la persona cuidada" : error ? "Ubicación sin verificar" : !position ? "Sin posición recibida" : !fresh ? "Ubicación desactualizada" : position.accuracy_m > 100 ? "GPS recibido con baja precisión" : "Ubicación reciente recibida";
-  const warning=!!error || !!position && (!fresh || position.accuracy_m>100);
+  const title = !residentId ? "Selecciona a la persona cuidada" : error ? "Ubicación sin verificar" : simulated ? "PRUEBA · GPS del celular administrador" : !position ? "Sin posición recibida" : !fresh ? "Ubicación desactualizada" : position.accuracy_m > 100 ? "GPS recibido con baja precisión" : "Ubicación reciente recibida";
+  const warning=simulated || !!error || !!position && (!fresh || position.accuracy_m>100);
   return <section className={`care-location-overview${warning ? " is-warning" : ""}`} aria-labelledby="care-location-title">
     <div className="care-overview-heading"><h2 id="care-location-title"><MapPin size={21}/>Ubicación y zona</h2>
       {source === "remote" && <button className="care-icon-action" title="Consultar ubicación por internet" aria-label="Consultar ubicación por internet" disabled={!residentId} onClick={onRefresh}><RefreshCw size={17}/></button>}</div>
     <div className="geo-source-selector" role="group" aria-label="Fuente de ubicación del resumen">
       <button aria-pressed={source==="remote"} onClick={()=>onSourceChange("remote")}>Por internet</button><button aria-pressed={source==="local"} onClick={()=>onSourceChange("local")}>Red local</button></div>
-    <div className="care-location-body"><div><strong>{title}</strong><p>{error && connectionPaused && source === "remote" ? "No se puede confirmar la ubicación actual." : error || zone}</p>
+    <div className="care-location-body"><div><strong>{title}</strong><p>{simulated ? "No es la ubicación real de la persona ni evalúa su geocerca." : error && connectionPaused && source === "remote" ? "No se puede confirmar la ubicación actual." : error || zone}</p>
       {position && <div className="care-position-meta"><span>Precisión ±{Math.round(position.accuracy_m)} m{fresh ? "" : " · última lectura"}</span><span>Última posición {relativeAge(age)}</span></div>}
       {source === "remote" && !position && !error && <p>{remote ? "Esperando un envío desde el celular vinculado." : "Consultando el GPS por internet…"}</p>}</div>
       <div className="care-overview-actions"><button className="resident-button link-resident" disabled={!residentId} onClick={onMap}>Ver mapa y geocerca<ArrowRight size={17}/></button>

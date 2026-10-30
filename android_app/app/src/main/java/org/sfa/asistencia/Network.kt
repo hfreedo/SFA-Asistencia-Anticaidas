@@ -13,7 +13,7 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 
-class ApiFailure(val status: Int) : IOException("Solicitud rechazada ($status)")
+class ApiFailure(val status: Int, val code: String? = null) : IOException("Solicitud rechazada ($status)")
 
 fun readLimited(stream: InputStream, limit: Int): ByteArray {
     val output = ByteArrayOutputStream()
@@ -58,7 +58,10 @@ class NativeApi(private val context: Context) {
         try {
             if (body != null) { connection.requestMethod = "POST"; connection.doOutput = true; connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) } }
             val status = connection.responseCode
-            if (status !in 200..299) throw ApiFailure(status)
+            if (status !in 200..299) {
+                val code = runCatching { connection.errorStream?.use { JSONObject(String(readLimited(it, 32768), Charsets.UTF_8)).optString("code") } }.getOrNull()
+                throw ApiFailure(status, code)
+            }
             return connection.inputStream.use { String(readLimited(it, 1048576), Charsets.UTF_8) }
         } finally { connection.disconnect() }
     }
@@ -90,6 +93,17 @@ class NativeApi(private val context: Context) {
     }
     fun remotePositions(token: String, resident: String): JSONArray {
         require(resident.matches(Regex("[0-9a-fA-F-]{36}")))
+        try {
+            val result = rpc("sfa_map_position", token, JSONObject().put("p_resident", resident))
+            check(result.has("position")) { "Respuesta de mapa invalida" }
+            if (result.isNull("position")) return JSONArray()
+            val point = result.getJSONObject("position")
+            check(point.get("simulated") is Boolean && point.getString("source") == if (point.getBoolean("simulated")) "admin_test" else "phone")
+            val lat = point.getDouble("latitude"); val lng = point.getDouble("longitude"); val accuracy = point.getDouble("accuracy_m")
+            check(lat.isFinite() && lat in -90.0..90.0 && lng.isFinite() && lng in -180.0..180.0 && accuracy.isFinite() && accuracy > 0 && accuracy <= 10000)
+            java.time.Instant.parse(point.getString("observed_at"))
+            return JSONArray().put(point)
+        } catch (error: ApiFailure) { if (error.status != 404 || error.code != "PGRST202") throw error }
         return JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.$resident&simulated=eq.false&order=observed_at.desc&limit=1", token))
     }
     fun remoteResidents(token: String): JSONArray = JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_residents?select=id,space_id,full_name,room&archived_at=is.null&order=full_name", token))

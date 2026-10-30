@@ -246,8 +246,18 @@ class CloudSync:
         people = self.transport('/rest/v1/sfa_residents?select=id,full_name,room&id=eq.' + resident + '&archived_at=is.null', token)
         if not isinstance(people, list) or not any(p.get('id') == resident for p in people if isinstance(p, dict)):
             raise CloudError(403, 'resident_access')
-        rows = self.transport('/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.'
-                              + resident + '&simulated=eq.false&order=observed_at.desc&limit=1', token)
+        try:
+            mapped = self.transport('/rest/v1/rpc/sfa_map_position', token, {'p_resident': resident})
+            if not isinstance(mapped, dict) or 'position' not in mapped:
+                raise CloudError(503, 'position_response')
+            if mapped['position'] is not None and (not isinstance(mapped['position'], dict) or 'simulated' not in mapped['position']):
+                raise CloudError(503, 'position_response')
+            rows = [] if mapped['position'] is None else [mapped['position']]
+        except CloudError as exc:
+            if exc.status != 404 or exc.code != 'PGRST202':
+                raise
+            rows = self.transport('/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.'
+                                  + resident + '&simulated=eq.false&order=observed_at.desc&limit=1', token)
         with self.session_lock:
             if (self.view_session or self.session) != session:
                 raise CloudError(401, 'session_changed')
@@ -262,6 +272,10 @@ class CloudSync:
                 if not all(math.isfinite(v) for v in (lat, lng, accuracy)) or not (-90 <= lat <= 90 and -180 <= lng <= 180 and 0 < accuracy <= 10000) or stamp.tzinfo is None:
                     raise ValueError()
                 position = dict(latitude=lat, longitude=lng, accuracy_m=accuracy, observed_at=stamp.isoformat())
+                if 'simulated' in row:
+                    if not isinstance(row['simulated'], bool) or row.get('source') != ('admin_test' if row['simulated'] else 'phone'):
+                        raise ValueError()
+                    position.update(simulated=row['simulated'],source=row['source'])
             except (ValueError, KeyError, TypeError, AttributeError):
                 raise CloudError(503, 'position_response') from None
         person = next(p for p in people if isinstance(p, dict) and p.get('id') == resident)

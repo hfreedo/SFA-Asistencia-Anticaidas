@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
         var binding by remember { mutableStateOf(bindingStore.load()) }
         var incoming by remember { mutableStateOf<PhoneBinding?>(null) }
         var importCa by remember { mutableStateOf(false) }
-        var tab by remember { mutableIntStateOf(0) }
+        var tab by remember { mutableIntStateOf(1) }
         var message by remember { mutableStateOf("") }
         var operationError by remember { mutableStateOf("") }
         var busy by remember { mutableStateOf(false) }
@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
         var residents by remember { mutableStateOf(JSONArray()) }
         var capabilities by remember { mutableStateOf<Map<String, PersonCapabilities>>(emptyMap()) }
         val canCare = capabilities.values.any { it.care }
+        val canEmit = capabilities.values.any { it.emit }
+        val canAdminTest = capabilities.values.any { it.adminTest }
         var events by remember { mutableStateOf(JSONArray()) }
         var selected by remember { mutableStateOf("") }
         var devices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -104,11 +106,15 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(canCare, selected, capabilities) {
             if (tab == 2 && !canCare) tab = 1
             if (selected.isNotEmpty() && capabilities[selected]?.care != true) { selected = ""; events = JSONArray(); positions = JSONArray() }
+            if (tab == 0 && !capabilities.values.any { it.emit }) tab = 1
         }
-        suspend fun refreshAccess(token: String) {
+        suspend fun refreshAccess(token: String): Map<String, PersonCapabilities> {
             try {
                 val result = withContext(Dispatchers.IO) { val people = api.remoteResidents(token); people to api.remoteCapabilities(token, people) }
                 residents = result.first; capabilities = result.second
+                if (result.second.values.none { it.emit } && state.running) {
+                    stopService(Intent(this@MainActivity, TrackingService::class.java))
+                }
                 if (cloudResident.isNotEmpty() && capabilities[cloudResident]?.emit != true) {
                     stopService(Intent(this@MainActivity, TrackingService::class.java))
                     cloudDevice = null; cloudResident = ""; cloudPerson = ""; gpsConsent = false
@@ -116,6 +122,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val carePerson = capabilities.entries.firstOrNull { it.value.care }?.key
                 if (carePerson != null) push.verify(token, carePerson)
+                return result.second
             } catch (error: Exception) { capabilities = emptyMap(); residents = JSONArray(); throw error }
         }
         LaunchedEffect(tab, selected, jwt != null, foreground) {
@@ -148,6 +155,7 @@ class MainActivity : ComponentActivity() {
             } finally { pushActive = push.enabled; acceptsTests = push.acceptsTests; busy = false } }
         }
         fun sendSos(simulated: Boolean) = work(refreshSession = false) {
+            check(capabilities[cloudResident]?.emit == true) { "Esta cuenta no tiene permiso de emisión real" }
             val device = cloudDevice ?: error("Selecciona la persona primero")
             withContext(Dispatchers.IO) { api.queueSos(device, simulated) }
             sosNotice = "Solicitud guardada en este celular; aún no se confirmó el registro remoto."
@@ -161,6 +169,7 @@ class MainActivity : ComponentActivity() {
             else message = "Activa el permiso de notificaciones para recibir avisos"
         }
         fun startTracking() {
+            if (!canEmit) { message = "Esta cuenta no puede iniciar seguimiento real. Usa Pruebas si eres administrador."; return }
             if (remoteGps && cloudDevice != null && !gpsConsent) { message = "Autoriza el envío de ubicación antes de iniciar"; return }
             val gpsReady = if (remoteGps) cloudDevice != null else binding != null
             if (!gpsReady && belt == null) { message = "Vincula un residente para compartir GPS. No necesitas cinturón."; return }
@@ -226,9 +235,9 @@ class MainActivity : ComponentActivity() {
                     }
                     HorizontalDivider(color = SfaBorder)
                     NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
-                        NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, label = { Text("Compartir") }, icon = { Icon(Icons.Outlined.LocationOn, null) })
+                        if (canEmit) NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, label = { Text("Mi seguimiento") }, icon = { Icon(Icons.Outlined.LocationOn, null) })
                         NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, label = { Text("Recuerdos") }, icon = { Icon(Icons.Outlined.PhotoLibrary, null) })
-                        NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, label = { Text(if (canCare) "Cuidar" else "Cuenta") }, icon = { Icon(if (canCare) Icons.Outlined.FavoriteBorder else Icons.Outlined.PersonOutline, null) })
+                        NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, label = { Text(if (canAdminTest) "Supervisar" else if (canCare) "Cuidar" else "Cuenta") }, icon = { Icon(if (canCare) Icons.Outlined.FavoriteBorder else Icons.Outlined.PersonOutline, null) })
                         if (canCare) NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, label = { Text("Pruebas") }, icon = { Icon(Icons.Outlined.Science, null) })
                     }
                 }
@@ -247,15 +256,15 @@ class MainActivity : ComponentActivity() {
                 if (jwt != null && capabilities[incidentResident]?.care == true) IncidentFeed(incidentResident, api)
                 if (tab == 3) {
                     MemoryAlbum { message = it }
-                } else if (tab == 0) {
-                    SfaHeading("Comparte tu ubicación", "El cinturón es opcional para el seguimiento GPS.")
+                } else if (tab == 0 && canEmit) {
+                    SfaHeading("Mi seguimiento", "Este celular envía su propia ubicación. No es la ubicación del cuidador.")
                     SfaSection("Conexión", Icons.Outlined.Wifi)
                     SfaChoice("Por internet", "Wi-Fi o datos móviles · sin red compartida", Icons.Outlined.Cloud, remoteGps, !state.running) { remoteGps = true }
                     SfaChoice("Solo red local", "Conexión directa a tu PC", Icons.Outlined.Computer, !remoteGps, !state.running) { remoteGps = false }
                     if (remoteGps) {
                         if (jwt == null) SfaButton("Iniciar sesión para vincular", Icons.Outlined.Login, { tab = 1 })
                         else {
-                            SfaSection("Persona vinculada", Icons.Outlined.PersonOutline)
+                            SfaSection("Este celular comparte ubicación como", Icons.Outlined.PersonOutline)
                             Text("Esta cuenta solo puede emitir para las fichas autorizadas de abajo. La ficha elegida debe ser la misma que consulta su cuidador.", style = MaterialTheme.typography.bodySmall, color = SfaMuted)
                             if (cloudDevice != null) SfaBadge("GPS vinculado a $cloudPerson", true)
                             Row(verticalAlignment = Alignment.Top) { Checkbox(checked = gpsConsent, onCheckedChange = { gpsConsent = it }, enabled = !state.running); Text("Autorizo compartir la ubicación de este celular con Supabase y mis cuidadores autorizados.", Modifier.weight(1f).padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium, color = SfaMuted) }
@@ -319,6 +328,7 @@ class MainActivity : ComponentActivity() {
                     TextButton(onClick = { showTrackingHelp = !showTrackingHelp }, modifier = Modifier.heightIn(min = 48.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Sobre la continuidad del seguimiento") }
                     if (showTrackingHelp) Text(if (remoteGps) "La sesión se renueva mientras el proceso siga activo; al reiniciar debes iniciar sesión otra vez. Android puede detener el servicio por cierre forzado o restricciones de batería." else "El modo local necesita la misma red o hotspot que la PC. El GPS no depende del cinturón.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
                 } else if (tab == 2 && canCare) {
+                    if (canAdminTest && jwt != null) AdminGpsLab(api, residents, capabilities, foreground, selected) { selected = it }
                     if (jwt != null && pushActive) Row(verticalAlignment = Alignment.Top) {
                         Checkbox(checked = acceptsTests, enabled = !busy, onCheckedChange = { enabled -> work { push.consentTests(jwt!!, enabled); message = if (enabled) "Este celular acepta pruebas de cuidadores autorizados" else "Recepción de pruebas desactivada" } })
                         Text("Aceptar pruebas SOS de las personas a mi cuidado en este celular", Modifier.weight(1f).padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium)
@@ -327,13 +337,13 @@ class MainActivity : ComponentActivity() {
                         localTest = { message = if (localAlarmTest(this@MainActivity)) "Prueba local publicada. Revisa la bandeja de notificaciones; el sonido depende de Android." else "Activa las notificaciones de SFA y su canal de alertas en Ajustes de Android." },
                         remoteTest = { work { push.test(jwt!!, selected); message = "Prueba en cola para este celular. Esperando a la PC emisora; esto todavía no confirma recepción." } })
                 } else {
-                    SfaHeading(if (jwt == null) "Acceso a SFA" else if (canCare) "Personas a tu cuidado" else "Mi cuenta", if (jwt == null) "Acceso privado para personas autorizadas." else if (canCare) "Ubicación, eventos y avisos del celular." else "Permisos de esta cuenta y envío de ubicación.")
+                    SfaHeading(if (jwt == null) "Acceso a SFA" else if (canAdminTest) "Monitoreo del espacio" else if (canCare) "Personas que cuido" else "Mi cuenta", if (jwt == null) "Acceso privado para personas autorizadas." else if (canAdminTest) "Supervisas fichas; este modo no comparte la ubicación de tu celular." else if (canCare) "Consultas la ubicación de las personas asignadas y recibes sus alertas." else "Tu seguimiento se inicia desde Mi seguimiento.")
                     if (jwt == null) {
                         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico") }, leadingIcon = { Icon(Icons.Outlined.MailOutline, null) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy)
                         OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña") }, leadingIcon = { Icon(Icons.Outlined.Lock, null) }, trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") } }, visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy)
                         SfaButton("Iniciar sesión", Icons.Outlined.Login, onClick = { val enteredPassword = password; password = ""; work {
                             val token = withContext(Dispatchers.IO) { api.login(email.trim(), enteredPassword) }
-                            refreshAccess(token); jwt = token; message = "Sesión verificada; permisos de la cuenta recibidos"
+                            val access = refreshAccess(token); jwt = token; tab = RolePolicy.homeTab(access.values); message = "Sesión verificada; permisos de la cuenta recibidos"
                         } }, enabled = !busy && !state.running && email.isNotBlank() && password.isNotBlank())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Outlined.VerifiedUser, null, Modifier.size(16.dp), tint = SfaMuted); Text("Sin registro público. Tus permisos determinan qué residentes puedes consultar.", style = MaterialTheme.typography.bodySmall, color = SfaMuted) }
                     } else {
@@ -362,11 +372,16 @@ class MainActivity : ComponentActivity() {
                         monitoringAt?.let { Text("Consulta verificada hace ${((clock - it).coerceAtLeast(0) / 1000)} s · ${selected.take(8)}", style = MaterialTheme.typography.bodySmall, color = SfaMuted) }
                         if (positions.length() > 0) {
                             val position = positions.getJSONObject(0)
+                            val testPosition = position.optBoolean("simulated")
+                            if (testPosition) {
+                                SfaBadge("PRUEBA · GPS del celular administrador")
+                                Text("Este punto sustituye temporalmente la ubicación mostrada. No confirma dónde está la persona cuidada ni evalúa su salida real de geocerca.", style = MaterialTheme.typography.bodyMedium, color = SfaOrange)
+                            }
                             val stamp = java.time.Instant.parse(position.getString("observed_at"))
                             val age = (clock - stamp.toEpochMilli()) / 1000L
-                            Text(if (age in 0..90) "Ubicación reciente · ±${position.getDouble("accuracy_m").toInt()} m" else "Ubicación histórica · no confirma la posición actual", fontWeight = FontWeight.SemiBold)
+                            Text(if (testPosition) "Lectura de prueba · ±${position.getDouble("accuracy_m").toInt()} m" else if (age in 0..90) "Ubicación reciente · ±${position.getDouble("accuracy_m").toInt()} m" else "Ubicación histórica · no confirma la posición actual", fontWeight = FontWeight.SemiBold)
                             Text(stamp.atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm:ss")), style = MaterialTheme.typography.bodySmall, color = SfaMuted)
-                            SfaButton("Ver ubicación en mapa", Icons.Outlined.Map, { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:${position.getDouble("latitude")},${position.getDouble("longitude")}?q=${position.getDouble("latitude")},${position.getDouble("longitude")}"))) } catch (_: android.content.ActivityNotFoundException) { message = "No se encontró una aplicación de mapas instalada" } }, secondary = true)
+                            SfaButton(if (testPosition) "Ver punto de PRUEBA en mapa" else "Ver ubicación en mapa", Icons.Outlined.Map, { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:${position.getDouble("latitude")},${position.getDouble("longitude")}?q=${position.getDouble("latitude")},${position.getDouble("longitude")}"))) } catch (_: android.content.ActivityNotFoundException) { message = "No se encontró una aplicación de mapas instalada" } }, secondary = true)
                         } else if (selected.isNotEmpty() && monitoringError.isBlank()) Text("Esta ficha aún no tiene ubicación recibida. Revisa que Compartir esté enviando para la misma referencia y que el seguimiento esté activo.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
                         if (selected.isNotEmpty()) SfaSection("Eventos recientes", Icons.Outlined.History)
                         if (selected.isNotEmpty() && events.length() == 0) Text("Sin eventos recibidos", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)

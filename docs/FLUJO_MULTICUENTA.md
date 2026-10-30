@@ -1,5 +1,9 @@
 # GPS, SOS y cuidado entre cuentas
 
+El flujo Android por rol y el GPS de prueba del administrador se detallan en
+[Recorridos Android](FLUJO_ROLES_ANDROID.md). La migracion aditiva se activo en
+el espacio de pruebas el 30/10/2026. En otra instalacion requiere aplicarla.
+
 ## La ficha es el punto de encuentro
 
 | Elemento | Que representa | Accion necesaria |

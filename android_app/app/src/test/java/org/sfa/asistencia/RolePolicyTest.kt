@@ -15,11 +15,25 @@ class RolePolicyTest {
     @Test fun administratorInAnotherSpaceCannotElevateResident() {
         val roles = listOf(MembershipGrant("a", "resident"), MembershipGrant("b", "admin"))
         assertFalse(RolePolicy.capabilities("a", "r", roles, listOf(PersonGrant("a", "r", true))).care)
-        assertEquals(PersonCapabilities(true, true), RolePolicy.capabilities("b", "s", roles, emptyList()))
+        assertEquals(PersonCapabilities(true, false, true), RolePolicy.capabilities("b", "s", roles, emptyList()))
     }
     @Test fun unknownRevokedOrDuplicateMembershipFailsClosed() {
         assertEquals(PersonCapabilities(false, false), RolePolicy.capabilities("a", "r", emptyList(), listOf(PersonGrant("a", "r", true))))
         assertFalse(RolePolicy.capabilities("a", "r", listOf(MembershipGrant("a", "unknown")), emptyList()).care)
         assertFalse(RolePolicy.capabilities("a", "r", listOf(MembershipGrant("a", "admin"), MembershipGrant("a", "resident")), emptyList()).care)
+    }
+    @Test fun administratorCannotEmitEvenWithAnExplicitSharingGrant() {
+        val capability = RolePolicy.capabilities("a", "r", listOf(MembershipGrant("a", "admin")), listOf(PersonGrant("a", "r", true)))
+        assertTrue(capability.care); assertTrue(capability.adminTest); assertFalse(capability.emit)
+    }
+    @Test fun homeReflectsRoleRatherThanAlwaysOpeningSharing() {
+        assertEquals(1, RolePolicy.homeTab(listOf(PersonCapabilities(true, false, true))))
+        assertEquals(1, RolePolicy.homeTab(listOf(PersonCapabilities(true, true))))
+        assertEquals(0, RolePolicy.homeTab(listOf(PersonCapabilities(false, true))))
+        assertEquals(1, RolePolicy.homeTab(emptyList()))
+    }
+    @Test fun testPermissionCannotBeInheritedFromAnotherSpace() {
+        val capability = RolePolicy.capabilities("a", "r", listOf(MembershipGrant("a", "resident"), MembershipGrant("b", "admin")), listOf(PersonGrant("a", "r", true)))
+        assertFalse(capability.adminTest); assertTrue(capability.emit)
     }
 }

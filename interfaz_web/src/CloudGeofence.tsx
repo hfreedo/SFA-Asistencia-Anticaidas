@@ -54,7 +54,7 @@ export function InternetGeofence({ api, position, clock }: { api: ZoneApi; posit
         <div className="cloud-zone-coordinates"><label>Latitud del centro<input type="number" step="any" min={-90} max={90} required value={lat} onChange={event => { setLat(event.target.value); setDirty(true); }} /></label>
           <label>Longitud del centro<input type="number" step="any" min={-180} max={180} required value={lng} onChange={event => { setLng(event.target.value); setDirty(true); }} /></label></div>
         <GeofenceRadius value={radius} onChange={value => { setRadius(value); setDirty(true); }} />
-        <div className="cloud-zone-actions"><button type="button" className="resident-button access-secondary" disabled={!position} onClick={() => { if (position) { setLat(String(position.latitude)); setLng(String(position.longitude)); setDirty(true); } }}><LocateFixed size={17} />Usar posición recibida como centro</button>
+        <div className="cloud-zone-actions"><button type="button" className="resident-button access-secondary" disabled={!position || position.simulated === true} onClick={() => { if (position && !position.simulated) { setLat(String(position.latitude)); setLng(String(position.longitude)); setDirty(true); } }}><LocateFixed size={17} />Usar posición recibida como centro</button>
           <button type="button" className="resident-button access-secondary" aria-pressed={editing} onClick={() => setEditing(value => !value)}><Pencil size={17} />{editing ? "Terminar selección en mapa" : "Elegir centro en el mapa"}</button>
           <button type="submit" className="resident-button link-resident access-primary" disabled={!valid || !dirty || !label.trim()}><Save size={17} />Guardar zona remota</button></div>
       </fieldset>

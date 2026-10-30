@@ -1,5 +1,20 @@
 # Changelog
 
+## Windows 1.2.0-rc15 / Android 0.7.3 - Recorridos por rol y GPS de prueba
+
+- Entrada segun rol: Mi seguimiento, Personas que cuido o Monitoreo del espacio.
+- Administrador con confirmacion explicita de prueba para compartir su GPS en el
+  mapa habitual de una ficha. Aviso permanente en app, panel y portal compatibles.
+- Punto temporal separado del historial real; una lectura real posterior puede
+  reemplazarlo. Detener/caducar la prueba devuelve la ultima posicion real.
+- Migracion aditiva que conserva roles, historiales y permisos antiguos, sin
+  alterar el puente PC/FCM ni los emisores reales de residentes y cuidadores.
+- La prueba no escribe posiciones/eventos reales ni dispara geocercas o FCM.
+- Migracion activada el 30/10/2026; hashes de roles, asignaciones y permiso GPS
+  previo iguales antes/despues. No se enviaron pruebas GPS ni alertas reales.
+- 143 tests web, 116 backend y 81 comprobaciones SQL aisladas. Validacion fisica
+  Android pendiente, no sustituida por compilacion.
+
 ## Candidatas Windows 1.2.0-rc14 / Android 0.7.2 - Flujo multicuenta
 
 - Monitoreo de fichas existentes por cuenta, separado de la creacion del emisor PC

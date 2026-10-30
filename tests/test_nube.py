@@ -14,6 +14,14 @@ RESIDENT = '33333333-3333-4333-8333-333333333333'
 DEVICE = '44444444-4444-4444-8444-444444444444'
 
 
+def legacy_map(transport):
+    def wrapped(path, token, body=None):
+        if path.endswith('/sfa_map_position'):
+            raise CloudError(404, 'PGRST202')
+        return transport(path, token, body)
+    return wrapped
+
+
 class CloudSyncTests(unittest.TestCase):
     def setUp(self):
         environment = patch.dict('os.environ', {'SFA_FCM_CREDENTIALS_FILE': ''})
@@ -160,7 +168,7 @@ class CloudSyncTests(unittest.TestCase):
             if 'sfa_residents?' in path: return [{'id': RESIDENT, 'full_name': 'Remote fixture'}]
             if 'sfa_positions?' in path: return []
             raise AssertionError('Monitoring must not create residents or emit data')
-        self.cloud.transport = transport
+        self.cloud.transport = legacy_map(transport)
         self.cloud.monitor('CAREGIVER_JWT', 1, RESIDENT)
         self.assertEqual(self.cloud.session, (OWNER, 'PRIVATE_JWT'))
         result = self.cloud.remote_location(1)
@@ -190,7 +198,7 @@ class CloudSyncTests(unittest.TestCase):
             if path == '/auth/v1/user': return {'id': OWNER}
             self.cloud.pause()
             return [{'id': RESIDENT}]
-        self.cloud.transport = transport
+        self.cloud.transport = legacy_map(transport)
         with self.assertRaises(CloudError) as failure: self.cloud.monitor('JWT', 1, RESIDENT)
         self.assertEqual(failure.exception.code, 'session_changed')
         with self.cloud.connection() as conn:
@@ -209,7 +217,7 @@ class CloudSyncTests(unittest.TestCase):
         def transport(path, token, body=None):
             calls.append((path,token))
             return [{'id':RESIDENT}] if 'sfa_residents?' in path else [row]
-        self.cloud.transport=transport
+        self.cloud.transport=legacy_map(transport)
         result=self.cloud.remote_location(1)
         self.assertEqual(result['position'],row)
         self.assertIn('simulated=eq.false',calls[1][0])
@@ -225,12 +233,30 @@ class CloudSyncTests(unittest.TestCase):
             if 'sfa_residents?' in path: return [{'id':RESIDENT}]
             self.cloud.pause()
             return []
-        self.cloud.transport=transport
+        self.cloud.transport=legacy_map(transport)
         with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
         self.assertEqual(error.exception.status,401)
 
     def test_remote_gps_rejects_malformed_provider_position(self):
         self.cloud.transport=lambda path,*args: [{'id':RESIDENT}] if 'sfa_residents?' in path else [{'latitude':91}]
+        with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
+        self.assertEqual(error.exception.code,'position_response')
+
+    def test_remote_map_preserves_test_labels_without_legacy_fallback(self):
+        point = dict(latitude=1,longitude=2,accuracy_m=8,observed_at=datetime.now(timezone.utc).isoformat(),simulated=True,source='admin_test')
+        self.cloud.transport=Mock(side_effect=[[{'id':RESIDENT}],{'position':point}])
+        self.assertEqual(self.cloud.remote_location(1)['position'],point)
+        self.cloud.transport.assert_called_with('/rest/v1/rpc/sfa_map_position','PRIVATE_JWT',{'p_resident':RESIDENT})
+        self.assertEqual(self.cloud.transport.call_count,2)
+
+    def test_remote_map_never_falls_back_after_authorization_failure(self):
+        self.cloud.transport=Mock(side_effect=[[{'id':RESIDENT}],CloudError(403,'42501')])
+        with self.assertRaises(CloudError): self.cloud.remote_location(1)
+        self.assertEqual(self.cloud.transport.call_count,2)
+
+    def test_remote_map_rejects_disguised_test_point(self):
+        point = dict(latitude=1,longitude=2,accuracy_m=8,observed_at=datetime.now(timezone.utc).isoformat(),simulated=True,source='phone')
+        self.cloud.transport=Mock(side_effect=[[{'id':RESIDENT}],{'position':point}])
         with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
         self.assertEqual(error.exception.code,'position_response')
 
@@ -250,7 +276,7 @@ class CloudSyncTests(unittest.TestCase):
         def transport(*args):
             self.cloud.pause()
             return {'can_configure':True,'geofence':None}
-        self.cloud.transport=transport
+        self.cloud.transport=legacy_map(transport)
         with self.assertRaises(CloudError) as error: self.cloud.remote_geofence(1)
         self.assertEqual(error.exception.code,'session_changed')
 
@@ -274,7 +300,7 @@ class CloudSyncTests(unittest.TestCase):
         def transport(*args):
             self.cloud.pause()
             return {'can_attend':True,'events':[]}
-        self.cloud.transport=transport
+        self.cloud.transport=legacy_map(transport)
         with self.assertRaises(CloudError) as error: self.cloud.remote_incidents(1)
         self.assertEqual(error.exception.code,'session_changed')
 
@@ -297,7 +323,7 @@ class CloudSyncTests(unittest.TestCase):
                 if path.endswith('sfa_claim_push_v2'):
                     return [{'id':'job','lease':'lease','is_test':True}]
                 return {}
-            self.cloud.transport = transport
+            self.cloud.transport = legacy_map(transport)
             self.cloud.flush_push('fixture-token')
             self.assertTrue(calls[0].endswith('sfa_claim_push_v2'))
             self.cloud.push_sender.send.assert_called_once_with({'id':'job','lease':'lease','is_test':True})

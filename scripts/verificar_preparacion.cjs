@@ -12,7 +12,9 @@ const people = process.argv.includes('--people');
 const quiet = process.argv.includes('--quiet');
 const unverified = process.argv.includes('--unverified');
 const independent = process.argv.includes('--independent');
-const home = process.argv.includes('--home') || quiet;
+const gpsTest = process.argv.includes('--gps-test');
+const home = process.argv.includes('--home') || quiet || gpsTest;
+const testPoint = () => ({latitude:-25.3,longitude:-57.6,accuracy_m:8,observed_at:new Date().toISOString(),simulated:true,source:'admin_test'});
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff' };
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -41,6 +43,11 @@ const server = http.createServer((req, res) => {
           '/auth/v1/user': user,
           '/rest/v1/rpc/sfa_accept_team_invites': { accepted: 0 },
           '/rest/v1/rpc/sfa_push_test_targets': { devices: [] },
+          '/rest/v1/rpc/sfa_map_position': {position: testPoint()},
+          '/rest/v1/rpc/sfa_get_geofence': {can_configure:true,geofence:null},
+          '/rest/v1/rpc/sfa_incidents': {can_attend:true,viewer_id:user.id,events:[]},
+          '/rest/v1/sfa_events': [],
+          '/rest/v1/sfa_samples': [],
           '/rest/v1/sfa_memberships': [{ space_id: 'fixture-space', role: 'admin' }],
           '/rest/v1/sfa_spaces': [{ id: 'fixture-space', name: 'Espacio de demostracion' }],
           '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración' }],
@@ -121,7 +128,9 @@ const server = http.createServer((req, res) => {
       else if (url.pathname === '/api/network-info') data = {url:origin,port:server.address().port,addresses:['127.0.0.1'],lan_available:false};
       if (home && url.pathname === '/api/cloud/residents/7/location') {
         status=200; data={position:{latitude:-25.3,longitude:-57.6,accuracy_m:8,observed_at:new Date(Date.now()-(quiet ? 21711000 : 0)).toISOString()}};
+        if (gpsTest) data={position:testPoint()};
       }
+      if (gpsTest && url.pathname === '/api/cloud/residents/7/geofence') {status=200;data={can_configure:true,geofence:null};}
       if (home && url.pathname === '/api/cloud/residents/7/incidents') {
         status=200; data={can_attend:false,viewer_id:'fixture',events:[{id:'fixture-exit',event_type:'GEOCERCA_SALIDA',observed_at:new Date().toISOString(),simulated:false,detail:{text:'Salida de demostracion'},actor_id:null,outcome:null,updated_at:null}],zone_status:{state:'outside',last_confirmed:'outside',observed_at:new Date().toISOString()}};
         if (quiet) data={can_attend:false,viewer_id:'fixture',events:[],zone_status:{state:'stale',last_confirmed:'unknown',observed_at:new Date(Date.now()-21711000).toISOString()}};
@@ -130,6 +139,22 @@ const server = http.createServer((req, res) => {
     });
     for (const [width, height] of [[1920, 1080], [1366, 768], [390, 844]]) {
       await page.setViewportSize({ width, height });
+      if (gpsTest) {
+        await page.goto(`${origin}/${portal ? 'acceso.html' : ''}?gps-test=${width}`);
+        if (portal) {
+          await page.getByLabel('Residente remoto').selectOption('fixture-person');
+        } else {
+          await page.getByText('PRUEBA · GPS del celular administrador',{exact:true}).waitFor();
+          await page.getByRole('button',{name:'Ver mapa y geocerca'}).click();
+        }
+        await page.getByText('PRUEBA · GPS del celular administrador',{exact:true}).waitFor();
+        assert.equal(await page.getByRole('button',{name:'Usar posición recibida como centro'}).isDisabled(),true);
+        assert.equal(await page.getByText('Posición reciente',{exact:true}).count(),0);
+        await page.evaluate(()=>document.fonts.ready);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Test map overflow at ${width}`);
+        await page.screenshot({path:path.join(output,`${portal ? 'portal' : 'panel'}-gps-test-${width}.png`),fullPage:true});
+        continue;
+      }
       if (portal) {
         await page.goto(`${origin}/acceso.html?qa=${width}`);
         await page.getByRole('button', { name: 'Personas y equipo', exact: true }).click();

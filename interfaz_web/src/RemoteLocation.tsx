@@ -3,7 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { LocateFixed, MapPin } from "lucide-react";
 
-export type RemotePosition = { latitude: number; longitude: number; accuracy_m: number; observed_at: string };
+export type RemotePosition = { latitude: number; longitude: number; accuracy_m: number; observed_at: string; simulated?: boolean; source?: "phone" | "admin_test" };
 export type MapGeofence = { home_lat: number; home_lng: number; radius_m: number };
 export function RemoteLocation({ position, clock, geofence = null, onSelectCenter }: {
   position: RemotePosition | null; clock: number; geofence?: MapGeofence | null;
@@ -46,7 +46,7 @@ export function RemoteLocation({ position, clock, geofence = null, onSelectCente
     const center: L.LatLngExpression = [position.latitude, position.longitude];
     current.marker ??= L.circleMarker(center, { radius: 8, fillOpacity: 1 }).addTo(current.map);
     current.accuracy ??= L.circle(center, { color: "#0d9488", fillOpacity: .08, weight: 1 }).addTo(current.map);
-    current.marker.setLatLng(center).setStyle({ color: fresh ? "#0d9488" : "#64748b" });
+    current.marker.setLatLng(center).setStyle({ color: position.simulated ? "#b7791f" : fresh ? "#0d9488" : "#64748b" });
     current.accuracy.setLatLng(center).setRadius(Math.max(0, position.accuracy_m));
   }, [position, fresh, hasPosition, hasMap]);
   useEffect(() => {
@@ -59,7 +59,8 @@ export function RemoteLocation({ position, clock, geofence = null, onSelectCente
   }, [geofence, hasZone, hasMap]);
   return <section className="cloud-location" aria-labelledby="cloud-location-title">
     <div className="cloud-section-title"><MapPin size={19} /><h3 id="cloud-location-title">Ubicación del celular</h3></div>
-    {!hasPosition || !position ? <p className="cloud-footnote">Sin ubicación recibida. El celular puede compartir GPS sin cinturón, usando Wi-Fi o datos móviles.</p> : <p className={fresh ? "cloud-signal fresh" : "cloud-warning"}>{fresh ? "Posición reciente" : "Última posición conocida, no actual"} · precisión ±{Math.round(position.accuracy_m)} m</p>}
+    {position?.simulated && <div role="status" className="cloud-warning"><strong>PRUEBA · GPS del celular administrador</strong><p>Este punto sustituye temporalmente la ubicación mostrada. No confirma dónde está la persona cuidada ni genera incidentes reales de geocerca.</p></div>}
+    {!hasPosition || !position ? <p className="cloud-footnote">Sin ubicación recibida. El celular puede compartir GPS sin cinturón, usando Wi-Fi o datos móviles.</p> : <p className={!position.simulated && fresh ? "cloud-signal fresh" : "cloud-warning"}>{position.simulated ? "Lectura de prueba" : fresh ? "Posición reciente" : "Última posición conocida, no actual"} · precisión ±{Math.round(position.accuracy_m)} m</p>}
     {hasMap && <>
       <div className="cloud-map-toolbar">
         {hasZone && <button type="button" className="resident-button access-secondary" onClick={() => { const current = layers.current; if (current?.zone) current.map.fitBounds(current.zone.getBounds(), { maxZoom: 19, padding: [30,30] }); }}><MapPin size={17} />Ver zona</button>}

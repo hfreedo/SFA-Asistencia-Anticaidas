@@ -10,7 +10,7 @@ function builder(value: unknown) {
     then: resolve => Promise.resolve(value).then(resolve) };
   return chain;
 }
-vi.mock("./accessClient", () => ({ accessDataClient: () => ({ from: (table: string) => builder(mock.responses[table]) }) }));
+vi.mock("./accessClient", () => ({ accessDataClient: () => ({ from: (table: string) => builder(mock.responses[table]), rpc: () => Promise.resolve({ data: null, error: { code: "PGRST202" } }) }) }));
 vi.mock("./IncidentPanel", () => ({ IncidentPanel: () => null }));
 vi.mock("./RemoteGeofence", () => ({ RemoteGeofence: () => null }));
 import { RemoteMonitor } from "./RemoteMonitor";
