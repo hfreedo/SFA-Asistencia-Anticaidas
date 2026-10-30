@@ -8,7 +8,7 @@ from preparar_entrega_actual import digest, validate_archive
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3'), default='1.2.0-rc13.3')
+parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14'), default='1.2.0-rc14')
 version = parser.parse_args().version
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 archive = root / 'release' / f'SFA-Asistencia-{version}-Windows.zip'
@@ -44,6 +44,11 @@ if captures.is_dir():
 Extraer TODO el ZIP en una carpeta con permiso de escritura.
 Abrir SFA_Asistencia.exe. No requiere Python ni Node.js instalados.
 No abrir esta copia junto al Centro habitual: cada copia aislada tiene sus datos.
+
+Novedad rc14: monitoreo por cuenta de una ficha existente, separado del emisor PC.
+Tabla de relaciones de cuidado y referencia de ficha visible en el mapa.
+Guia: docs/FLUJO_MULTICUENTA.md. Android complementario: 0.7.2-release.
+El push requiere receptor registrado y PC emisora FCM activa; no es cloud autonomo.
 
 Novedad rc13.3: confirmacion integrada para salir de formularios, con cancelacion
 por Escape y foco en seguir editando. Comprobacion preventiva de permisos antes

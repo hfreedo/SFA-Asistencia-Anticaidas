@@ -50,4 +50,11 @@ describe("remote monitoring", () => {
     expect(await screen.findByText("Aún no hay un perfil sincronizado")).toBeTruthy();
     expect(screen.queryByText("Residente de prueba")).toBeNull();
   });
+  it("requires choosing the ficha instead of silently displaying the first of several", async () => {
+    mock.responses.sfa_residents = { data: [{ id: "first", full_name: "Persona uno", room: "A" }, { id: "second", full_name: "Persona dos", room: "B" }], error: null };
+    render(<RemoteMonitor session={session} spaces={[]} />);
+    expect(await screen.findByText("Selecciona a quién quieres monitorear")).toBeTruthy();
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
+    expect(screen.queryByText("Aún no hay un perfil sincronizado")).toBeNull();
+  });
 });

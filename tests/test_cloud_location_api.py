@@ -14,6 +14,27 @@ def request(host='127.0.0.1', origin=None):
 
 
 class CloudLocationApiTests(unittest.TestCase):
+    def test_monitor_link_is_loopback_only_and_requires_session(self):
+        import uuid
+        body = main.CloudMonitorRequest(local_resident_id=12, remote_resident_id=uuid.UUID('33333333-3333-4333-8333-333333333333'))
+        with patch.object(main.cloud_sync, 'monitor', return_value={'linked': True}) as monitor:
+            for incoming in (request('203.0.113.9'), request(origin='https://untrusted.invalid')):
+                with self.assertRaises(HTTPException): main.cloud_monitor(body, incoming, 'Bearer fixture')
+            with self.assertRaises(HTTPException): main.cloud_monitor(body, request(), '')
+            monitor.assert_not_called()
+            main.cloud_monitor(body, request(), 'Bearer fixture')
+            monitor.assert_called_once_with('fixture', 12, str(body.remote_resident_id))
+
+    def test_monitor_session_routes_do_not_pause_emitter_and_reject_lan(self):
+        with patch.object(main.cloud_sync, 'monitor_session') as resume, patch.object(main.cloud_sync, 'pause_monitor') as pause, patch.object(main.cloud_sync, 'pause') as emitter:
+            for incoming in (request('203.0.113.9'), request(origin='https://untrusted.invalid')):
+                with self.assertRaises(HTTPException): main.cloud_monitor_session(incoming, 'Bearer fixture')
+                with self.assertRaises(HTTPException): main.cloud_pause_monitor(incoming)
+            resume.assert_not_called(); pause.assert_not_called()
+            main.cloud_monitor_session(request(), 'Bearer fixture')
+            main.cloud_pause_monitor(request())
+            resume.assert_called_once_with('fixture'); pause.assert_called_once()
+            emitter.assert_not_called()
     def test_push_tests_require_loopback_origin_and_explicit_confirmation(self):
         import uuid
         device=uuid.UUID('66666666-6666-4666-8666-666666666666')

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+vi.mock("./LocalCareLink", () => ({ LocalCareLink: () => <p>Monitorear una ficha existente</p> }));
 
 const mock = vi.hoisted(() => ({
   getSession: vi.fn(), getUser: vi.fn(), signIn: vi.fn(), reset: vi.fn(), from: vi.fn(),
@@ -57,16 +58,29 @@ describe("SFA access screen", () => {
     expect(screen.queryByRole("main")).toBeNull();
     expect(screen.queryByRole("link", { name: /SFA Asistencia, inicio/ })).toBeNull();
   });
-  it("a verified caregiver cannot bind the PC through embedded access", async () => {
+  it("a caregiver can monitor an existing ficha but cannot create a PC emitter", async () => {
     mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
     mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
     mock.from.mockImplementation((table: string) => table === "sfa_memberships"
       ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "caregiver" }], error: null }) }) }) }
       : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
     render(<AccessApp embedded activeResidentId={7} />);
-    expect(await screen.findByText(/necesita intervenir un administrador/)).toBeTruthy();
+    expect(await screen.findByText("Monitorear una ficha existente")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Vincular y sincronizar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Personas y equipo" })).toBeNull();
+  });
+  it("caregiver logout pauses monitoring without stopping the PC emitter", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true }); vi.stubGlobal("fetch", fetcher);
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
+    mock.from.mockImplementation((table: string) => table === "sfa_memberships"
+      ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "caregiver" }], error: null }) }) }) }
+      : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
+    render(<AccessApp embedded activeResidentId={7}/>);
+    fireEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
+    await waitFor(() => expect(mock.signOut).toHaveBeenCalled());
+    expect(fetcher).toHaveBeenCalledWith("/api/cloud/monitor/pause", { method: "POST" });
+    expect(fetcher.mock.calls.some(call => call[0] === "/api/cloud/pause")).toBe(false);
   });
   it("embedded recovery keeps the existing authorized portal return path", async () => {
     render(<AccessApp embedded />);

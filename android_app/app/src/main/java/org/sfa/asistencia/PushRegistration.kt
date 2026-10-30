@@ -24,6 +24,17 @@ class PushRegistration(private val context: Context) {
     val renewalPending get() = preferences.getBoolean("renewal_pending", false)
     val acceptsTests get() = preferences.getBoolean("accept_tests", false)
     val configured get() = FirebaseApp.getApps(context).isNotEmpty()
+    suspend fun verify(jwt: String, resident: String): Boolean {
+        if (!enabled) return false
+        val installation = preferences.getString("installation", null) ?: return false
+        val result = try { withContext(Dispatchers.IO) { NativeApi(context).rpc("sfa_push_test_targets", jwt, JSONObject().put("p_resident", resident)) } }
+        catch (error: kotlinx.coroutines.CancellationException) { throw error }
+        catch (_: Exception) { preferences.edit().putBoolean("renewal_pending", true).commit(); return false }
+        val devices = result.getJSONArray("devices")
+        val present = (0 until devices.length()).any { devices.getJSONObject(it).getString("installation_id") == installation }
+        preferences.edit().putBoolean("renewal_pending", !present).commit()
+        return present
+    }
     suspend fun consentTests(jwt: String, active: Boolean) {
         check(enabled)
         val installation = preferences.getString("installation", null) ?: error("Sin registro")
@@ -49,7 +60,8 @@ class PushRegistration(private val context: Context) {
             val token = if (active) messaging.token.result() else null
             val body = JSONObject().put("p_installation", installation).put("p_token", token ?: JSONObject.NULL).put("p_enabled", active).toString()
             withContext(Dispatchers.IO) {
-                NativeApi(context).request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/rpc/sfa_register_push", jwt, body)
+                val result = JSONObject(NativeApi(context).request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/rpc/sfa_register_push", jwt, body))
+                check(result.getBoolean("enabled") == active)
             }
             if (!active) {
                 messaging.isAutoInitEnabled = false

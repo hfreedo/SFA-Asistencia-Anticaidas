@@ -9,6 +9,7 @@ import { LocalSync, RemoteMonitor } from "./RemoteMonitor";
 import { isLocalPortal } from "./cloudPolicy";
 import { TeamPanel } from "./TeamPanel";
 import { withTeamDraftExit } from "./teamDraftGuard";
+import { LocalCareLink } from "./LocalCareLink";
 
 type Membership = { space_id: string; role: string; name: string };
 const INITIAL_MODE = callbackMode(window.location.search, window.location.hash);
@@ -133,7 +134,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
     setBusy(true); setError("");
     try {
       if (isLocalPortal(window.location) || (embedded && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname))) {
-        const paused = await fetch("/api/cloud/pause", { method: "POST" });
+        const paused = await fetch(memberships.some(m => m.role === "admin") ? "/api/cloud/pause" : "/api/cloud/monitor/pause", { method: "POST" });
         if (!paused.ok) throw new Error("pause");
       }
       const { error: problem } = await client.auth.signOut({ scope: "local" });
@@ -172,13 +173,13 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
           signedIn ? <div className="access-account">{personContext ? <details className="person-account-details"><summary>Sesión de {user?.email}</summary>{accountIdentity}</details> : accountIdentity}
             {memberships.length > 0 && session && <>
               {!personContext && <nav className="portal-navigation" aria-label="Vistas del espacio">
-                <button aria-pressed={view === "monitor"} onClick={() => { if (view !== "monitor") withTeamDraftExit(() => setView("monitor")); }}><LayoutDashboard size={18} />{embedded ? "Vincular esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
+                <button aria-pressed={view === "monitor"} onClick={() => { if (view !== "monitor") withTeamDraftExit(() => setView("monitor")); }}><LayoutDashboard size={18} />{embedded ? "Monitoreo de esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
                 {memberships.some(m => m.role === "admin") && <button aria-pressed={view === "people"} onClick={() => setView("people")}><UsersRound size={18} />Personas y equipo</button>}
               </nav>}
               {view === "people" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} initialResidentId={personContext?.resident_id} initialSpaceId={personContext?.space_id} initialSection="people" onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : embedded
                 ? memberships.some(m => m.role === "admin")
-                  ? activeResidentId ? <LocalSync key={`${user?.id}:${activeResidentId}`} session={session} spaces={memberships.filter(m => m.role === "admin")} activeResidentId={activeResidentId} /> : <p className="access-stage-note">Selecciona un perfil local antes de vincular esta PC.</p>
-                  : <p className="access-stage-note">{memberships.some(m => m.role === "caregiver") ? "Tu acceso permite cuidar." : "Tu cuenta corresponde a una persona cuidada."} {personContext ? "Solo un administrador puede gestionar el equipo y las cuentas de esta ficha." : "Para vincular esta PC necesita intervenir un administrador del espacio."}</p>
+                  ? activeResidentId ? <><LocalCareLink session={session} localId={activeResidentId}/><details><summary>Emisor PC · crear y sincronizar una ficha nueva</summary><LocalSync key={`${user?.id}:${activeResidentId}`} session={session} spaces={memberships.filter(m => m.role === "admin")} activeResidentId={activeResidentId} /></details></> : <p className="access-stage-note">Selecciona un perfil local antes de vincular esta PC.</p>
+                  : memberships.some(m => m.role === "caregiver") && !personContext ? <LocalCareLink session={session} localId={activeResidentId}/> : <p className="access-stage-note">Tu cuenta corresponde a una persona cuidada o no administra esta ficha. Solo un administrador gestiona el equipo.</p>
                 : <RemoteMonitor session={session} spaces={memberships} />}
             </>}
             {!personContext && <button type="button" className="access-secondary" disabled={busy} onClick={() => withTeamDraftExit(() => { void logout(); })}><LogOut size={18} />Cerrar sesión</button>}

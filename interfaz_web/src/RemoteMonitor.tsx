@@ -109,6 +109,8 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(Date.now());
+  const [receivers, setReceivers] = useState<number | null>(null);
+  const [receiverError, setReceiverError] = useState(false);
   useEffect(() => {
     let active = true;
     const data = accessDataClient(session.access_token);
@@ -116,13 +118,24 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
       const result = await data.from("sfa_residents").select("id,full_name,room").is("archived_at", null).order("full_name");
       if (!active) return;
       if (result.error) { setResidents([]); setSelected(""); setError("No se pudo consultar el directorio remoto."); }
-      else { const list = result.data ?? []; setResidents(list); setSelected(previous => list.some(r => r.id === previous) ? previous : list[0]?.id ?? ""); setError(""); }
+      else { const list = result.data ?? []; setResidents(list); setSelected(previous => list.some(r => r.id === previous) ? previous : list.length === 1 ? list[0].id : ""); setError(""); }
       setLoading(false);
     };
     void load().catch(() => { if (active) { setError("Sin conexión con el monitoreo remoto."); setLoading(false); } });
     const timer = window.setInterval(() => void load().catch(() => { if (active) setError("Sin conexión con el monitoreo remoto."); }), 10000);
     return () => { active = false; window.clearInterval(timer); };
   }, [session.access_token]);
+  useEffect(() => {
+    let active = true;
+    setReceivers(null); setReceiverError(false);
+    if (!selected || !spaces.some(s => s.role === "admin" || s.role === "caregiver")) return;
+    void Promise.resolve(accessDataClient(session.access_token).rpc("sfa_push_test_targets", { p_resident: selected })).then(result => {
+      if (!active) return;
+      if (result.error || !Array.isArray(result.data?.devices)) setReceiverError(true);
+      else setReceivers(result.data.devices.length);
+    }).catch(() => { if (active) setReceiverError(true); });
+    return () => { active = false; };
+  }, [selected, session.access_token, spaces]);
   useEffect(() => {
     let active = true;
     setSample(null); setEvents([]); setPosition(null); setPositionError("");
@@ -166,9 +179,11 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
     {isLocalPortal(window.location) && spaces.some(s => s.role === "admin") && <LocalSync session={session} spaces={spaces.filter(s => s.role === "admin")} />}
     <section className="cloud-remote" aria-labelledby="cloud-monitor-title">
       <div className="cloud-section-title"><Cloud size={21} /><h2 id="cloud-monitor-title">Monitoreo remoto</h2>
-        <label className="cloud-resident-picker"><UserRound size={18} /><select aria-label="Residente remoto" value={selected} onChange={e => setSelected(e.target.value)} disabled={!residents.length}>{!residents.length && <option value="">Sin residentes vinculados</option>}{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</select></label></div>
+        <label className="cloud-resident-picker"><UserRound size={18} /><select aria-label="Residente remoto" value={selected} onChange={e => setSelected(e.target.value)} disabled={!residents.length}><option value="">{residents.length ? "Seleccionar persona autorizada" : "Sin residentes vinculados"}</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name} · {r.id.slice(0,8)}</option>)}</select></label></div>
       {error && <p className="cloud-warning" role="alert">{error}</p>}
-      {loading ? <p role="status">Consultando residentes autorizados…</p> : !person ? <div className="cloud-empty"><Link2 size={26} /><strong>Aún no hay un perfil sincronizado</strong><p>Los perfiles locales se conservan en la PC.</p></div> : <>
+      {loading ? <p role="status">Consultando residentes autorizados…</p> : !person ? <div className="cloud-empty"><Link2 size={26} /><strong>{residents.length ? "Selecciona a quién quieres monitorear" : "Aún no hay un perfil sincronizado"}</strong><p>{residents.length ? "La referencia debe coincidir con la ficha elegida en Compartir en el celular emisor." : "Los perfiles locales se conservan en la PC."}</p></div> : <>
+        <p className="cloud-footnote">Ficha remota: {person.full_name} · {person.id.slice(0,8)}. GPS y SOS se consultan para esta ficha, independientemente del cinturón.</p>
+        <details><summary>Recepción de avisos en tu cuenta</summary>{receiverError ? <p role="status">No se pudo verificar el registro de celulares.</p> : receivers !== null ? <p>{receivers ? `${receivers} celular(es) registrado(s) para tu cuenta.` : "Sin celulares registrados para recibir FCM. Activa avisos desde Cuidar > Alertas en tu Android."}</p> : <p>Registro no consultado.</p>}<p className="cloud-footnote">El mapa y los incidentes web no requieren FCM. El envío push actual necesita la PC emisora configurada y activa; las pruebas SOS requieren aceptar pruebas en cada celular receptor.</p></details>
         <div className="cloud-person"><div><h3>{person.full_name}</h3><p>{person.room}</p></div><span className={fresh ? `cloud-signal ${["CAIDA_CONFIRMADA","POSIBLE_CAIDA"].includes(sample.payload.state ?? "") ? "critical" : "fresh"}` : "cloud-signal"}><Activity size={16} />{fresh ? STATE[sample.payload.state ?? ""] ?? "Lectura reciente" : sample?.payload.simulated ? "Muestra de simulación" : "Sin lecturas recientes"}</span></div>
         <IncidentPanel resident={selected} session={session} />
         <div className="cloud-metrics"><div><span>Aceleración</span><strong>{metric(sample?.payload.accel_g, " g")}</strong></div><div><span>Inclinación</span><strong>{metric(sample?.payload.tilt_deg, "°")}</strong></div><div><span>Movimiento</span><strong>{metric(sample?.payload.motion)}</strong></div></div>

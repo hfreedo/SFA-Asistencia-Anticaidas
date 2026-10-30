@@ -151,6 +151,58 @@ class CloudSyncTests(unittest.TestCase):
         with self.assertRaises(CloudError) as error: self.cloud.remote_location(1)
         self.assertEqual(error.exception.status,404)
 
+    def test_caregiver_monitoring_is_independent_of_bridge_owner_and_outbox(self):
+        caregiver = '55555555-5555-4555-8555-555555555555'
+        calls = []
+        def transport(path, token, body=None):
+            calls.append(path)
+            if path == '/auth/v1/user': return {'id': caregiver}
+            if 'sfa_residents?' in path: return [{'id': RESIDENT, 'full_name': 'Remote fixture'}]
+            if 'sfa_positions?' in path: return []
+            raise AssertionError('Monitoring must not create residents or emit data')
+        self.cloud.transport = transport
+        self.cloud.monitor('CAREGIVER_JWT', 1, RESIDENT)
+        self.assertEqual(self.cloud.session, (OWNER, 'PRIVATE_JWT'))
+        result = self.cloud.remote_location(1)
+        self.assertEqual(result['remote_resident_id'], RESIDENT)
+        self.assertEqual(result['remote_name'], 'Remote fixture')
+        self.assertEqual(self.cloud.status()['pending'], 0)
+        with self.cloud.connection() as conn:
+            self.assertEqual(conn.execute('SELECT owner_id FROM cloud_bindings').fetchone()[0], OWNER)
+        self.cloud.view_session = (OWNER, 'PRIVATE_JWT')
+        self.assertEqual(self.cloud.status()['monitor_links'], [])
+        self.cloud.pause()
+        with self.assertRaises(CloudError): self.cloud.remote_location(1)
+
+    def test_monitor_rejects_unauthorized_reference_and_later_revocation(self):
+        self.cloud.transport = lambda path, *args: {'id': OWNER} if path == '/auth/v1/user' else []
+        with self.assertRaises(CloudError) as failure: self.cloud.monitor('JWT', 1, RESIDENT)
+        self.assertEqual(failure.exception.status, 403)
+        self.assertEqual(self.cloud.status()['monitor_links'], [])
+        self.cloud.transport = lambda path, *args: {'id': OWNER} if path == '/auth/v1/user' else [{'id': RESIDENT}]
+        self.cloud.monitor('JWT', 1, RESIDENT)
+        self.cloud.transport = lambda *args: []
+        with self.assertRaises(CloudError) as failure: self.cloud.remote_location(1)
+        self.assertEqual(failure.exception.status, 403)
+
+    def test_monitor_never_persists_after_session_changes_during_verification(self):
+        def transport(path, token, body=None):
+            if path == '/auth/v1/user': return {'id': OWNER}
+            self.cloud.pause()
+            return [{'id': RESIDENT}]
+        self.cloud.transport = transport
+        with self.assertRaises(CloudError) as failure: self.cloud.monitor('JWT', 1, RESIDENT)
+        self.assertEqual(failure.exception.code, 'session_changed')
+        with self.cloud.connection() as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM cloud_monitor_links').fetchone()[0], 0)
+
+    def test_monitor_logout_does_not_stop_original_emitter(self):
+        self.cloud.view_session = ('55555555-5555-4555-8555-555555555555', 'VIEW_JWT')
+        self.cloud.pause_monitor()
+        self.assertIsNone(self.cloud.view_session)
+        self.assertEqual(self.cloud.session, (OWNER, 'PRIVATE_JWT'))
+        self.assertNotIn(b'VIEW_JWT', self.path.read_bytes())
+
     def test_remote_gps_uses_rls_and_does_not_persist_positions(self):
         row={'latitude':-25.3,'longitude':-57.6,'accuracy_m':9,'observed_at':datetime.now(timezone.utc).isoformat()}
         calls=[]

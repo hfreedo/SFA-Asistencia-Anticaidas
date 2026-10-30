@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import zipfile
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
@@ -91,6 +92,17 @@ try:
                                 styles.append(response.read().decode('utf-8'))
                         assert any('.team-select' in style and '.team-assignment' in style for style in styles), 'Old people/team styles'
                 print('PASS: packaged dashboard and portal contain the new people/team flow')
+            if '--multiaccount' in sys.argv:
+                assert any('Vincular monitoreo' in bundle and 'Relaciones de cuidado y envío GPS' in bundle for bundle in bundles)
+                for endpoint in ('/api/cloud/monitor-session', '/api/cloud/monitor'):
+                    body = {} if endpoint.endswith('session') else {'local_resident_id': 1, 'remote_resident_id': '33333333-3333-4333-8333-333333333333'}
+                    req = urllib.request.Request(base + endpoint, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'})
+                    try:
+                        urllib.request.urlopen(req, timeout=5, context=context)
+                        raise AssertionError('Monitoring must require authentication')
+                    except urllib.error.HTTPError as error:
+                        assert error.code == 401, (endpoint,error.code)
+                print('PASS: packaged multiaccount monitoring requires an authenticated session')
             if mobile:
                 def request(path, body=None, token=None, method=None):
                     req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,

@@ -30,14 +30,14 @@ Teleasistencia distribuida que conecta señales del cinturón y ubicación del c
 
 | Plataforma | Version vigente | Descarga directa | Notas y verificacion |
 | --- | --- | --- | --- |
-| **Windows 10/11 x64** | **1.2.0-rc13.3** | [Descargar Centro portable ZIP](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc13.3/SFA-Asistencia-1.2.0-rc13.3-Windows.zip) | [Release](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc13.3) · [SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc13.3/SFA-Asistencia-1.2.0-rc13.3.sha256) |
-| **Android 12 o posterior** | **0.7.1 release** | [Descargar APK firmada](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.7.1-android-release/SFA-Asistencia-Android-0.7.1-release.apk) | [Release](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.7.1-android-release) · [SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.7.1-android-release/SFA-Asistencia-Android-0.7.1-release.sha256) |
+| **Windows 10/11 x64** | **1.2.0-rc14** | [Descargar Centro portable ZIP](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc14/SFA-Asistencia-1.2.0-rc14-Windows.zip) | [Release](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v1.2.0-rc14) · [SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v1.2.0-rc14/SFA-Asistencia-1.2.0-rc14.sha256) |
+| **Android 12 o posterior** | **0.7.2 release** | [Descargar APK firmada](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.7.2-android-release/SFA-Asistencia-Android-0.7.2-release.apk) | [Release](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/tag/v0.7.2-android-release) · [SHA-256](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases/download/v0.7.2-android-release/SFA-Asistencia-Android-0.7.2-release.sha256) |
 
 Estas son las **candidatas de prueba mas recientes** de cada plataforma. Las
 versiones anteriores se conservan como historial. Windows incorpora Personas y
 equipo y preparacion unificada; Android diferencia las funciones por rol.
 Para actualizar Windows, cerrar el Centro y conservar `data/`, `.env` y los
-certificados propios. Android 0.7.1 mantiene la firma release de 0.7.0: actualizar
+certificados propios. Android 0.7.2 mantiene la firma release de 0.7.0: actualizar
 sin desinstalar conserva los datos y Recuerdos del celular.
 
 ## Del Sensor a la Atención
@@ -135,9 +135,9 @@ del mapa; los controles y funciones posteriores se documentan en las guías actu
 
 La interfaz de **Preparación unificada** reúne acceso y vínculo
 en el panel local. Consulta el [recorrido del operador](docs/PREPARACION_UNIFICADA.md).
-Está disponible en **Windows 1.2.0-rc13.3**, en las descargas de esta portada.
+Está disponible en **Windows 1.2.0-rc14**, en las descargas de esta portada.
 Los releases anteriores conservan sus accesos originales.
-rc12 y Android **0.7.1 release** separan gestion local y emision GPS y adaptan
+rc12 y Android **0.7.2 release** separan gestion local y emision GPS y adaptan
 las funciones visibles al rol. Limites: [Roles en demostracion](docs/ROLES_DEMOSTRACION.md).
 rc13 conecta cada ficha con sus cuidadores y su cuenta personal desde **Personas**.
 rc13.1 integra sus selectores, opciones y formulario con el estilo del panel.
@@ -153,7 +153,7 @@ con GPS remoto en el resumen y actividad local/remota identificada por origen.
 4. Para GPS remoto instala la APK publicada, utiliza una cuenta invitada e inicia **Compartir > Por internet**. Vincula la PC al mismo residente desde **Acceso y sincronización** si vas a consultar en el panel local.
 
 Destino de escritorio: Windows 10/11 x64; pruebas realizadas en Windows 11.
-Android requiere **12 o posterior**. La APK **0.7.1 release** conserva la firma propia
+Android requiere **12 o posterior**. La APK **0.7.2 release** conserva la firma propia
 de 0.6.2 e incorpora [Recuerdos](docs/RECUERDOS_ANDROID.md). La 0.6.1 anterior conserva firma debug. El cambio inicial de firma exige revisar
 la [guía de instalación y continuidad](docs/ANDROID_RELEASE.md) antes de reinstalar.
 La validación física de esta nueva entrega sigue pendiente.

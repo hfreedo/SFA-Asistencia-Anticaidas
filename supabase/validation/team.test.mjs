@@ -306,5 +306,28 @@ try {
     await login(2); await rpc('sfa_register_push',[id(102),null,false]);
     assert.deepEqual((await rpc('sfa_push_test_targets',[id(11)])).devices,[]);
   });
+  await check('two non-admin accounts share GPS and SOS only through the same assigned resident', async () => {
+    await db.exec('reset role');
+    for (const n of [50,51,52]) await db.query('insert into auth.users values($1,$2,now())',[id(n),`fixture${n}@example.invalid`]);
+    await db.query("insert into public.sfa_memberships values($1,$2,'caregiver',null),($1,$3,'resident',null),($1,$4,'caregiver',null)",[id(10),id(50),id(51),id(52)]);
+    await db.query('insert into public.sfa_resident_access(space_id,resident_id,user_id,can_configure,can_share_location) values($1,$2,$3,false,false),($1,$2,$4,false,true)',[id(10),id(12),id(50),id(51)]);
+    await login(51); const phone = await rpc('sfa_register_phone',[id(12)]);
+    await rpc('sfa_ingest_phone',[phone.device_id,id(500),{latitude:0,longitude:0,accuracy_m:5,observed_at:new Date().toISOString()}]);
+    await rpc('sfa_phone_sos',[phone.device_id,id(501),new Date().toISOString(),false]);
+    await denied(()=>rpc('sfa_team',[id(10)]));
+    await login(50);
+    assert.equal((await db.query('select count(*)::int n from public.sfa_positions where resident_id=$1',[id(12)])).rows[0].n,1);
+    assert.ok((await rpc('sfa_incidents',[id(12)])).events.some(e=>e.id===id(501)));
+    assert.deepEqual((await rpc('sfa_push_test_targets',[id(12)])).devices,[]);
+    await rpc('sfa_register_push',[id(502),'fixture_new_caregiver_registration',true]);
+    await db.exec('reset role'); await db.query("update public.sfa_events set received_at=now()-interval '31 seconds' where id=$1",[id(501)]);
+    await login(51); await rpc('sfa_phone_sos',[phone.device_id,id(503),new Date().toISOString(),false]);
+    await login(52);
+    assert.equal((await db.query('select count(*)::int n from public.sfa_positions where resident_id=$1',[id(12)])).rows[0].n,0);
+    await denied(()=>rpc('sfa_incidents',[id(12)]));
+    await db.exec('reset role');
+    assert.equal((await db.query('select count(*)::int n from sfa_private.push_jobs where event_id=$1 and installation_id=$2',[id(503),id(502)])).rows[0].n,1);
+    assert.equal((await db.query('select count(*)::int n from sfa_private.push_jobs where event_id=$1 and installation_id=$2',[id(501),id(502)])).rows[0].n,0);
+  });
   console.log(`${checks} team/incident checks passed (isolated PGlite, not live Auth/email/FCM).`);
 } finally { await db.close(); }

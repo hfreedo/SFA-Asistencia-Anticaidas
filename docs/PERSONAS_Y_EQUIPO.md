@@ -1,5 +1,10 @@
 # Personas y equipo
 
+Para comprobar GPS, SOS y avisos entre cuentas, consultar
+[Flujo multicuenta](FLUJO_MULTICUENTA.md). La tabla Relaciones de cuidado y envio
+GPS identifica las cuentas de cada ficha sin suponer que un permiso significa
+que el seguimiento o las notificaciones del celular estan activados.
+
 ## Dos conceptos, un recorrido
 
 La **ficha** representa a la persona cuidada. La **cuenta** permite entrar.

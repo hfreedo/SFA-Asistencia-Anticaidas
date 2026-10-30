@@ -17,7 +17,7 @@ it("explains a missing cloud session instead of pretending the phone is disconne
   fetchMock.mockResolvedValue({ok:false,status:401,json:async()=>({detail:{code:"session_required"}})});
   render(<LocalRemoteLocation residentId={1} residentName="Prueba"/>);
   expect(await screen.findByRole("alert")).toBeTruthy();
-  expect(screen.getByText(/Abre Preparación, inicia sesión/)).toBeTruthy();
+  expect(screen.getByText(/Abre Preparación e inicia sesión/)).toBeTruthy();
   expect(screen.getByRole("link").getAttribute("href")).toBe("/acceso/acceso.html");
 });
 it("opens preparation in the same panel when integrated", async()=>{

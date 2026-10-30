@@ -15,7 +15,7 @@ const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuid
 const accessSnapshot = (member: Member) => JSON.stringify({ role: member.role, access: member.access.map(a => [a.resident_id, a.can_configure, a.can_share_location]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))) });
 class TeamAccessChanged extends Error {}
 
-function TeamSelect({ icon: LeadingIcon, children, id, value, disabled, onChange }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
+export function TeamSelect({ icon: LeadingIcon, children, id, value, disabled, onChange }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
   const options = Children.toArray(children).filter(isValidElement<{ value: string; children: string } >).map(option => option.props);
   const placeholder = options.find(option => option.value === "")?.children;
   return <span className="team-select"><Select.Root value={String(value ?? "")} disabled={disabled} onValueChange={next => {
@@ -39,6 +39,7 @@ export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId,
 
 function TeamSpace({ space, session, onAccessChanged, initialResidentId, initialSection }: { space: Space; session: Session; onAccessChanged: () => void; initialResidentId?: string; initialSection: "people" | "team" }) {
   const [section, setSection] = useState<"people" | "team">(initialSection);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [personId, setPersonId] = useState(initialResidentId ?? "");
   const [formOpen, setFormOpen] = useState(initialSection === "team");
   const [addingCaregiver, setAddingCaregiver] = useState(false);
@@ -146,6 +147,16 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     {error && <p role="alert" className="cloud-warning">{error}</p>}
     {loadFailed && <button className="access-secondary" disabled={busy} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16}/>Reintentar consulta</button>}
     {notice && <p role="status" className="team-notice"><Check size={18} />{notice}</p>}
+    {!loading && !loadFailed && <details className="team-connections" onToggle={event => setConnectionsOpen(event.currentTarget.open)}><summary>Relaciones de cuidado y envío GPS</summary>
+      {connectionsOpen && <div className="team-connections-scroll"><table><caption>Las cuentas se comunican cuando comparten la misma ficha remota. Los permisos no activan automáticamente el celular.</caption><thead><tr><th scope="col">Ficha remota</th><th scope="col">Cuidadores asignados</th><th scope="col">Cuenta de la persona cuidada</th><th scope="col">GPS autorizado</th></tr></thead><tbody>
+        {residents.filter(r => !initialResidentId || r.id === initialResidentId).map(r => {
+          const caregivers = members.filter(m => m.role === "caregiver" && m.access.some(a => a.resident_id === r.id));
+          const personal = members.filter(m => m.role === "resident" && m.access.some(a => a.resident_id === r.id));
+          const emitters = members.filter(m => m.role !== "admin" && m.access.some(a => a.resident_id === r.id && a.can_share_location));
+          return <tr key={r.id}><th scope="row">{r.full_name}<small>{r.id.slice(0,8)}</small></th><td data-label="Cuidadores asignados">{caregivers.map(m => m.email).join(", ") || "Sin cuidador asignado"}</td><td data-label="Cuenta de la persona cuidada">{personal.map(m => m.email).join(", ") || "Sin cuenta personal"}</td><td data-label="GPS autorizado">{emitters.map(m => m.email).join(", ") || "Sin emisor limitado autorizado"}</td></tr>;
+        })}
+      </tbody></table></div>}<p className="cloud-footnote">Los administradores acceden a todas las fichas de su espacio. Para recibir avisos push, cada cuidador debe registrar su propio celular en Cuidar &gt; Alertas. Las pruebas SOS requieren además aceptar pruebas.</p>
+    </details>}
     <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section !== "people") withTeamDraftExit(() => { reset(); setSection("people"); }); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section !== "team") withTeamDraftExit(() => { reset(); setSection("team"); }); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
     {section === "people" && <section className="person-access-summary" aria-label="Cuidado y acceso de la persona">
       {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { const id = e.target.value; withTeamDraftExit(() => { setPersonId(id); reset(); }); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}

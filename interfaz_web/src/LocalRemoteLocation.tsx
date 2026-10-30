@@ -4,7 +4,7 @@ import { type RemotePosition } from "./RemoteLocation";
 import { InternetGeofence, type ZoneApi } from "./CloudGeofence";
 
 export function LocalRemoteLocation({ residentId, residentName, onPrepare }: { residentId?: number; residentName: string; onPrepare?: () => void }) {
-  const [result, setResult] = useState<{ id: number; position: RemotePosition | null; error: string; reference: string } | null>(null);
+  const [result, setResult] = useState<{ id: number; position: RemotePosition | null; error: string; reference: string; remoteName?: string; remoteId?: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [clock, setClock] = useState(Date.now());
   const [loading, setLoading] = useState(false);
@@ -31,12 +31,12 @@ export function LocalRemoteLocation({ residentId, residentName, onPrepare }: { r
         const data = await response.json();
         if (!response.ok) {
           const code = data?.detail?.code;
-          const error = response.status === 401 ? "Abre Preparación, inicia sesión y reanuda los envíos para habilitar la consulta remota."
+          const error = response.status === 401 ? "Abre Preparación e inicia sesión con tu cuenta de cuidador o administrador para consultar la ubicación."
             : response.status === 404 ? "Este perfil local todavía no está vinculado al residente de Supabase. Vincúlalo desde Preparación."
             : response.status === 403 ? "Abre el panel en localhost y comprueba que tu cuenta tenga acceso a este residente."
             : "No se pudo consultar Supabase. Revisa la conexión de esta PC.";
           if (active) setResult({ id: residentId, position: null, error, reference: typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? code : String(response.status) });
-        } else if (active) setResult({ id: residentId, position: data.position ?? null, error: "", reference: "" });
+        } else if (active) setResult({ id: residentId, position: data.position ?? null, error: "", reference: "", remoteName: data.remote_name, remoteId: data.remote_resident_id });
       } catch { if (active) setResult({ id: residentId, position: null, error: "No se pudo conectar con el servidor de esta PC.", reference: "network" }); }
       finally { pending = false; if (active) setLoading(false); }
     };
@@ -50,6 +50,7 @@ export function LocalRemoteLocation({ residentId, residentName, onPrepare }: { r
     <div className="geo-section-heading"><Cloud size={20} /><h3>GPS por internet · {residentName}</h3>
       <button type="button" className="resident-button" disabled={!residentId || loading} onClick={() => setRefresh(v => v + 1)}><RefreshCw size={17} />Actualizar</button></div>
     <p className="remote-gps-description">Ubicación compartida desde la app Android mediante Wi-Fi o datos móviles. No requiere cinturón ni la misma red que esta PC.</p>
+    {current?.remoteId && <p className="cloud-footnote">Ficha remota: <strong>{current.remoteName || "Persona autorizada"}</strong> · {current.remoteId.slice(0,8)}. El nombre del perfil local no determina quién envía el GPS.</p>}
     {!residentId ? <p role="status">Selecciona un residente para consultar su ubicación.</p> : current?.error ? <div className="geo-feedback error" role="alert"><Cloud size={19} /><div><strong>{current.error}</strong><p>Referencia: {current.reference}</p></div></div> : <>
       {!current && <p role="status">Consultando la ubicación remota…</p>}
       {current && <InternetGeofence key={residentId} api={zoneApi} position={current.position} clock={clock} />}

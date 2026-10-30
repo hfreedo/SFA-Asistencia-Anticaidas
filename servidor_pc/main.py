@@ -1121,6 +1121,11 @@ class CloudConnectRequest(BaseModel):
     consent: bool
 
 
+class CloudMonitorRequest(BaseModel):
+    local_resident_id: int = Field(gt=0)
+    remote_resident_id: UUID
+
+
 def require_cloud_operator(request: Request) -> None:
     require_local_operator(request)
     if not request.client or request.client.host not in {"127.0.0.1", "::1"}:
@@ -1245,6 +1250,32 @@ def cloud_connect(body: CloudConnectRequest, request: Request, authorization: st
         return cloud_sync.connect(token, body.resident_id, str(body.space_id))
     except CloudError as exc:
         raise HTTPException(exc.status, {"code": exc.code, "message": "No se pudo vincular la PC"}) from None
+
+
+@app.post("/api/cloud/monitor")
+def cloud_monitor(body: CloudMonitorRequest, request: Request, authorization: str = Header(default="")):
+    require_cloud_operator(request)
+    try:
+        return cloud_sync.monitor(cloud_bearer(authorization), body.local_resident_id, str(body.remote_resident_id))
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
+@app.post("/api/cloud/monitor-session")
+def cloud_monitor_session(request: Request, authorization: str = Header(default="")):
+    require_cloud_operator(request)
+    try:
+        cloud_sync.monitor_session(cloud_bearer(authorization))
+        return {'session_active': True}
+    except CloudError as exc:
+        raise HTTPException(exc.status, {"code": exc.code}) from None
+
+
+@app.post("/api/cloud/monitor/pause")
+def cloud_pause_monitor(request: Request):
+    require_cloud_operator(request)
+    cloud_sync.pause_monitor()
+    return {'session_active': False}
 
 
 @app.post("/api/cloud/session")

@@ -40,6 +40,7 @@ const server = http.createServer((req, res) => {
         const fixtures = {
           '/auth/v1/user': user,
           '/rest/v1/rpc/sfa_accept_team_invites': { accepted: 0 },
+          '/rest/v1/rpc/sfa_push_test_targets': { devices: [] },
           '/rest/v1/sfa_memberships': [{ space_id: 'fixture-space', role: 'admin' }],
           '/rest/v1/sfa_spaces': [{ id: 'fixture-space', name: 'Espacio de demostracion' }],
           '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración' }],
@@ -49,7 +50,7 @@ const server = http.createServer((req, res) => {
             { user_id: 'fixture-spare', email: 'nuevo-cuidador@example.invalid', role: 'caregiver', access: [] },
           ], invitations: [] },
         };
-        if (people && !['GET', 'OPTIONS'].includes(route.request().method()) && !['/rest/v1/rpc/sfa_team', '/rest/v1/rpc/sfa_accept_team_invites', '/rest/v1/rpc/sfa_incidents', '/rest/v1/rpc/sfa_get_geofence'].includes(pathname)) errors.push(`Unexpected cloud mutation: ${pathname}`);
+        if (people && !['GET', 'OPTIONS'].includes(route.request().method()) && !['/rest/v1/rpc/sfa_team', '/rest/v1/rpc/sfa_accept_team_invites', '/rest/v1/rpc/sfa_incidents', '/rest/v1/rpc/sfa_get_geofence', '/rest/v1/rpc/sfa_push_test_targets'].includes(pathname)) errors.push(`Unexpected cloud mutation: ${pathname}`);
         return route.fulfill({ status: fixtures[pathname] ? 200 : 403, contentType: 'application/json', body: JSON.stringify(fixtures[pathname] || {}) });
       });
     }
@@ -80,6 +81,14 @@ const server = http.createServer((req, res) => {
     async function choose(label, text) {
       await page.getByLabel(label, {exact:true}).click();
       await page.getByRole('option', {name:text,exact:true}).click();
+    }
+    async function checkConnections(width) {
+      await page.getByText('Relaciones de cuidado y envío GPS', { exact: true }).click();
+      await page.getByRole('table').waitFor();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Connections overflow at ${width}`);
+      await page.screenshot({ path: path.join(output, `${portal ? 'portal' : 'panel'}-relaciones-${width}.png`), fullPage: true });
+      await page.getByText('Relaciones de cuidado y envío GPS', { exact: true }).click();
+      await page.getByRole('table').waitFor({ state: 'detached' });
     }
     async function checkTeamDialog() {
       await page.getByRole('button', { name: 'Cerrar formulario', exact: true }).click();
@@ -133,6 +142,7 @@ const server = http.createServer((req, res) => {
         await page.evaluate(() => { window.scrollTo(0,0); return document.fonts.ready; });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Portal overflow at ${width}`);
         await page.screenshot({ path: path.join(output, `portal-personas-${width}.png`), fullPage: true });
+        await checkConnections(width);
         await checkTeamDialog();
         continue;
       }
@@ -154,6 +164,7 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.getByLabel('Correo electrónico', { exact: true }).count(), 0);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Care overflow at ${width}`);
         await page.screenshot({ path: path.join(output, `personas-cuidado-${width}.png`), fullPage: true });
+        await checkConnections(width);
         await page.getByRole('button', { name: 'Dar acceso a esta persona', exact: true }).click();
         await page.getByText('Ficha a la que corresponde esta cuenta', { exact: true }).waitFor();
         assert.equal(await page.getByRole('radio', { name: 'Residente de demostración', exact: true }).isChecked(), true);

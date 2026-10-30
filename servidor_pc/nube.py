@@ -29,6 +29,7 @@ class CloudSync:
         self.db_path = db_path
         self.transport = transport or self._http
         self.session = None
+        self.view_session = None
         self.session_lock = threading.Lock()
         self.send_lock = threading.Lock()
         self.push_error = None
@@ -84,6 +85,9 @@ class CloudSync:
                 attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0,
                 last_error TEXT, sent_at TEXT);
               CREATE INDEX IF NOT EXISTS cloud_outbox_pending ON cloud_outbox(status,next_attempt);
+              CREATE TABLE IF NOT EXISTS cloud_monitor_links (
+                local_resident_id INTEGER NOT NULL, owner_id TEXT NOT NULL,
+                resident_id TEXT NOT NULL, PRIMARY KEY(local_resident_id,owner_id));
             ''')
             conn.execute('INSERT OR IGNORE INTO cloud_installation VALUES (1,?)', (str(uuid.uuid4()),))
 
@@ -114,7 +118,7 @@ class CloudSync:
         except (OSError, ValueError):
             raise CloudError(503, 'network_or_response') from None
 
-    def authenticate(self, token):
+    def identity(self, token):
         if not token or len(token)>16384:
             raise CloudError(401)
         user = self.transport('/auth/v1/user', token)
@@ -122,6 +126,10 @@ class CloudSync:
             owner = str(uuid.UUID(user['id']))
         except (KeyError, ValueError, TypeError):
             raise CloudError(401) from None
+        return owner
+
+    def authenticate(self, token):
+        owner = self.identity(token)
         with self.session_lock:
             self.session = (owner, token)
         return owner
@@ -160,16 +168,47 @@ class CloudSync:
     def pause(self):
         with self.session_lock:
             self.session = None
+            self.view_session = None
+
+    def monitor(self, token, local_id, remote_id):
+        remote_id = str(uuid.UUID(remote_id))
+        owner = self.identity(token)
+        session = (owner, token)
+        with self.session_lock:
+            self.view_session = session
+        with self.connection() as conn:
+            if not conn.execute('SELECT 1 FROM residents WHERE id=?', (local_id,)).fetchone():
+                raise CloudError(404, 'local_resident_missing')
+        people = self.transport('/rest/v1/sfa_residents?select=id&id=eq.' + remote_id + '&archived_at=is.null', token)
+        if not isinstance(people, list) or not any(isinstance(p, dict) and p.get('id') == remote_id for p in people):
+            raise CloudError(403, 'resident_access')
+        with self.session_lock:
+            if self.view_session != session:
+                raise CloudError(401, 'session_changed')
+            with self.connection() as conn:
+                conn.execute('INSERT INTO cloud_monitor_links VALUES(?,?,?) ON CONFLICT(local_resident_id,owner_id) DO UPDATE SET resident_id=excluded.resident_id', (local_id,owner,remote_id))
+        return {'linked': True, 'remote_resident_id': remote_id}
+
+    def monitor_session(self, token):
+        owner = self.identity(token)
+        with self.session_lock:
+            self.view_session = (owner, token)
+
+    def pause_monitor(self):
+        with self.session_lock:
+            self.view_session = None
 
     def _bound_session(self, local_id):
         with self.session_lock:
-            session = self.session
+            session = self.view_session or self.session
         if not session:
             raise CloudError(401, 'session_required')
         owner, token = session
         with self.connection() as conn:
-            binding = conn.execute('SELECT resident_id FROM cloud_bindings WHERE local_resident_id=? AND owner_id=? AND enabled=1',
-                                   (local_id, owner)).fetchone()
+            binding = conn.execute('SELECT resident_id FROM cloud_monitor_links WHERE local_resident_id=? AND owner_id=?', (local_id,owner)).fetchone()
+            if binding is None:
+                binding = conn.execute('SELECT resident_id FROM cloud_bindings WHERE local_resident_id=? AND owner_id=? AND enabled=1',
+                                       (local_id, owner)).fetchone()
         if not binding:
             raise CloudError(404, 'resident_not_linked')
         resident = str(uuid.UUID(binding[0]))
@@ -182,7 +221,7 @@ class CloudSync:
             body.update(values)
         result = self.transport('/rest/v1/rpc/' + ('sfa_save_geofence' if values is not None else 'sfa_get_geofence'), session[1], body)
         with self.session_lock:
-            if self.session != session:
+            if (self.view_session or self.session) != session:
                 raise CloudError(401, 'session_changed')
         if not isinstance(result, dict) or not isinstance(result.get('can_configure'), bool):
             raise CloudError(503, 'geofence_response')
@@ -204,13 +243,13 @@ class CloudSync:
         session, resident = self._bound_session(local_id)
         owner, token = session
         # RLS is checked on every request. Never mirror private GPS into the LAN database.
-        people = self.transport('/rest/v1/sfa_residents?select=id&id=eq.' + resident + '&archived_at=is.null', token)
+        people = self.transport('/rest/v1/sfa_residents?select=id,full_name,room&id=eq.' + resident + '&archived_at=is.null', token)
         if not isinstance(people, list) or not any(p.get('id') == resident for p in people if isinstance(p, dict)):
             raise CloudError(403, 'resident_access')
         rows = self.transport('/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.'
                               + resident + '&simulated=eq.false&order=observed_at.desc&limit=1', token)
         with self.session_lock:
-            if self.session != session:
+            if (self.view_session or self.session) != session:
                 raise CloudError(401, 'session_changed')
         if not isinstance(rows, list):
             raise CloudError(503, 'position_response')
@@ -225,7 +264,9 @@ class CloudSync:
                 position = dict(latitude=lat, longitude=lng, accuracy_m=accuracy, observed_at=stamp.isoformat())
             except (ValueError, KeyError, TypeError, AttributeError):
                 raise CloudError(503, 'position_response') from None
-        return {'source': 'supabase', 'resident_id': local_id, 'remote_resident_id': resident, 'position': position}
+        person = next(p for p in people if isinstance(p, dict) and p.get('id') == resident)
+        return {'source': 'supabase', 'resident_id': local_id, 'remote_resident_id': resident,
+                'remote_name':str(person.get('full_name',''))[:160], 'position': position}
 
     def remote_incidents(self, local_id, action=None):
         session, resident = self._bound_session(local_id)
@@ -236,11 +277,11 @@ class CloudSync:
             if not any(isinstance(event, dict) and event.get('id') == action['p_event'] for event in snapshot['events']):
                 raise CloudError(404, 'incident_not_linked')
             with self.session_lock:
-                if self.session != session: raise CloudError(401, 'session_changed')
+                if (self.view_session or self.session) != session: raise CloudError(401, 'session_changed')
             self.transport('/rest/v1/rpc/sfa_attend_incident', session[1], action)
             snapshot = self.transport('/rest/v1/rpc/sfa_incidents', session[1], {'p_resident': resident})
         with self.session_lock:
-            if self.session != session: raise CloudError(401, 'session_changed')
+            if (self.view_session or self.session) != session: raise CloudError(401, 'session_changed')
         try:
             if not isinstance(snapshot.get('can_attend'), bool): raise ValueError()
             events = []
@@ -268,11 +309,13 @@ class CloudSync:
     def status(self):
         with self.session_lock:
             owner = self.session[0] if self.session else None
+            viewer = self.view_session[0] if self.view_session else owner
         with self.connection() as conn:
             counts = {r[0]:r[1] for r in conn.execute('SELECT status,count(*) FROM cloud_outbox GROUP BY status')}
             links = [dict(r) for r in conn.execute('SELECT local_resident_id,resident_id,device_id,space_id,enabled FROM cloud_bindings')]
+            monitors = [dict(r) for r in conn.execute('SELECT local_resident_id,resident_id FROM cloud_monitor_links WHERE owner_id=?', (viewer,))] if viewer else []
             last_error = conn.execute("SELECT last_error FROM cloud_outbox WHERE last_error IS NOT NULL ORDER BY rowid DESC LIMIT 1").fetchone()
-        return {'session_active': owner is not None, 'bindings': links,
+        return {'session_active': owner is not None, 'monitor_session_active': viewer is not None, 'bindings': links, 'monitor_links':monitors,
                 'pending': counts.get('pending',0), 'sent': counts.get('sent',0),
                 'blocked': counts.get('blocked',0), 'last_error': last_error[0] if last_error else None,
                 'push': {'configured': bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')), 'last_error': self.push_error}}
@@ -297,7 +340,7 @@ class CloudSync:
         except (KeyError,ValueError,TypeError,AttributeError):
             raise CloudError(503,'push_test_response') from None
         with self.session_lock:
-            if self.session != session: raise CloudError(401,'session_changed')
+            if (self.view_session or self.session) != session: raise CloudError(401,'session_changed')
         if installation is not None:
             if not os.getenv('SFA_FCM_CREDENTIALS_FILE'): raise CloudError(409,'push_not_configured')
             if installation not in [d['installation_id'] for d in devices]: raise CloudError(404,'receiver_unavailable')
@@ -307,7 +350,7 @@ class CloudSync:
                 event=str(uuid.UUID(result['event_id']))
             except (ValueError,TypeError,KeyError,AttributeError): raise CloudError(503,'push_test_response') from None
             with self.session_lock:
-                if self.session != session: raise CloudError(401,'session_changed')
+                if (self.view_session or self.session) != session: raise CloudError(401,'session_changed')
             return {'queued':True,'event_id':event}
         return {'devices':devices,'emitter_configured':bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')),'emitter_error':self.push_error is not None}
 

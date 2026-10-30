@@ -131,3 +131,19 @@
   .person-access-summary h3 { font-size:18px; }
 }
 @media(prefers-reduced-motion:reduce) { .people-team-tabs button,.team-workspace .team-select select { transition:none; } }
+.team-connections { margin: 16px 0; border-bottom: 1px solid #dce6eb; padding-bottom: 16px; }
+.team-connections summary { color: #087d79; font-weight: 600; cursor: pointer; }
+.team-connections-scroll { overflow-x: auto; max-width: 100%; margin-top: 12px; }
+.team-connections table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px; }
+.team-connections caption { text-align: left; color: #526573; padding-bottom: 12px; }
+.team-connections th, .team-connections td { padding: 12px; border-bottom: 1px solid #dce6eb; text-align: left; vertical-align: top; overflow-wrap: anywhere; max-width: 220px; }
+.team-connections thead th { color: #526573; font-weight: 500; }
+.team-connections small { display: block; color: #526573; font-weight: 400; }
+@media (max-width: 640px) {
+  .team-connections table, .team-connections tbody, .team-connections tr { display: block; min-width: 0; }
+  .team-connections thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .team-connections caption { display: block; }
+  .team-connections th, .team-connections td { display: block; max-width: none; border: 0; padding: 8px 0; }
+  .team-connections tr { padding: 8px 0; border-bottom: 1px solid #dce6eb; }
+  .team-connections td::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 12px; color: #526573; }
+}

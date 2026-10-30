@@ -1,5 +1,19 @@
 # Changelog
 
+## Candidatas Windows 1.2.0-rc14 / Android 0.7.2 - Flujo multicuenta
+
+- Monitoreo de fichas existentes por cuenta, separado de la creacion del emisor PC
+  y con sesion de lectura independiente para no reemplazar la sesion de envio.
+- Verificacion RLS de la ficha al vincular y en cada lectura; no copia GPS a SQLite
+  ni crea residentes para encontrar a alguien ya registrado en otra computadora.
+- Tabla de cuidadores, cuentas personales y permiso GPS por ficha; referencia
+  remota visible y seleccion explicita cuando el portal tiene varias fichas.
+- Android actualiza ubicacion/eventos en la vista del cuidador; comprueba el
+  registro del receptor en el servidor y aclara los requisitos de SOS de prueba.
+- Se conservan roles, asignaciones, claves y datos reales de Supabase sin cambios.
+- Limites: FCM sigue necesitando una PC emisora privada activa. La prueba fisica
+  de dos celulares y el control atomico de edicion de permisos siguen pendientes.
+
 ## Windows 1.2.0-rc13.3 - Confirmacion integrada de borradores
 
 - Dialogo visual de SFA para salir de formularios de equipo, cambiar ficha o
