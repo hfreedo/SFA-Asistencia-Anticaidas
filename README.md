@@ -154,7 +154,7 @@ con GPS remoto en el resumen y actividad local/remota identificada por origen.
 1. Descarga el **ZIP Windows** de [Releases](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases) y extrae todo su contenido en una carpeta con permiso de escritura.
 2. Abre `SFA_Asistencia.exe`: desde el Centro puedes iniciar o detener el servidor y abrir el panel. No necesitas Python ni Node.js instalados.
 3. Crea o importa un perfil. Para el cinturón, selecciona su puerto en **Ajustes > Dispositivo**: USB a 115200 baudios o HC-06 a 9600.
-4. Para GPS remoto instala la APK publicada, utiliza una cuenta invitada e inicia **Compartir > Por internet**. Vincula la PC al mismo residente desde **Acceso y sincronización** si vas a consultar en el panel local.
+4. Para GPS real usa una cuenta de persona cuidada autorizada y abre **Mi seguimiento > Por internet**. El cuidador consulta desde **Cuidar** y el administrador desde **Supervisar**; su GPS de demostracion requiere confirmar en **Pruebas**. Vincula la PC a la misma ficha desde **Acceso y sincronización** para consultar en el panel local.
 
 Destino de escritorio: Windows 10/11 x64; pruebas realizadas en Windows 11.
 Android requiere **12 o posterior**. La APK **0.7.3 release** conserva la firma propia

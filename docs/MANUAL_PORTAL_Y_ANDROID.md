@@ -1,5 +1,10 @@
 # Portal y Android
 
+**Android 0.7.3:** el apartado antes llamado Compartir se llama **Mi seguimiento**.
+El cuidador entra a **Cuidar** y el administrador a **Supervisar**. El administrador
+comparte su GPS desde **Pruebas**, con confirmacion y aviso en el mapa habitual.
+Consulta [Recorridos por rol](FLUJO_ROLES_ANDROID.md) para ese recorrido actualizado.
+
 [Índice](README.md) · Anterior: [Windows](MANUAL_USO_PC.md) · Siguiente: [Stack tecnológico](GUIA_STACK_TECNOLOGICO.md)
 
 Aquí se prepara el recorrido **celular de la persona cuidada → datos compartidos → cuidador**. Primero identifica el rol de cada cuenta. La misma APK puede ofrecer controles diferentes según sus permisos.
