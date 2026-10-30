@@ -1,5 +1,7 @@
 # Stack Tecnológico de SFA Asistencia
 
+**Guía de estudio vigente:** [Stack tecnológico con tablas, ejemplos y diagramas](GUIA_STACK_TECNOLOGICO.md). Esta página conserva la explicación de la base local; sus secciones de ampliación se leen como contexto histórico.
+
 ## Album local de Android: Recuerdos
 
 `MemoryAlbum.kt` usa Kotlin y Jetpack Compose con el selector de fotos de

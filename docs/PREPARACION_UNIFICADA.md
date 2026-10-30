@@ -1,5 +1,7 @@
 # Preparacion unificada - etapa 1
 
+**La rc10 descrita abajo es el origen de esta función.** El recorrido actual para Windows rc13.1 está en el [manual de uso](MANUAL_USO_PC.md). Esta página conserva decisiones y pruebas de las etapas anteriores.
+
 Esta etapa reorganiza el panel local y el Centro Windows. No cambia las tablas,
 roles, permisos RLS, destinos de autenticacion ni servicios de Supabase o FCM.
 Android conserva su version actual. Los ZIP publicados anteriormente no cambian.

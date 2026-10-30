@@ -1,5 +1,7 @@
 # Etapa 2: portal de acceso y copia local
 
+**Documento histórico de la etapa de acceso.** Para entrar y usar las funciones actuales consulta [Portal y Android](MANUAL_PORTAL_Y_ANDROID.md). El portal ya permite consulta, equipo, geocerca y atención; no se limita a validar usuarios.
+
 ## Alcance implementado
 
 Portal React independiente con la identidad visual existente. Incluye login,

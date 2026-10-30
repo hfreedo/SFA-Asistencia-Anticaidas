@@ -20,6 +20,10 @@ Prueba fisica pendiente: `docs/PRUEBA_ATENCION_CINTURON.md`.
 Incluyen incidentes persistentes y geocerca por internet. Los paquetes anteriores
 se conservan como historial y no fueron reemplazados retroactivamente.
 
+## Manuales de lectura progresiva
+
+Empieza por el [índice de manuales](docs/README.md): uso con capturas, portal y Android, stack con diagramas, lectura de código y exposición. Para el recorrido habitual de Windows consulta el [manual actualizado](docs/MANUAL_USO_PC.md).
+
 ## Usar el proyecto en esta PC
 
 La copia de trabajo incorpora **Preparacion unificada (etapa 1)**. Desde el

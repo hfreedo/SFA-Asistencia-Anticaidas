@@ -1,5 +1,7 @@
 # Mapa Maestro: de Cero al Estado Actual
 
+Para el recorrido vigente, empieza por el [índice de manuales](README.md) y la [guía del stack tecnológico](GUIA_STACK_TECNOLOGICO.md). Este mapa conserva también la construcción histórica por etapas.
+
 Para la siguiente construccion funcional, consultar el
 [Plan de integracion operativa](PLAN_INTEGRACION_OPERATIVA.md): auditoria actual,
 flujos entre dispositivos, roles, arquitectura, etapas y pruebas de aceptacion.

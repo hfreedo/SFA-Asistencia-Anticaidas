@@ -1,5 +1,7 @@
 # Desarrollo Desde el Código Fuente
 
+**Alcance local actualizado:** desde rc12 la gestión completa y el WebSocket se reservan al puesto localhost. Para cuidar desde otro equipo usa el [portal autenticado](MANUAL_PORTAL_Y_ANDROID.md); la LAN conserva la ruta GPS emisora limitada, no el panel completo. Las instrucciones LAN históricas de esta página no conceden acceso al monitoreo completo.
+
 Para una reproducción guiada con puntos de control, resultados esperados y
 diagnóstico, utiliza el [Manual de reproducción](MANUAL_REPRODUCCION.md).
 Esta página es la referencia rápida de comandos de desarrollo.

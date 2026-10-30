@@ -1,0 +1,48 @@
+name: Documentacion
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'scripts/validar_documentacion.py'
+      - 'scripts/capturar_manuales.cjs'
+      - 'herramientas/documentacion/**'
+      - '.github/workflows/documentacion.yml'
+      - 'arduino/**'
+      - 'servidor_pc/**'
+      - 'interfaz_web/src/**'
+      - 'android_app/app/src/**'
+      - 'supabase/migrations/**'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  enlaces-y-contratos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python scripts/validar_documentacion.py
+  markdown-y-mermaid:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: herramientas/documentacion/package-lock.json
+      - run: npm ci
+        working-directory: herramientas/documentacion
+      - run: npx playwright install --with-deps chromium
+        working-directory: herramientas/documentacion
+      - run: npm run revisar
+        working-directory: herramientas/documentacion
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revision-documentacion
+          path: build/documentacion-qa/

@@ -11,6 +11,21 @@ Teleasistencia distribuida que conecta señales del cinturón y ubicación del c
 
 [Descargar ejecutables](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases) · [Portal HTTPS](https://hfreedo.github.io/SFA-Asistencia-Anticaidas/acceso.html) · [Recorrido del proyecto](docs/MAPA_MAESTRO.md) · [Stack tecnológico](docs/STACK_TECNOLOGICO.md)
 
+## Manuales para usar y entender el proyecto
+
+**Primera lectura:** [Índice de manuales](docs/README.md). El recorrido avanza desde el uso cotidiano hasta las funciones que conectan las tecnologías.
+
+| Necesito… | Leer |
+| --- | --- |
+| Preparar y usar la PC con capturas | [Manual Windows](docs/MANUAL_USO_PC.md) |
+| Compartir GPS o cuidar desde otra red | [Portal y Android](docs/MANUAL_PORTAL_Y_ANDROID.md) |
+| Entender tecnologías, bibliotecas y arquitectura | [Guía del stack](docs/GUIA_STACK_TECNOLOGICO.md) |
+| Seguir funciones y puntos de nexo | [Código y nexos](docs/GUIA_CODIGO_Y_NEXOS.md) |
+| Preparar una exposición breve | [Guía para exponer](docs/GUIA_EXPOSICION.md) |
+| Comprobar un recorrido o localizar fallos | [Comprobación y diagnóstico](docs/COMPROBACION_Y_DIAGNOSTICO.md) |
+
+**Clave:** el GPS remoto puede llegar sin PC, pero el emisor push actual sigue en la PC. Las capturas nuevas usan datos ficticios y no prueban sensores ni entregas físicas. [Alcance y revisión](docs/ESTADO_DOCUMENTACION.md).
+
 ## Descargas Actuales
 
 | Plataforma | Version vigente | Descarga directa | Notas y verificacion |

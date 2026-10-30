@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-29",
+  "data": "fixtures only; no real residents, no external messages or writes",
+  "generator": "scripts/capturar_manuales.cjs",
+  "fixtureGenerator": "scripts/verificar_preparacion.cjs",
+  "commands": [
+    "node scripts/verificar_preparacion.cjs --linked --home",
+    "node scripts/verificar_preparacion.cjs --linked",
+    "node scripts/verificar_preparacion.cjs --linked --people",
+    "node scripts/verificar_preparacion.cjs --linked --portal"
+  ],
+  "captures": [
+    {
+      "file": "preparacion.png",
+      "source": "build/preparation-qa/preparacion-vinculada-1366.png",
+      "sha256": "b849b5a13f55643c1aa875deb1797dfa8f4971c42958d4fe567693b012f66dcf",
+      "kind": "web interface with synthetic API fixtures"
+    },
+    {
+      "file": "principal.png",
+      "source": "build/preparation-qa/principal-1366.png",
+      "sha256": "c60b085e447a04867ac2c6d3b9983dc30b73048f8912d9d031b95f38ef97fd01",
+      "kind": "web interface with synthetic API fixtures"
+    },
+    {
+      "file": "personas.png",
+      "source": "build/preparation-qa/personas-cuidado-1366.png",
+      "sha256": "a8193858846bfb14df558b61dc951418c2665717bc5aa486335d5db2565504b7",
+      "kind": "web interface with synthetic API fixtures"
+    },
+    {
+      "file": "portal-personas.png",
+      "source": "build/preparation-qa/portal-personas-1366.png",
+      "sha256": "b36629517ccff6f85a9821a753b79f52b00e793dc3a5bd188a44414020f7260c",
+      "kind": "web interface with synthetic API fixtures"
+    },
+    {
+      "file": "principal-movil.png",
+      "source": "build/preparation-qa/principal-390.png",
+      "sha256": "15d692368830c700240ecf09ed83269ce9c132decfd3867996b411d208df0fa3",
+      "kind": "web interface with synthetic API fixtures"
+    }
+  ],
+  "bundles": [
+    {
+      "file": "interfaz_web/static/assets/index-RwdppJ7G.js",
+      "sha256": "03a837d989f5826904417b02b5e2d7ff859e15454bbd0fc223de30c31bfedbed"
+    },
+    {
+      "file": "interfaz_web/dist-acceso/assets/acceso-DC75v1l5.js",
+      "sha256": "aa6db6d4a7c3cbf8ff91e09994af9bbf02a99c6f0843634d888a0b4b9d0c49ee"
+    }
+  ]
+}
