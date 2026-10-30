@@ -1,0 +1,35 @@
+.draft-confirm {
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  overflow: auto;
+  margin: auto;
+  padding: 24px;
+  border: 1px solid #dbe5e9;
+  border-radius: 8px;
+  background: #fff;
+  color: #14282c;
+  box-shadow: 0 16px 48px #14282c26;
+  font: 400 15px/1.5 Geist, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+.draft-confirm::backdrop { background: #14282c66; }
+.draft-confirm h2 { margin: 0 0 10px; font: 600 20px/1.3 Geist, system-ui, sans-serif; }
+.draft-confirm p { margin: 0; color: #526573; }
+.draft-confirm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.draft-confirm-actions button {
+  flex: 1 1 160px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #b8d8d6;
+  border-radius: 6px;
+  background: #fff;
+  color: #087d79;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.draft-confirm-actions .draft-confirm-stay { background: #087d79; color: #fff; border-color: #087d79; }
+.draft-confirm-actions button:hover { background: #effaf8; }
+.draft-confirm-actions .draft-confirm-stay:hover { background: #066b68; }
+.draft-confirm-actions button:focus-visible { outline: 2px solid #087d79; outline-offset: 3px; }

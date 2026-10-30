@@ -8,6 +8,8 @@ import { TeamPanel } from "./TeamPanel";
 const session = { access_token: "PRIVATE_SESSION_FIXTURE", user: { id: "admin" } } as Session;
 const spaces = [{ space_id: "space-a", name: "Equipo A", role: "admin" }];
 beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
   HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.clearAllMocks();
   mock.rpc.mockImplementation(async (name: string) => name === "sfa_team" ? { data: { members: [
@@ -116,15 +118,15 @@ it("reports pending invitations as space-wide without guessing a person's identi
   expect(screen.queryByText("other@example.invalid")).toBeNull();
 });
 it("keeps an open draft when navigation is cancelled", async () => {
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
   await screen.findByText("care@example.invalid");
   fireEvent.click(screen.getByRole("button", { name: "Dar acceso a esta persona" }));
   fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "draft@example.invalid" } });
   fireEvent.click(screen.getByRole("button", { name: "Equipo y accesos" }));
+  expect(screen.getByRole("alertdialog")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Seguir editando" }));
   expect((screen.getByLabelText("Correo electrónico") as HTMLInputElement).value).toBe("draft@example.invalid");
   expect(mock.invoke).not.toHaveBeenCalled();
-  confirm.mockRestore();
 });
 it("assigning an existing caregiver preserves other residents and waits for explicit save", async () => {
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-b" onAccessChanged={() => {}}/>);
@@ -136,6 +138,26 @@ it("assigning an existing caregiver preserves other residents and waits for expl
   expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Guardar permisos" }));
   await waitFor(() => expect(mock.rpc).toHaveBeenCalledWith("sfa_set_team_access", { p_space: "space-a", p_user: "caregiver", p_residents: ["person-a", "person-b"], p_configure: false, p_share: false }));
+});
+it("does not overwrite permissions changed by another administrator", async () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("care@example.invalid");
+  fireEvent.click(screen.getByRole("button", { name: "Permisos" }));
+  mock.rpc.mockImplementation(async (name: string) => name === "sfa_team" ? { data: { members: [{ user_id: "caregiver", email: "care@example.invalid", role: "caregiver", access: [{ resident_id: "person-a", can_configure: true, can_share_location: false }] }] }, error: null } : { data: {}, error: null });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar permisos" }));
+  expect(await screen.findByText(/Los permisos cambiaron desde que abriste/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Guardar permisos" })).toBeTruthy();
+  expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
+});
+it("does not save when the current permissions cannot be verified", async () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("care@example.invalid");
+  fireEvent.click(screen.getByRole("button", { name: "Permisos" }));
+  mock.rpc.mockResolvedValue({ data: null, error: { message: "offline" } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar permisos" }));
+  expect(await screen.findByText(/La operación no se completó/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Guardar permisos" })).toBeTruthy();
+  expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
 });
 it("heterogeneous permissions cannot be silently normalized", async () => {
   mock.rpc.mockResolvedValue({ data: { members: [{ user_id: "mixed", email: "mixed@example.invalid", role: "caregiver", access: [

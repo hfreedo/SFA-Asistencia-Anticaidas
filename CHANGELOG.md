@@ -1,5 +1,19 @@
 # Changelog
 
+## Windows 1.2.0-rc13.3 - Confirmacion integrada de borradores
+
+- Dialogo visual de SFA para salir de formularios de equipo, cambiar ficha o
+  cerrar sesion; sustituye las confirmaciones nativas de esas acciones internas.
+- Foco inicial en Seguir editando, Escape cancela, solicitudes duplicadas no
+  acumulan navegaciones y desmontar el formulario cancela acciones pendientes.
+- Aviso nativo conservado al cerrar/recargar la pestana por limitacion del navegador.
+- Consulta preventiva antes de guardar permisos: cambios detectados o fallos de
+  verificacion no envian el guardado y conservan el formulario.
+- 132 pruebas de interfaz y revision visual en tres tamanos de panel y portal.
+- Sin cambios en Supabase, FCM, cuentas o asignaciones reales. Android sigue 0.7.1.
+- La consulta previa no elimina la carrera entre consulta y escritura; el control
+  atomico y los permisos independientes por ficha siguen pendientes en backend.
+
 ## Windows 1.2.0-rc13.2 - Cuidadores y acceso claros
 
 - Ficha reorganizada en cuidadores, cuenta personal y administradores con acceso.

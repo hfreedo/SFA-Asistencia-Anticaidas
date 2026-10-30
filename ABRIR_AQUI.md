@@ -1,16 +1,16 @@
 # Empieza aqui
 
-**Ultima candidata local Windows:** `release/SFA_Asistencia_v1.2.0-rc13.2/LEEME.txt`.
+**Ultima candidata local Windows:** `release/SFA_Asistencia_v1.2.0-rc13.3/LEEME.txt`.
 **Entrega de revision anterior (rc9):** `distribucion/actual/LEEME.md`.
 **Para conocer la arquitectura:** `README.md`.
 **Para desarrollar:** `docs/DESARROLLO.md`.
-**Descargas publicadas:** Windows rc13.2 y Android 0.7.1 en
+**Descargas publicadas:** Windows rc13.3 y Android 0.7.1 en
 [Releases de GitHub](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases).
 La firma Android esta en `docs/ANDROID_RELEASE.md`. Android 0.7.0 conserva
 la firma release de 0.6.2; no desinstalar para actualizar entre ambas.
 Si todavia usas debug, revisa primero la migracion de firma.
 
-Version local actual: **Centro Windows 1.2.0-rc13.2** y **Android 0.7.1-release (11)**.
+Version local actual: **Centro Windows 1.2.0-rc13.3** y **Android 0.7.1-release (11)**.
 APK local: `release/SFA-Asistencia-Android-0.7.1-release.apk`.
 Roles y limites de demostracion: `docs/ROLES_DEMOSTRACION.md`.
 Recuerdos esta en la navegacion inferior de Android. Es un album de este celular,
@@ -30,7 +30,7 @@ La copia de trabajo incorpora **Preparacion unificada (etapa 1)**. Desde el
 Centro actualizado usa **Preparar sistema**: el acceso y el vinculo de esta PC
 estan dentro del panel, junto a los accesos a mapa, dispositivo y pruebas.
 Recorrido: [Preparacion unificada](docs/PREPARACION_UNIFICADA.md).
-Paquete local: `release/SFA-Asistencia-1.2.0-rc13.2-Windows.zip`.
+Paquete local: `release/SFA-Asistencia-1.2.0-rc13.3-Windows.zip`.
 rc13.1 integra los controles, opciones y formulario de Personas con la estetica del panel.
 rc13 unifica el recorrido Personas > ficha > Datos / Cuidadores y acceso.
 Ver [Personas y equipo](docs/PERSONAS_Y_EQUIPO.md).
@@ -41,11 +41,11 @@ rc11.1 diferencia Atencion y Ubicacion y compacta las acciones secundarias.
 rc11.2 agrega indicadores de Preparacion por perfil y diagnostico compacto.
 rc11.3 unifica el estilo y reduce avisos/acciones repetidos en el principal.
 rc12 reserva la gestion a localhost y Android 0.7.1 diferencia cuidado/emision.
-Las candidatas anteriores se conservan; GitHub destaca rc13.2 y Android 0.7.1
+Las candidatas anteriores se conservan; GitHub destaca rc13.3 y Android 0.7.1
 con enlaces directos en el README.
 
-Para probar rc13.2, cierra el Centro anterior y abre
-`release/SFA_Asistencia_v1.2.0-rc13.2/SFA_Asistencia.exe`.
+Para probar rc13.3, cierra el Centro anterior y abre
+`release/SFA_Asistencia_v1.2.0-rc13.3/SFA_Asistencia.exe`.
 El acceso directo habitual y `dist/SFA_Centro.exe` pueden apuntar a una copia
 anterior. No se reemplazan automaticamente ni se migran datos personales.
 Para actualizar una instalacion con tus fichas, respalda y conserva su carpeta

@@ -3,7 +3,7 @@ import * as Select from "@radix-ui/react-select";
 import type { Session } from "@supabase/supabase-js";
 import { Building2, Check, ChevronDown, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X, type LucideIcon } from "lucide-react";
 import { accessDataClient } from "./accessClient";
-import { registerTeamDraft } from "./teamDraftGuard";
+import { registerTeamDraft, withTeamDraftExit } from "./teamDraftGuard";
 import "./peopleTeam.css";
 
 type Space = { space_id: string; name: string; role: string };
@@ -12,6 +12,8 @@ type Member = { user_id: string; email: string; role: string; access: Access[] }
 type Invitation = { id: string; email: string; role: string; expires_at: string };
 type Resident = { id: string; full_name: string };
 const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
+const accessSnapshot = (member: Member) => JSON.stringify({ role: member.role, access: member.access.map(a => [a.resident_id, a.can_configure, a.can_share_location]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))) });
+class TeamAccessChanged extends Error {}
 
 function TeamSelect({ icon: LeadingIcon, children, id, value, disabled, onChange }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
   const options = Children.toArray(children).filter(isValidElement<{ value: string; children: string } >).map(option => option.props);
@@ -85,7 +87,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     if (busy) return;
     setBusy(true); setError(""); setNotice("");
     try { const result = await action(); setNotice(result ?? "Permisos actualizados."); setRevision(n => n + 1); }
-    catch { setError("La operación no se completó. Comprueba permisos, conexión y si la cuenta ya pertenece al equipo. Actualiza antes de repetir."); }
+    catch (problem) { setError(problem instanceof TeamAccessChanged ? "Los permisos cambiaron desde que abriste el formulario. Cierra la edición, actualiza el equipo y vuelve a revisarlos antes de guardar." : "La operación no se completó. Comprueba permisos, conexión y si la cuenta ya pertenece al equipo. Actualiza antes de repetir."); }
     finally { setBusy(false); setConfirmation(null); }
   }
   async function command(name: string, body: object) {
@@ -93,16 +95,20 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     if (problem) throw problem;
   }
   function reset() { setEditing(null); setEmail(""); setRole("caregiver"); setChosen([]); setConfigure(false); setShare(false); setUniformConsent(false); setFormOpen(false); setAddingCaregiver(false); }
-  function edit(member: Member) {
-    if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return false;
+  function edit(member: Member, extraResident?: string) {
+    withTeamDraftExit(() => {
     setFormOpen(true); setUniformConsent(false);
-    setEditing(member); setEmail(member.email); setRole(member.role); setChosen(member.access.map(a => a.resident_id));
+    setEditing(member); setEmail(member.email); setRole(member.role); setChosen([...new Set([...member.access.map(a => a.resident_id), ...(extraResident ? [extraResident] : [])])]);
     setConfigure(member.access.some(a => a.can_configure)); setShare(member.access.some(a => a.can_share_location));
-    return true;
+    });
   }
   async function save() {
     const selected = role === "admin" ? [] : chosen;
     if (editing) {
+      const current = await accessDataClient(session.access_token).rpc("sfa_team", { p_space: space.space_id });
+      if (current.error || !Array.isArray(current.data?.members)) throw new Error("team_verification_failed");
+      const latest = current.data.members.find((member: Member) => member.user_id === editing.user_id);
+      if (!latest || accessSnapshot(latest) !== accessSnapshot(editing)) throw new TeamAccessChanged();
       await command("sfa_set_team_access", { p_space: space.space_id, p_user: editing.user_id, p_residents: selected,
         p_configure: role === "caregiver" && configure, p_share: role !== "admin" && share });
       reset(); return "Asignación de residentes guardada.";
@@ -131,23 +137,24 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
   const availableCaregivers = person ? members.filter(m => m.role === "caregiver" && !m.access.some(a => a.resident_id === person.id)) : [];
   function inviteForPerson(nextRole: "caregiver" | "resident") {
     if (!person) return;
-    if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return;
+    withTeamDraftExit(() => {
     reset(); setRole(nextRole); setChosen([person.id]); setShare(nextRole === "resident"); setFormOpen(true);
     window.setTimeout(() => document.getElementById("team-email")?.focus(), 0);
+    });
   }
   return <>
     {error && <p role="alert" className="cloud-warning">{error}</p>}
     {loadFailed && <button className="access-secondary" disabled={busy} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16}/>Reintentar consulta</button>}
     {notice && <p role="status" className="team-notice"><Check size={18} />{notice}</p>}
-    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section === "people") return; if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; reset(); setSection("people"); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section === "team") return; if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; reset(); setSection("team"); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
+    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section !== "people") withTeamDraftExit(() => { reset(); setSection("people"); }); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section !== "team") withTeamDraftExit(() => { reset(); setSection("team"); }); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
     {section === "people" && <section className="person-access-summary" aria-label="Cuidado y acceso de la persona">
-      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; setPersonId(e.target.value); reset(); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
+      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { const id = e.target.value; withTeamDraftExit(() => { setPersonId(id); reset(); }); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
       {loading && <p role="status">Consultando cuidadores y acceso…</p>}
       {!loading && !loadFailed && initialResidentId && !person && <p role="alert" className="cloud-warning">La ficha vinculada no está disponible en este espacio. No se seleccionará otra persona automáticamente.</p>}
       {person && !loadFailed && <><h3>{person.full_name}</h3><div className="person-access-columns"><section><h4>Cuidadores asignados</h4>
         {related.some(m => m.role === "caregiver") ? <ul>{related.filter(m => m.role === "caregiver").map(m => <li key={m.user_id}><span>{m.email}</span><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuentas de cuidador asignadas. Los administradores del espacio también tienen acceso.</p>}
         {!addingCaregiver && <button className="access-secondary" disabled={busy || loading} onClick={() => setAddingCaregiver(true)}><UserPlus size={16}/>Añadir cuidador</button>}
-        {addingCaregiver && <div className="caregiver-choices">{availableCaregivers.length > 0 && <div className="team-field"><label htmlFor="team-caregiver">Elegir una cuenta existente</label><TeamSelect icon={UsersRound} id="team-caregiver" value="" disabled={busy || loading} onChange={e => { const member = availableCaregivers.find(m => m.user_id === e.target.value); if (member && edit(member)) setChosen([...new Set([...member.access.map(a => a.resident_id), person.id])]); }}><option value="">Seleccionar del equipo</option>{availableCaregivers.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}</TeamSelect></div>}
+        {addingCaregiver && <div className="caregiver-choices">{availableCaregivers.length > 0 && <div className="team-field"><label htmlFor="team-caregiver">Elegir una cuenta existente</label><TeamSelect icon={UsersRound} id="team-caregiver" value="" disabled={busy || loading} onChange={e => { const member = availableCaregivers.find(m => m.user_id === e.target.value); if (member) edit(member, person.id); }}><option value="">Seleccionar del equipo</option>{availableCaregivers.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}</TeamSelect></div>}
         <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("caregiver")}><Mail size={16}/>Invitar una cuenta nueva</button><button className="team-text-action" disabled={busy} onClick={() => setAddingCaregiver(false)}>Cerrar opciones</button></div>}</section>
         <section><h4>Cuenta de la persona</h4>{related.some(m => m.role === "resident") ? <ul>{related.filter(m => m.role === "resident").map(m => <li key={m.user_id}><div><span>{m.email}</span><small>Esta cuenta corresponde a {person.full_name}</small></div><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuenta personal vinculada.</p>}
         <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("resident")}><Mail size={16}/>Dar acceso a esta persona</button></section></div>

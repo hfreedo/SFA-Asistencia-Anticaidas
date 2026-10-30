@@ -89,6 +89,16 @@ actual no entrega la ficha de cada invitacion, por lo que no se deduce por
 correo ni nombre. Una consulta fallida no se presenta como una lista vacia.
 La edicion de permisos sigue aplicando los valores elegidos a todas las fichas
 seleccionadas y no incorpora control de concurrencia entre administradores.
+La interfaz de desarrollo vuelve a consultar los permisos antes de guardar y
+conserva el formulario si detecta cambios o no puede verificar la respuesta.
+Es una barrera provisional: otra operacion puede ocurrir entre esa consulta y
+el guardado, y los clientes anteriores no realizan esta comprobacion. La
+proteccion completa requiere validacion atomica en el backend y una estrategia
+para los clientes antiguos. La comprobacion preventiva se incluye en rc13.3.
+
+La salida de formularios dentro del panel usa una confirmacion integrada: Seguir
+editando conserva los datos y Descartar cambios ejecuta la accion solicitada.
+Escape cancela; cerrar o recargar la pestana conserva el aviso nativo obligatorio.
 
 ## Validacion y limites
 

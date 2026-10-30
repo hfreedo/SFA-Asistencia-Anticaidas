@@ -8,7 +8,7 @@ import projectLogo from "./assets/sfa-asistencia-logo.png";
 import { LocalSync, RemoteMonitor } from "./RemoteMonitor";
 import { isLocalPortal } from "./cloudPolicy";
 import { TeamPanel } from "./TeamPanel";
-import { confirmTeamDraftExit } from "./teamDraftGuard";
+import { withTeamDraftExit } from "./teamDraftGuard";
 
 type Membership = { space_id: string; role: string; name: string };
 const INITIAL_MODE = callbackMode(window.location.search, window.location.hash);
@@ -154,7 +154,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
 
   const accountIdentity = <><p className="access-account-email"><Mail size={18} />{user?.email}</p>
     {memberships.length ? <ul>{memberships.map(link => <li key={link.space_id}><ShieldCheck size={20} /><div><strong>{link.name}</strong><span>{LABELS[link.role] ?? "Acceso autorizado"}</span></div></li>)}</ul> :
-      <p className="access-no-membership">Tu cuenta está verificada, pero aún no tiene un espacio asignado. El administrador debe autorizar tu vínculo.</p>}{personContext && <button type="button" className="access-secondary" disabled={busy} onClick={() => { if (confirmTeamDraftExit()) void logout(); }}><LogOut size={18} />Cerrar sesión</button>}</>;
+      <p className="access-no-membership">Tu cuenta está verificada, pero aún no tiene un espacio asignado. El administrador debe autorizar tu vínculo.</p>}{personContext && <button type="button" className="access-secondary" disabled={busy} onClick={() => withTeamDraftExit(() => { void logout(); })}><LogOut size={18} />Cerrar sesión</button>}</>;
   return <div role={embedded ? undefined : "main"} className={`${embedded ? "sfa-access embedded-access" : "sfa-access"}${personContext ? " person-context" : ""}`}>
     {!embedded && <div className="access-topline"><a className="access-brand" href={accessUrl(window.location.href)} aria-label="SFA Asistencia, inicio">
       <img src={projectLogo} alt="" />
@@ -172,7 +172,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
           signedIn ? <div className="access-account">{personContext ? <details className="person-account-details"><summary>Sesión de {user?.email}</summary>{accountIdentity}</details> : accountIdentity}
             {memberships.length > 0 && session && <>
               {!personContext && <nav className="portal-navigation" aria-label="Vistas del espacio">
-                <button aria-pressed={view === "monitor"} onClick={() => { if (view === "monitor" || confirmTeamDraftExit()) setView("monitor"); }}><LayoutDashboard size={18} />{embedded ? "Vincular esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
+                <button aria-pressed={view === "monitor"} onClick={() => { if (view !== "monitor") withTeamDraftExit(() => setView("monitor")); }}><LayoutDashboard size={18} />{embedded ? "Vincular esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
                 {memberships.some(m => m.role === "admin") && <button aria-pressed={view === "people"} onClick={() => setView("people")}><UsersRound size={18} />Personas y equipo</button>}
               </nav>}
               {view === "people" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} initialResidentId={personContext?.resident_id} initialSpaceId={personContext?.space_id} initialSection="people" onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : embedded
@@ -181,7 +181,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
                   : <p className="access-stage-note">{memberships.some(m => m.role === "caregiver") ? "Tu acceso permite cuidar." : "Tu cuenta corresponde a una persona cuidada."} {personContext ? "Solo un administrador puede gestionar el equipo y las cuentas de esta ficha." : "Para vincular esta PC necesita intervenir un administrador del espacio."}</p>
                 : <RemoteMonitor session={session} spaces={memberships} />}
             </>}
-            {!personContext && <button type="button" className="access-secondary" disabled={busy} onClick={() => { if (confirmTeamDraftExit()) void logout(); }}><LogOut size={18} />Cerrar sesión</button>}
+            {!personContext && <button type="button" className="access-secondary" disabled={busy} onClick={() => withTeamDraftExit(() => { void logout(); })}><LogOut size={18} />Cerrar sesión</button>}
           </div> : <form onSubmit={event => void submit(event)}>
             {mode !== "password" && <label htmlFor="access-email">Correo electrónico<div className="access-input"><Mail size={18} /><input id="access-email" name="email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} disabled={busy || !client} /></div></label>}
             {mode !== "recovery" && <label htmlFor="access-password">{mode === "password" ? "Nueva contraseña" : "Contraseña"}<div className="access-input"><KeyRound size={18} /><input id="access-password" name="password" type={visible ? "text" : "password"} autoComplete={mode === "password" ? "new-password" : "current-password"} value={password} onChange={event => setPassword(event.target.value)} required minLength={mode === "password" ? 12 : undefined} disabled={busy || !client || (mode === "password" && !user)} /><button type="button" title={visible ? "Ocultar contraseña" : "Mostrar contraseña"} aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>}

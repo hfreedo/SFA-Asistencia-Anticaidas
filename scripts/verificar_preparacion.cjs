@@ -161,10 +161,13 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Account overflow at ${width}`);
         await page.evaluate(() => { window.scrollTo(0,0); return new Promise(resolve => requestAnimationFrame(resolve)); });
         await page.screenshot({ path: path.join(output, `personas-cuenta-${width}.png`), fullPage: true });
-        let draftWarning = false;
-        page.once('dialog', dialog => { draftWarning = true; return dialog.dismiss(); });
         await page.getByRole('button', { name: 'Datos de Residente de demostración', exact: true }).click();
-        assert.equal(draftWarning, true, 'Leaving an open draft must ask before discarding');
+        const draftDialog = page.getByRole('alertdialog', {name:'¿Salir de la edición?'});
+        await draftDialog.waitFor();
+        await page.screenshot({ path: path.join(output, `confirmar-borrador-${width}.png`) });
+        assert.equal(await draftDialog.getByRole('button', { name:'Seguir editando' }).evaluate(button => button === document.activeElement), true);
+        await page.keyboard.press('Escape');
+        await draftDialog.waitFor({state:'detached'});
         assert.equal(await page.getByLabel('Correo electrónico', { exact: true }).isVisible(), true, 'Cancelled navigation preserves the draft');
         await checkTeamDialog();
         await page.getByRole('button', { name: 'Equipo y accesos', exact: true }).click();

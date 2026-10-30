@@ -11,7 +11,7 @@ import { PushTestSettings } from "./PushTestSettings";
 import { Preparation, type SettingsEntry } from "./Preparation";
 import { PreparationIndicator, usePreparationStatus, type PreparationCheck } from "./preparationStatus";
 import { LocalPersonAccess } from "./LocalPersonAccess";
-import { confirmTeamDraftExit, hasTeamDraft } from "./teamDraftGuard";
+import { withTeamDraftExit, hasTeamDraft } from "./teamDraftGuard";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -232,7 +232,7 @@ export function SfaDashboardApp() {
   const [focusPreparationAccess, setFocusPreparationAccess] = useState(false);
   const openPreparationAccess = () => { setFocusPreparationAccess(true); setView("setup"); };
   const [view, setViewState] = useState<View>(() => window.location.hash === "#preparacion" ? "setup" : "home");
-  const setView = (next: View) => { if (next === view || confirmTeamDraftExit()) setViewState(next); };
+  const setView = (next: View) => { if (next !== view) withTeamDraftExit(() => setViewState(next)); };
   const [settingsEntry, setSettingsEntry] = useState<SettingsEntry>("residents");
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [connected, setConnected] = useState(false);
@@ -304,18 +304,20 @@ export function SfaDashboardApp() {
   }, []);
 
   const selectResident = async (id: number) => {
-    if (!confirmTeamDraftExit()) return;
+    withTeamDraftExit(() => { void (async () => {
     try {
       await actionRequest(`/api/residents/${id}/activate`, { method: "POST" });
       await loadResidents(); notify("Residente vinculado");
     } catch { notify("No se pudo vincular el residente.", "error"); }
+    })(); });
   };
   const deleteResident = async (id: number) => {
-    if (!confirmTeamDraftExit()) return;
+    withTeamDraftExit(() => { void (async () => {
     try {
       await actionRequest(`/api/residents/${id}`, { method: "DELETE" });
       await loadResidents(); notify("Residente eliminado");
     } catch { notify("No se pudo eliminar el residente.", "error"); }
+    })(); });
   };
   const createResident = async (newResident: ResidentProfile) => {
     try {
@@ -1655,7 +1657,7 @@ function SettingsScreen({
             </div>
 
             <section className="person-detail" aria-label="Ficha y relaciones de la persona">
-            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => { if (personTab === "data" || confirmTeamDraftExit()) setPersonTab("data"); }}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
+            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => { if (personTab !== "data") withTeamDraftExit(() => setPersonTab("data")); }}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
             {profile?.id && personTab === "access" && <div className="preparation-access"><LocalPersonAccess key={profile.id} localId={profile.id} onPrepare={onPrepare}/></div>}
             {profile && personTab === "data" && (
               <form onSubmit={handleSaveProfile} className="sfa-editorial-card p-6 space-y-4">
