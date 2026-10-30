@@ -1,13 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { CareLocationSummary, CareSignal, mergeCareActivity, recentPosition, validPosition, useRemoteHomePosition } from "./CareOverview";
+import { CareLocationSummary, CareSignal, RemoteCareIdentity, mergeCareActivity, recentPosition, validPosition, useRemoteHomePosition } from "./CareOverview";
 import type { IncidentFeed } from "./IncidentWorkspace";
 const now=Date.now();
 const position={latitude:-25.3,longitude:-57.6,accuracy_m:8,observed_at:new Date(now).toISOString()};
 const feed:IncidentFeed={events:[{id:"remote",event_type:"GEOCERCA_SALIDA",observed_at:position.observed_at,simulated:false,detail:{text:"Salida remota"},actor_id:null,outcome:null,updated_at:null}],zone:{state:"outside",last_confirmed:"outside",observed_at:position.observed_at},checkedAt:now,error:""};
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 describe("person-first overview",()=>{
+  it("uses the verified remote identity without substituting a local person's details",()=>{
+    const {rerender}=render(<RemoteCareIdentity reading={{id:7,position:null,error:"",remoteId:"remote-uuid",remoteName:"Persona remota"}} localName="Otra persona local"/>);
+    expect(screen.getByRole("heading",{name:"Persona remota"})).toBeTruthy();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+    rerender(<RemoteCareIdentity reading={{id:7,position:null,error:"Sin permiso",remoteId:"remote-uuid",remoteName:"Persona anterior"}} localName="Otra persona local"/>);
+    expect(screen.getByRole("heading",{name:"Ficha por verificar"})).toBeTruthy();
+    expect(screen.queryByText("Persona anterior")).toBeNull();
+  });
   it("never attributes a real zone evaluation to an administrator test coordinate",()=>{
     render(<CareLocationSummary residentId={7} source="remote" onSourceChange={vi.fn()} local={null} remote={{id:7,position:{...position,simulated:true,source:"admin_test"},error:""}} feed={feed} now={now} onMap={vi.fn()} onPrepare={vi.fn()} onRefresh={vi.fn()}/>);
     expect(screen.getByText("PRUEBA · GPS del celular administrador")).toBeTruthy();

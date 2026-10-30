@@ -47,10 +47,10 @@ export function LocalRemoteLocation({ residentId, residentName, onPrepare }: { r
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   const current = result?.id === residentId ? result : null;
   return <section className="local-remote-gps" aria-label="GPS por internet">
-    <div className="geo-section-heading"><Cloud size={20} /><h3>GPS por internet · {residentName}</h3>
+    <div className="geo-section-heading"><Cloud size={20} /><h3>GPS por internet · {current?.remoteId && !current.error ? current.remoteName || "Persona autorizada" : "Ficha por verificar"}</h3>
       <button type="button" className="resident-button" disabled={!residentId || loading} onClick={() => setRefresh(v => v + 1)}><RefreshCw size={17} />Actualizar</button></div>
     <p className="remote-gps-description">Ubicación compartida desde la app Android mediante Wi-Fi o datos móviles. No requiere cinturón ni la misma red que esta PC.</p>
-    {current?.remoteId && <p className="cloud-footnote">Ficha remota: <strong>{current.remoteName || "Persona autorizada"}</strong> · {current.remoteId.slice(0,8)}. El nombre del perfil local no determina quién envía el GPS.</p>}
+    <p className="cloud-footnote">Perfil local de esta PC: {residentName}. La consulta por internet utiliza su vínculo autorizado.</p>
     {!residentId ? <p role="status">Selecciona un residente para consultar su ubicación.</p> : current?.error ? <div className="geo-feedback error" role="alert"><Cloud size={19} /><div><strong>{current.error}</strong><p>Referencia: {current.reference}</p></div></div> : <>
       {!current && <p role="status">Consultando la ubicación remota…</p>}
       {current && <InternetGeofence key={residentId} api={zoneApi} position={current.position} clock={clock} />}

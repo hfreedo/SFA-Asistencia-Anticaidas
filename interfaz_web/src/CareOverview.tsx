@@ -7,7 +7,7 @@ import "./careOverview.css";
 import { relativeAge } from "./timeLabels";
 
 export type LocationSource = "remote" | "local";
-type GpsReading = { id:number; position:RemotePosition|null; error:string };
+type GpsReading = { id:number; position:RemotePosition|null; error:string; remoteId?:string; remoteName?:string };
 class PositionReadError extends Error {}
 export function validPosition(value: unknown): value is RemotePosition {
   const p = value as RemotePosition | null;
@@ -29,6 +29,7 @@ export function useRemoteHomePosition(id:number|undefined, enabled:boolean) {
   const [reading,setReading] = useState<GpsReading|null>(null);
   const [revision,setRevision] = useState(0);
   useEffect(() => {
+    setReading(null);
     if (!id || !enabled) return;
     let active = true, pending = false;
     const load = async () => {
@@ -41,7 +42,7 @@ export function useRemoteHomePosition(id:number|undefined, enabled:boolean) {
           : response.status === 404 ? "Este perfil todavía no tiene un vínculo remoto disponible."
           : response.status === 403 ? "No se pudo verificar el permiso de consulta de esta PC." : "No se pudo consultar el GPS por internet.");
         if (data.position != null && !validPosition(data.position)) throw new PositionReadError("La posición recibida no es válida.");
-        if (active) setReading({id,position:data.position ?? null,error:""});
+        if (active) setReading({id,position:data.position ?? null,error:"",remoteId:typeof data.remote_resident_id === "string" ? data.remote_resident_id : undefined,remoteName:typeof data.remote_name === "string" ? data.remote_name : undefined});
       } catch (error) { if (active) setReading({id,position:null,error:error instanceof PositionReadError ? error.message : "No se pudo consultar el GPS por internet."}); }
       finally { pending = false; }
     };
@@ -49,6 +50,16 @@ export function useRemoteHomePosition(id:number|undefined, enabled:boolean) {
     return () => { active = false; window.clearInterval(timer); };
   },[id,enabled,revision]);
   return { reading: enabled && reading?.id === id ? reading : null, refresh: () => setRevision(n=>n+1) };
+}
+
+export function RemoteCareIdentity({reading,localName}:{reading:GpsReading|null;localName?:string}) {
+  const name=reading?.remoteId && !reading.error ? reading.remoteName?.trim() : "";
+  return <section className="focus-profile resident-identity" aria-labelledby="remote-person-heading">
+    <div className="resident-avatar"><MapPin size={30} aria-hidden="true"/></div>
+    <div className="focus-identity"><p>Persona que consultas por internet</p><h1 id="remote-person-heading" className="font-serif">{name || "Ficha por verificar"}</h1>
+      <p>{name ? "Mapa e incidentes de la ficha autorizada" : "Comprueba el acceso y el vínculo desde Preparación."}</p>
+      {localName && <p className="focus-care-note">Perfil local de esta PC: {localName} · datos del cinturón separados</p>}</div>
+  </section>;
 }
 
 export type LocalActivity = { id:string; type:string; detail:string; at:string; residentId?:number };

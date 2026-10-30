@@ -170,7 +170,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
         {error && <div className="access-feedback is-error" role="alert"><WifiOff size={18} /><span>{error}{errorReference && <small>Referencia de soporte: {errorReference}</small>}</span></div>}
         {notice && <div className="access-feedback" role="status"><Check size={18} /><span>{notice}</span></div>}
         {pending ? <div className="access-progress" role="status"><LoaderCircle className="access-spin" size={24} /> Verificando acceso…</div> :
-          signedIn ? <div className="access-account">{personContext ? <details className="person-account-details"><summary>Sesión de {user?.email}</summary>{accountIdentity}</details> : accountIdentity}
+          signedIn ? <div className="access-account">{personContext ? <details className="person-account-details"><summary>Sesión de {user?.email}</summary>{accountIdentity}</details> : embedded ? <div className="access-identity-compact" aria-label="Cuenta conectada">{accountIdentity}</div> : accountIdentity}
             {memberships.length > 0 && session && <>
               {!personContext && <nav className="portal-navigation" aria-label="Vistas del espacio">
                 <button aria-pressed={view === "monitor"} onClick={() => { if (view !== "monitor") withTeamDraftExit(() => setView("monitor")); }}><LayoutDashboard size={18} />{embedded ? "Monitoreo de esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
@@ -178,7 +178,7 @@ export function AccessApp({ embedded = false, activeResidentId, initialView = "m
               </nav>}
               {view === "people" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} initialResidentId={personContext?.resident_id} initialSpaceId={personContext?.space_id} initialSection="people" onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : embedded
                 ? memberships.some(m => m.role === "admin")
-                  ? activeResidentId ? <><LocalCareLink session={session} localId={activeResidentId}/><details><summary>Emisor PC · crear y sincronizar una ficha nueva</summary><LocalSync key={`${user?.id}:${activeResidentId}`} session={session} spaces={memberships.filter(m => m.role === "admin")} activeResidentId={activeResidentId} /></details></> : <p className="access-stage-note">Selecciona un perfil local antes de vincular esta PC.</p>
+                  ? activeResidentId ? <><LocalCareLink session={session} localId={activeResidentId}/><details className="access-emitter"><summary>Emisor PC · crear y sincronizar una ficha nueva</summary><LocalSync key={`${user?.id}:${activeResidentId}`} session={session} spaces={memberships.filter(m => m.role === "admin")} activeResidentId={activeResidentId} /></details></> : <p className="access-stage-note">Selecciona un perfil local antes de vincular esta PC.</p>
                   : memberships.some(m => m.role === "caregiver") && !personContext ? <LocalCareLink session={session} localId={activeResidentId}/> : <p className="access-stage-note">Tu cuenta corresponde a una persona cuidada o no administra esta ficha. Solo un administrador gestiona el equipo.</p>
                 : <RemoteMonitor session={session} spaces={memberships} />}
             </>}

@@ -1,7 +1,8 @@
-import { Children, isValidElement, useEffect, useState, type FormEvent, type SelectHTMLAttributes } from "react";
-import * as Select from "@radix-ui/react-select";
+import { useEffect, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Building2, Check, ChevronDown, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X, type LucideIcon } from "lucide-react";
+import { Building2, Check, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X } from "lucide-react";
+import { TeamSelect } from "./TeamSelect";
+export { TeamSelect } from "./TeamSelect";
 import { accessDataClient } from "./accessClient";
 import { registerTeamDraft, withTeamDraftExit } from "./teamDraftGuard";
 import "./peopleTeam.css";
@@ -14,15 +15,6 @@ type Resident = { id: string; full_name: string };
 const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
 const accessSnapshot = (member: Member) => JSON.stringify({ role: member.role, access: member.access.map(a => [a.resident_id, a.can_configure, a.can_share_location]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))) });
 class TeamAccessChanged extends Error {}
-
-export function TeamSelect({ icon: LeadingIcon, children, id, value, disabled, onChange }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
-  const options = Children.toArray(children).filter(isValidElement<{ value: string; children: string } >).map(option => option.props);
-  const placeholder = options.find(option => option.value === "")?.children;
-  return <span className="team-select"><Select.Root value={String(value ?? "")} disabled={disabled} onValueChange={next => {
-    // Keep the existing field handlers; they consume only the selected value.
-    onChange?.({ target: { value: next }, currentTarget: { value: next } } as React.ChangeEvent<HTMLSelectElement>);
-  }}><Select.Trigger id={id} className="team-select-trigger"><LeadingIcon size={17} aria-hidden="true"/><Select.Value placeholder={placeholder}/><Select.Icon className="team-trigger-chevron"><ChevronDown size={16}/></Select.Icon></Select.Trigger><Select.Portal><Select.Content className="team-select-menu" position="popper" sideOffset={6} collisionPadding={12}><Select.Viewport>{options.filter(option => option.value !== "").map(option => <Select.Item key={option.value} value={String(option.value)} className="team-select-option"><Select.ItemText>{option.children}</Select.ItemText><Select.ItemIndicator><Check size={16}/></Select.ItemIndicator></Select.Item>)}</Select.Viewport></Select.Content></Select.Portal></Select.Root></span>;
-}
 
 export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId, initialSpaceId, initialSection = "team" }: { session: Session; spaces: Space[]; onAccessChanged: () => void; initialResidentId?: string; initialSpaceId?: string; initialSection?: "people" | "team" }) {
   const allowed = spaces.filter(s => s.role === "admin");

@@ -1,5 +1,26 @@
 # Changelog
 
+## Windows 1.2.0-rc15.1 - Preparacion e identidad de consulta
+
+- Recupera el vinculo existente solo si su ID aparece entre las fichas autorizadas
+  de la cuenta actual; cambiarlo requiere seleccion y confirmacion explicitas.
+- Principal y mapa muestran la identidad remota, sin reutilizar foto, telefono o
+  notas del perfil local como si pertenecieran a la persona consultada.
+- Preparacion separa consulta, sesion y permiso del navegador de la emision
+  opcional del cinturon y FCM. Permiso concedido no significa aviso recibido.
+- Correccion del proxy de desarrollo local con validacion TLS mediante la CA de
+  la PC y normalizacion de Origin limitada al mismo origen en loopback.
+- 153 pruebas web aprobadas; 19 pruebas especificas verificadas adicionalmente.
+  Revision visual en navegador interno a 1920 x 1080 CSS con cuenta cuidadora.
+- Android conserva 0.7.3-release. Sin migraciones Supabase ni cambios de roles,
+  asignaciones, historiales o infraestructura FCM. Pruebas fisicas pendientes.
+
+- Selector compartido con estilos propios, independiente del contenedor Personas.
+- Cuenta y rol compactos; formulario de monitoreo con ancho contenido, etiquetas
+  discretas, confirmacion alineada y accion de tamano coherente.
+- Avisos de error/confirmacion diferenciados y boton deshabilitado neutro.
+- Sin cambios de permisos, vinculos, Supabase, Android ni FCM.
+
 ## Windows 1.2.0-rc15 / Android 0.7.3 - Recorridos por rol y GPS de prueba
 
 - Entrada segun rol: Mi seguimiento, Personas que cuido o Monitoreo del espacio.

@@ -6,7 +6,7 @@ import { LocalRemoteLocation } from "./LocalRemoteLocation";
 import { LocalIncidentPanel } from "./LocalIncidentPanel";
 import { IncidentNavIndicator } from "./IncidentNavIndicator";
 import type { IncidentAttention, IncidentFeed } from "./IncidentWorkspace";
-import { CareActivity, CareLocationSummary, CareSignal, mergeCareActivity, useRemoteHomePosition, type LocationSource } from "./CareOverview";
+import { CareActivity, CareLocationSummary, CareSignal, RemoteCareIdentity, mergeCareActivity, useRemoteHomePosition, type LocationSource } from "./CareOverview";
 import { PushTestSettings } from "./PushTestSettings";
 import { Preparation, type SettingsEntry } from "./Preparation";
 import { PreparationIndicator, usePreparationStatus, type PreparationCheck } from "./preparationStatus";
@@ -261,6 +261,7 @@ export function SfaDashboardApp() {
   const currentFeed = cloudFeed?.id === profile?.id ? cloudFeed?.value ?? null : null;
   const [locationSources,setLocationSources]=useState<Record<number,LocationSource>>({});
   const locationSource = profile?.id ? locationSources[profile.id] ?? "remote" : "remote";
+  const remoteGps = useRemoteHomePosition(profile?.id,view === "home" && locationSource === "remote");
   const chooseLocationSource = (source:LocationSource) => { const id=profile?.id; if (id) setLocationSources(current=>({...current,[id]:source})); };
   const reportAttention=useCallback((value:IncidentAttention)=>setCloudAttention(value),[]);
   useEffect(()=>setCloudAttention({pending:0,followup:false}),[profile?.id]);
@@ -505,21 +506,22 @@ export function SfaDashboardApp() {
       onSelectResident={selectResident}
       onOpenNewResidentModal={() => setView("people")}
     >
-      {view === "home" && <ResidentIdentity profile={profile}/>}
-      {view === "home" && profile?.id && preparationCheck.status?.session_active === false && <section className="care-connection-notice" role="status" aria-label="Conexión de esta PC"><Icon name="cloud-off" size={20}/><div><strong>Sesión de esta PC pausada</strong><p>Reanuda el acceso para consultar información por internet.</p></div><button className="resident-button" onClick={openPreparationAccess}>Revisar conexión<Icon name="arrow-right" size={17}/></button></section>}
+      {view === "home" && (locationSource === "remote" ? <RemoteCareIdentity reading={remoteGps.reading} localName={profile?.full_name}/> : <ResidentIdentity profile={profile}/>)}
+      {view === "home" && profile?.id && (preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false && <section className="care-connection-notice" role="status" aria-label="Conexión de esta PC"><Icon name="cloud-off" size={20}/><div><strong>Consulta por internet sin sesión</strong><p>Inicia sesión para consultar las fichas autorizadas.</p></div><button className="resident-button" onClick={openPreparationAccess}>Revisar conexión<Icon name="arrow-right" size={17}/></button></section>}
       {view === "home" && geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
         <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona local</strong><p>Salida confirmada por el seguimiento local. Requiere comprobar su situación.</p></div>
         <button type="button" onClick={() => { chooseLocationSource("local"); setView("map"); }}><Icon name="map" size={17} />Ver ubicación</button>
         {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
       </section>}
-      <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} connectionPaused={preparationCheck.status?.session_active === false} onAttentionChange={reportAttention} onSnapshotChange={reportFeed} onPrepare={openPreparationAccess}/>
+      <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} connectionPaused={(preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false} onAttentionChange={reportAttention} onSnapshotChange={reportFeed} onPrepare={openPreparationAccess}/>
       {view === "setup" && <Preparation profile={profile} connected={connected} check={preparationCheck} focusAccess={focusPreparationAccess}
         onSettings={tab => { setSettingsEntry(tab); setView(tab === "residents" ? "people" : "settings"); }}
         onMap={() => setView("map")} onMonitor={() => setView("home")} />}
       {view === "home" && (
         <HomeScreen
-          connectionPaused={preparationCheck.status?.session_active === false}
+          connectionPaused={(preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false}
           profile={profile}
+          remoteGps={remoteGps}
           locationSnapshot={locationSnapshot}
           telemetry={telemetry}
           connected={connected}
@@ -707,7 +709,7 @@ function AppShell({
                 connected ? "bg-[#2F8F5B]" : "bg-[#B7791F]"
               }`}
             />
-            <div><p className="font-semibold">Perfil de cuidado</p><p>{activeProfile?.full_name || "Sin residente vinculado"}</p></div>
+            <div><p className="font-semibold">Perfil local de esta PC</p><p>{activeProfile?.full_name || "Sin perfil seleccionado"}</p></div>
           </div>
         </div>
       </aside>
@@ -846,9 +848,10 @@ function ResidentIdentity({profile}:{profile:ResidentProfile|null}) {
 
 function HomeScreen({
   profile, telemetry, connected, firstMotion, events, accelHistory,
-  onOpenMap, onOpenSettings, onOpenDevice, locationSnapshot, locationSource, onLocationSourceChange, remoteFeed, connectionPaused,
+  onOpenMap, onOpenSettings, onOpenDevice, locationSnapshot, locationSource, onLocationSourceChange, remoteFeed, connectionPaused, remoteGps,
 }: {
   profile: ResidentProfile | null;
+  remoteGps: ReturnType<typeof useRemoteHomePosition>;
   telemetry: Telemetry | null;
   connected: boolean;
   firstMotion: Date | null;
@@ -878,7 +881,6 @@ function HomeScreen({
   const today = new Date(now).toDateString();
   const motionToday = firstMotion?.toDateString() === today ? firstMotion : null;
   const activity = mergeCareActivity(events,remoteFeed,profile?.id,now);
-  const remoteGps = useRemoteHomePosition(profile?.id,locationSource === "remote");
   const battery = telemetry?.battery_percent;
   const points = accelHistory.map((value, i) =>
     `${i * 480 / Math.max(1, accelHistory.length - 1)},${Math.max(8, Math.min(72, 40 - (value - 1) * 30))}`).join(" ");
@@ -1092,7 +1094,7 @@ export function MapScreen({
 
   return (
     <div className="location-workspace">
-      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Seguimiento de {residentName}.</p></div>{locationSource === "local" && <span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span>}</div>
+      <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>{locationSource === "local" ? `Seguimiento local de ${residentName}.` : "Seguimiento de la ficha autorizada por internet."}</p></div>{locationSource === "local" && <span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span>}</div>
       <div className="geo-source-selector" role="group" aria-label="Fuente de ubicación"><button type="button" aria-pressed={locationSource === "remote"} onClick={() => setLocationSource("remote")}><Icon name="cloud" size={18} />Por internet</button><button type="button" aria-pressed={locationSource === "local"} onClick={() => setLocationSource("local")}><Icon name="wifi" size={18} />Red local y geocerca</button></div>
       {locationSource === "remote" ? <LocalRemoteLocation key={profile?.id || "none"} residentId={profile?.id} residentName={residentName} onPrepare={onPrepare} /> : <>
       <LocationPanel key={profile?.id || "none"} residentId={profile?.id} snapshot={locationSnapshot} />

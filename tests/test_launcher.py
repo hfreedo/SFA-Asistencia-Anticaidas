@@ -11,6 +11,11 @@ from servidor_pc import main
 
 
 class LauncherTests(unittest.TestCase):
+    def test_explicit_local_mode_overrides_existing_lan_certificates(self):
+        with patch('sys.argv', ['sfa', '--local-only', '--no-browser']), patch.object(launcher, 'acquire', return_value=(None, False)), patch.object(launcher, 'release'), patch.object(launcher.Path, 'is_file', return_value=True), patch.object(launcher, 'SfaPortableApp') as ui:
+            launcher.main()
+            ui.assert_called_once_with(8780, False, True)
+
     def test_start_open_stop_and_restart(self):
         with tempfile.TemporaryDirectory() as folder:
             with socket.socket() as sock:

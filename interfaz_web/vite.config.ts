@@ -1,8 +1,11 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { localProxyOrigin } from "./localProxyOrigin.ts";
+import { devBackend } from "./devBackend.ts";
 
-export default defineConfig(({ mode, command }) => {
+export default defineConfig(async ({ mode, command }): Promise<UserConfig> => {
+  const backend=command==="serve" ? await devBackend() : {target:"http://127.0.0.1:8780",agent:undefined};
   // The local dashboard now embeds access. Reuse only its two public settings.
   const access = loadEnv("acceso", process.cwd(), "VITE_");
   const current = loadEnv(mode, process.cwd(), "VITE_");
@@ -24,8 +27,18 @@ export default defineConfig(({ mode, command }) => {
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:8780",
-      "/ws": { target: "ws://127.0.0.1:8780", ws: true },
+      "/api": { target: backend.target, agent:backend.agent, changeOrigin:true, configure(proxy) {
+        proxy.on("proxyReq",(outgoing,request)=>{
+          const origin=localProxyOrigin(request.headers.origin,request.headers.host,request.socket.remoteAddress,request.headers["sec-fetch-site"] as string | undefined,backend.target);
+          if(origin) outgoing.setHeader("Origin",origin);
+        });
+      } },
+      "/ws": { target: backend.target.replace(/^http/,"ws"), agent:backend.agent, ws: true, changeOrigin:true, configure(proxy) {
+        proxy.on("proxyReqWs",(outgoing,request)=>{
+          const origin=localProxyOrigin(request.headers.origin,request.headers.host,request.socket.remoteAddress,request.headers["sec-fetch-site"] as string | undefined,backend.target);
+          if(origin) outgoing.setHeader("Origin",origin);
+        });
+      } },
     },
   },
 });

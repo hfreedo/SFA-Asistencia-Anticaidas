@@ -3,11 +3,20 @@ import { CircleAlert, CircleCheck, CircleHelp } from "lucide-react";
 
 export type PreparationStatus = {
   session_active: boolean;
+  monitor_session_active?: boolean;
+  monitor_links?: { local_resident_id: number; resident_id: string }[];
   bindings: { local_resident_id: number; enabled: number | boolean }[];
   push?: { configured: boolean; last_error: string | null };
 };
 export type PreparationCheck = { status: PreparationStatus | null; failed: boolean };
 export const isLoopback = (host: string) => ["localhost", "127.0.0.1", "[::1]"].includes(host);
+export function monitoringState(status: PreparationStatus, id?: number) {
+  const active=status.monitor_session_active ?? status.session_active;
+  const linked=status.monitor_links !== undefined
+    ? status.monitor_links.some(link=>link.local_resident_id===id)
+    : status.bindings.some(link=>link.local_resident_id===id && Boolean(link.enabled));
+  return {active,linked};
+}
 export function usePreparationStatus(enabled = true): PreparationCheck {
   const [check, setCheck] = useState<PreparationCheck>({ status: null, failed: false });
   useEffect(() => {
@@ -35,9 +44,9 @@ export function usePreparationStatus(enabled = true): PreparationCheck {
 export function preparationIssues(check: PreparationCheck, id?: number) {
   const { status, failed } = check;
   if (!status) return { count: 0, unknown: true, label: failed ? "Preparación sin verificar" : "Comprobando preparación" };
-  const linked = status.bindings.some(b => b.local_resident_id === id && Boolean(b.enabled));
-  const count = Number(!id || !linked) + Number(!status.session_active) + Number(Boolean(status.push?.last_error));
-  return { count, unknown: false, label: count ? `${count} acciones necesarias para asistencia por internet` : "Conexión por internet preparada; entrega de avisos sin verificar" };
+  const {active,linked}=monitoringState(status,id);
+  const count = Number(!id || !linked) + Number(!active);
+  return { count, unknown: false, label: count ? `${count} acciones necesarias para consultar por internet` : "Consulta por internet preparada; entrega de avisos sin verificar" };
 }
 export function PreparationIndicator({ check, id }: { check: PreparationCheck; id?: number }) {
   const issue = preparationIssues(check, id);

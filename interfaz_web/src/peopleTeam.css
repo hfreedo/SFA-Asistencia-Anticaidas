@@ -4,17 +4,6 @@
 .people-team-tabs button[aria-pressed="true"] { background:#f0fdfa; color:#0f766e; border-color:#bdebe5; }
 .people-team-tabs button:focus-visible { outline:2px solid #0d9488; outline-offset:3px; }
 .people-team-tabs button svg { flex-shrink:0; }
-.team-workspace .team-select-trigger { display:flex; align-items:center; gap:10px; width:100%; height:42px; padding:9px 12px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:#334155; font:400 14px/1.5 Geist,sans-serif; text-align:left; cursor:pointer; }
-.team-select-trigger > svg { flex-shrink:0; color:#0f766e; }
-.team-select-trigger > span:not(.team-trigger-chevron) { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.team-trigger-chevron { display:flex; margin-left:auto; flex-shrink:0; color:#0f766e; }
-.team-workspace .team-select-trigger:focus-visible,.team-workspace .team-select-trigger[data-state="open"] { outline:0; border-color:#0d9488; box-shadow:0 0 0 3px #0d948815; }
-.team-workspace .team-select-trigger:disabled { background:#f8fafc; color:#64748b; cursor:not-allowed; }
-.team-select-menu { z-index:150; width:var(--radix-select-trigger-width); max-height:var(--radix-select-content-available-height); overflow:auto; box-sizing:border-box; padding:5px; border:1px solid #d8e6e3; border-radius:8px; background:#fff; box-shadow:0 8px 24px #14201d18; font:400 14px/1.5 Geist,sans-serif; color:#334155; }
-.team-select-option { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:9px 10px; border-radius:5px; outline:0; cursor:pointer; overflow-wrap:anywhere; }
-.team-select-option[data-highlighted],.team-select-option[data-state="checked"] { background:#f0fdfa; color:#0f766e; }
-.team-select-option > span:first-child { min-width:0; overflow-wrap:anywhere; }
-.team-select-option > span:last-child { flex-shrink:0; }
 .person-detail .team-workspace h4 { font-weight:550; font-size:14px; }
 .team-workspace .team-field > label,.team-workspace .team-form legend { font-weight:500; }
 .person-detail { min-width:0; }

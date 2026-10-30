@@ -8,7 +8,7 @@ from preparar_entrega_actual import digest, validate_archive
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14', '1.2.0-rc15'), default='1.2.0-rc15')
+parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14', '1.2.0-rc15', '1.2.0-rc15.1'), default='1.2.0-rc15.1')
 version = parser.parse_args().version
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 archive = root / 'release' / f'SFA-Asistencia-{version}-Windows.zip'
@@ -44,6 +44,14 @@ if captures.is_dir():
 Extraer TODO el ZIP en una carpeta con permiso de escritura.
 Abrir SFA_Asistencia.exe. No requiere Python ni Node.js instalados.
 No abrir esta copia junto al Centro habitual: cada copia aislada tiene sus datos.
+
+Novedad rc15.1: Preparacion recupera el vinculo autorizado de la cuenta sin
+pedir confirmarlo otra vez. Cambiar ficha sigue requiriendo confirmacion.
+El panel principal y el mapa identifican la ficha remota, separada del perfil
+local; no se atribuyen su foto, telefono o notas locales a otra persona.
+Consulta, permiso del navegador y emision opcional se muestran por separado.
+Android sigue en 0.7.3-release; no es necesario reinstalarlo para esta mejora.
+No modifica roles ni esquemas cloud. No confirma entrega fisica de avisos.
 
 Novedad rc15: el GPS de prueba confirmado por un administrador se ve en el mapa
 habitual con aviso PRUEBA. No borra GPS real ni genera incidentes de geocerca.

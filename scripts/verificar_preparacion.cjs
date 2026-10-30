@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, portal ? '../interfaz_web/dist-acceso' : '.
 const output = path.resolve(__dirname, '../build/preparation-qa');
 const linked = process.argv.includes('--linked');
 const people = process.argv.includes('--people');
+const careLink = process.argv.includes('--care-link');
 const quiet = process.argv.includes('--quiet');
 const unverified = process.argv.includes('--unverified');
 const independent = process.argv.includes('--independent');
@@ -50,14 +51,14 @@ const server = http.createServer((req, res) => {
           '/rest/v1/sfa_samples': [],
           '/rest/v1/sfa_memberships': [{ space_id: 'fixture-space', role: 'admin' }],
           '/rest/v1/sfa_spaces': [{ id: 'fixture-space', name: 'Espacio de demostracion' }],
-          '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración' }],
+          '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración', room:'Sala de pruebas' },...(careLink ? [{id:'fixture-long-name',full_name:'María de los Ángeles Fernández de la Cruz',room:'Residencia de demostración · Sector de acompañamiento familiar'}] : [])],
           '/rest/v1/rpc/sfa_team': { members: [
             { user_id: user.id, email: user.email, role: 'admin', access: [] },
             { user_id: 'fixture-care', email: 'cuidador@example.invalid', role: 'caregiver', access: [{ resident_id: 'fixture-person', can_configure: false, can_share_location: false }] },
             { user_id: 'fixture-spare', email: 'nuevo-cuidador@example.invalid', role: 'caregiver', access: [] },
           ], invitations: [] },
         };
-        if (people && !['GET', 'OPTIONS'].includes(route.request().method()) && !['/rest/v1/rpc/sfa_team', '/rest/v1/rpc/sfa_accept_team_invites', '/rest/v1/rpc/sfa_incidents', '/rest/v1/rpc/sfa_get_geofence', '/rest/v1/rpc/sfa_push_test_targets'].includes(pathname)) errors.push(`Unexpected cloud mutation: ${pathname}`);
+        if (people && !['GET', 'OPTIONS'].includes(route.request().method()) && !['/rest/v1/rpc/sfa_team', '/rest/v1/rpc/sfa_accept_team_invites', '/rest/v1/rpc/sfa_incidents', '/rest/v1/rpc/sfa_get_geofence', '/rest/v1/rpc/sfa_push_test_targets', '/rest/v1/rpc/sfa_map_position'].includes(pathname)) errors.push(`Unexpected cloud mutation: ${pathname}`);
         return route.fulfill({ status: fixtures[pathname] ? 200 : 403, contentType: 'application/json', body: JSON.stringify(fixtures[pathname] || {}) });
       });
     }
@@ -119,6 +120,7 @@ const server = http.createServer((req, res) => {
       let status = 200;
       let data = {};
       if (url.pathname === '/api/residents') data = [{ id: 7, full_name: 'Residente de demostración', room: 'Sala de pruebas', is_active: 1, phone: '', medical_notes: '' }];
+      else if (url.pathname === '/api/cloud/monitor-session') { status=unverified ? 503 : 200; }
       else if (url.pathname.endsWith('/geofence')) data = { home_lat: -25.3, home_lng: -57.6, radius_m: 100, address_name: 'Zona de prueba' };
       else if (url.pathname.startsWith('/api/cloud/residents')) { status = 401; data = { detail: { code: 'session_required' } }; }
       else if (url.pathname.endsWith('/location')) data = { resident_id: 7, paired: false, status: 'no_fix', position: null, events: [] };
@@ -139,6 +141,35 @@ const server = http.createServer((req, res) => {
     });
     for (const [width, height] of [[1920, 1080], [1366, 768], [390, 844]]) {
       await page.setViewportSize({ width, height });
+      if (careLink) {
+        await page.goto(`${origin}/?care-link=${width}#preparacion`);
+        const section=page.getByRole('region',{name:'Monitorear una ficha existente',exact:true});
+        await section.waitFor();
+        const trigger=section.getByRole('combobox',{name:'Ficha a monitorear',exact:true});
+        const style=await trigger.evaluate(node=>{const s=getComputedStyle(node),r=node.getBoundingClientRect();return {height:r.height,width:r.width,radius:s.borderRadius,border:s.borderTopWidth,display:s.display,workspace:!!node.closest('.team-workspace')};});
+        assert.equal(style.workspace,false,'Selector tested outside Personas');
+        assert.equal(style.height,42); assert.equal(style.radius,'6px'); assert.equal(style.border,'1px'); assert.equal(style.display,'flex');
+        const action=section.getByRole('button',{name:'Vincular monitoreo',exact:true});
+        assert.equal(await action.isDisabled(),true);
+        const neutral=await action.evaluate(node=>getComputedStyle(node).backgroundColor);
+        assert.equal(neutral,'rgb(241, 245, 249)','Disabled action is neutral, not teal');
+        if(width>600) assert((await action.boundingBox()).width<style.width,'Action does not stretch across desktop form');
+        const text=await section.locator('.care-link-confirm').evaluate(node=>getComputedStyle(node).fontWeight);
+        assert.equal(text,'400','Consent remains secondary');
+        if(unverified) await section.getByRole('alert').waitFor();
+        await page.evaluate(()=>document.fonts.ready);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Care link overflow at ${width}`);
+        await page.screenshot({path:path.join(output,`preparacion-refinada-${unverified ? 'aviso-' : ''}${width}.png`),fullPage:true});
+        await trigger.click();
+        const menu=page.getByRole('listbox'); await menu.waitFor();
+        assert(Math.abs((await menu.boundingBox()).width-style.width)<2,'Menu matches field width');
+        assert.equal(await menu.evaluate(node=>node.scrollWidth<=node.clientWidth),true,'Long labels do not overflow the menu');
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        assert.equal((await menu.innerText()).includes('undefined'),false,'Person labels remain complete');
+        await page.screenshot({path:path.join(output,`preparacion-selector-${width}.png`),fullPage:true});
+        await page.keyboard.press('Escape');
+        continue;
+      }
       if (gpsTest) {
         await page.goto(`${origin}/${portal ? 'acceso.html' : ''}?gps-test=${width}`);
         if (portal) {

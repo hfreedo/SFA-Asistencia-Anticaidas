@@ -30,6 +30,7 @@ async function localRequest(path: string, token?: string, body?: object) {
       const value = result?.detail?.code;
       if (typeof value === "string" && /^[a-zA-Z0-9_]{1,60}$/.test(value)) code = value;
     } catch { /* The status remains usable for non-JSON responses. */ }
+    if(code==="local_operator_required") throw new Error("Conexión local rechazada: revisa el origen y el puerto del panel, no los roles de Supabase");
     throw new Error(`${response.status}${code ? ` · ${code}` : ""}`);
   }
   return response.json();

@@ -331,7 +331,9 @@ class SfaPortableApp:
 
 def main():
     parser = argparse.ArgumentParser(description='SFA Asistencia: centro de inicio')
-    parser.add_argument('--lan', action='store_true')
+    network = parser.add_mutually_exclusive_group()
+    network.add_argument('--lan', action='store_true')
+    network.add_argument('--local-only', action='store_true', help='Iniciar solo en esta PC, aunque existan certificados LAN')
     parser.add_argument('--port', type=int, default=8780)
     parser.add_argument('--no-browser', action='store_true')
     args = parser.parse_args()
@@ -342,7 +344,7 @@ def main():
         focus_existing()
         return
     try:
-        SfaPortableApp(args.port, args.lan or (APP_HOME / 'certs/sfa.pem').is_file(), args.no_browser).run()
+        SfaPortableApp(args.port, not args.local_only and (args.lan or (APP_HOME / 'certs/sfa.pem').is_file()), args.no_browser).run()
     finally:
         release(lease)
 
