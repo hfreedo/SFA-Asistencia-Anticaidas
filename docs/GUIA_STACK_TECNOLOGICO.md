@@ -129,7 +129,7 @@ EVT,ms,tipo,detalle
 RSP,comando,resultado
 ```
 
-`TEL` transporta telemetría; `EVT`, un hecho significativo; `RSP`, la respuesta a una orden. Cada línea termina en salto de línea. USB utiliza **115200 baudios** y el HC-06 del montaje, **9600**. El sketch inicia con transmisión habilitada; `STREAM OFF` y `STREAM ON` permiten controlarla. Este comportamiento es distinto del firmware de SFA Aire.
+`TEL` transporta telemetría; `EVT`, un hecho significativo; `RSP`, la respuesta a una orden. Cada línea termina en salto de línea. USB utiliza **115200 baudios** y el HC-06 del montaje, **9600**. El sketch inicia con transmisión habilitada; `STREAM OFF` y `STREAM ON` permiten controlarla.
 
 Una llamada real de `confirmarCaida()`:
 
@@ -381,5 +381,3 @@ No se implementa en esta revisión un detector anticaídas basado únicamente en
 | Realtime | Capacidad de otra forma de recibir cambios; no se presume utilizada por tener Supabase |
 
 Lecturas para profundizar: [WebSockets en FastAPI](https://fastapi.tiangolo.com/advanced/websockets/), [RLS en Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security) y [envío FCM HTTP v1](https://firebase.google.com/docs/cloud-messaging/send/v1-api). Las fuentes locales enlazadas arriba determinan qué está usando SFA.
-
-La organización didáctica toma como referencia la [guía de SFA Aire](https://github.com/hfreedo/SFA-Aire-Portal/blob/main/docs/GUIA_STACK_TECNOLOGICO.md). Sus sensores, protocolo y despliegue no se trasladan a este proyecto: aquí se describe el cinturón y la implementación efectiva de Anticaídas.
