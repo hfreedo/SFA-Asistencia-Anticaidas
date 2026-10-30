@@ -16,10 +16,10 @@ son referencias sincronizadas, no una copia completa de los datos locales.
 
 ![Ficha y cuidadores en rc13.1, con datos ficticios](capturas/personas-cuidadores-rc13.1.png)
 
-Los controles de rc13.1 mantienen el lenguaje visual del panel: superficies
+Los controles de rc13.2 mantienen el lenguaje visual del panel: superficies
 blancas, bordes suaves, iconos, foco teal y opciones de ficha con seleccion
-visible. Los selectores siguen siendo nativos para conservar teclado y el
-selector del sistema en el celular. No se cambiaron permisos ni asignaciones.
+visible. Los selectores accesibles admiten navegacion por teclado y opciones
+integradas con el panel. No se cambiaron permisos ni asignaciones.
 
 ```mermaid
 flowchart LR
@@ -46,11 +46,14 @@ de esta etapa, no una garantia de aislamiento entre usuarios de Windows.
 ## Asignar un cuidador
 
 1. Abrir la ficha y entrar en **Cuidadores y acceso**.
-2. Elegir un **Cuidador existente**, o **Agregar cuidador** para invitar una cuenta.
+2. Pulsar **Añadir cuidador** y elegir una cuenta existente o invitar una nueva.
 3. Revisar **Personas que podra cuidar** y sus permisos.
 4. Guardar. Sus otras asignaciones se conservan si no se desmarcan expresamente.
 
 La seleccion abre un borrador. No envia nada hasta guardar.
+La ficha identifica el borrador como cambio sin guardar; al salir de un
+formulario de equipo se solicita confirmacion. En una alerta de emergencia,
+la atencion tiene prioridad y el formulario puede cerrarse sin guardar.
 Si la cuenta ya tiene permisos distintos entre fichas, el comando existente
 solo permite aplicar un conjunto comun. El formulario exige confirmacion para
 uniformarlos; cancelar conserva los permisos actuales.
@@ -80,6 +83,12 @@ Nunca se deduce la identidad por coincidencia de nombre o correo.
 Los telefonos, notas y fotos no se suben por abrir esta pantalla. Crear una
 cuenta tampoco crea otra ficha. Esta etapa unifica la navegacion, no fusiona
 bases de datos ni cambia los permisos de Supabase o la infraestructura FCM.
+
+Las invitaciones pendientes se indican para el espacio completo: la consulta
+actual no entrega la ficha de cada invitacion, por lo que no se deduce por
+correo ni nombre. Una consulta fallida no se presenta como una lista vacia.
+La edicion de permisos sigue aplicando los valores elegidos a todas las fichas
+seleccionadas y no incorpora control de concurrencia entre administradores.
 
 ## Validacion y limites
 

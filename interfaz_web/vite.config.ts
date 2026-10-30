@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // The local dashboard now embeds access. Reuse only its two public settings.
   const access = loadEnv("acceso", process.cwd(), "VITE_");
   const current = loadEnv(mode, process.cwd(), "VITE_");
@@ -11,7 +11,12 @@ export default defineConfig(({ mode }) => {
     [`import.meta.env.${name}`, JSON.stringify(process.env[name] ?? current[name] ?? access[name] ?? "")])),
   base: mode === "acceso" ? "./" : "/static/",
   publicDir: mode === "acceso" ? false : "public",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), {
+    name: "dev-access-csp",
+    transformIndexHtml(html) {
+      return command === "serve" ? html.replace("style-src 'self'", "style-src 'self' 'unsafe-inline'") : html;
+    },
+  }],
   build: {
     outDir: mode === "acceso" ? "dist-acceso" : "static",
     emptyOutDir: true,

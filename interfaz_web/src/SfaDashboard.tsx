@@ -11,6 +11,7 @@ import { PushTestSettings } from "./PushTestSettings";
 import { Preparation, type SettingsEntry } from "./Preparation";
 import { PreparationIndicator, usePreparationStatus, type PreparationCheck } from "./preparationStatus";
 import { LocalPersonAccess } from "./LocalPersonAccess";
+import { confirmTeamDraftExit, hasTeamDraft } from "./teamDraftGuard";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -230,7 +231,8 @@ export function SfaDashboardApp() {
   const preparationCheck = usePreparationStatus();
   const [focusPreparationAccess, setFocusPreparationAccess] = useState(false);
   const openPreparationAccess = () => { setFocusPreparationAccess(true); setView("setup"); };
-  const [view, setView] = useState<View>(() => window.location.hash === "#preparacion" ? "setup" : "home");
+  const [view, setViewState] = useState<View>(() => window.location.hash === "#preparacion" ? "setup" : "home");
+  const setView = (next: View) => { if (next === view || confirmTeamDraftExit()) setViewState(next); };
   const [settingsEntry, setSettingsEntry] = useState<SettingsEntry>("residents");
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [connected, setConnected] = useState(false);
@@ -302,12 +304,14 @@ export function SfaDashboardApp() {
   }, []);
 
   const selectResident = async (id: number) => {
+    if (!confirmTeamDraftExit()) return;
     try {
       await actionRequest(`/api/residents/${id}/activate`, { method: "POST" });
       await loadResidents(); notify("Residente vinculado");
     } catch { notify("No se pudo vincular el residente.", "error"); }
   };
   const deleteResident = async (id: number) => {
+    if (!confirmTeamDraftExit()) return;
     try {
       await actionRequest(`/api/residents/${id}`, { method: "DELETE" });
       await loadResidents(); notify("Residente eliminado");
@@ -466,7 +470,8 @@ export function SfaDashboardApp() {
       );
       emergencyAlarm.stop();
       setEmergencyStartedAt(null);
-      setView("home");
+      if (hasTeamDraft()) notify("El formulario de equipo se cerró al atender la alerta; sus cambios no se guardaron.", "error");
+      setViewState("home");
     } catch (error) {
       setAttentionError(error instanceof Error ? error.message : "No se pudo confirmar la atencion. Vuelve a intentar.");
     } finally {
@@ -1650,7 +1655,7 @@ function SettingsScreen({
             </div>
 
             <section className="person-detail" aria-label="Ficha y relaciones de la persona">
-            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => setPersonTab("data")}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
+            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => { if (personTab === "data" || confirmTeamDraftExit()) setPersonTab("data"); }}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
             {profile?.id && personTab === "access" && <div className="preparation-access"><LocalPersonAccess key={profile.id} localId={profile.id} onPrepare={onPrepare}/></div>}
             {profile && personTab === "data" && (
               <form onSubmit={handleSaveProfile} className="sfa-editorial-card p-6 space-y-4">

@@ -1,5 +1,16 @@
 # Changelog
 
+## Windows 1.2.0-rc13.2 - Cuidadores y acceso claros
+
+- Ficha reorganizada en cuidadores, cuenta personal y administradores con acceso.
+- Selector accesible con opciones integradas; identidad y permisos diferenciados.
+- Borradores protegidos al cambiar de vista, persona o cerrar sesion; la atencion
+  de emergencia mantiene prioridad. Fallos de consulta no simulan estados vacios.
+- Invitaciones pendientes indicadas por espacio, sin inferir su ficha por correo.
+- Sin migraciones de Supabase, cambios FCM, reasignaciones ni APK nueva.
+- Limitaciones: permisos compartidos por seleccion, sin control de concurrencia;
+  asociacion de invitaciones a ficha pendiente en el contrato remoto.
+
 ## Windows 1.2.0-rc13.1 - Presentacion integrada de Personas (local)
 
 - Pestanas, tipografia y botones de Personas alineados con los ajustes del panel.

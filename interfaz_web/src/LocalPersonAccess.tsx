@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { AccessApp } from "./AccessApp";
+import { confirmTeamDraftExit } from "./teamDraftGuard";
 
 type Link = { resident_id: string; space_id: string };
 export function LocalPersonAccess({ localId, onPrepare }: { localId: number; onPrepare: () => void }) {
@@ -23,6 +24,6 @@ export function LocalPersonAccess({ localId, onPrepare }: { localId: number; onP
   }, [localId, revision]);
   const current = result?.id === localId ? result : null;
   if (!current) return <p role="status">Comprobando el vínculo de esta ficha…</p>;
-  if (!current.link) return <section className="person-link-empty"><h3>{current.failed ? "Vínculo sin verificar" : "Ficha guardada solo en esta PC"}</h3><p>{current.failed ? "No se pudo comprobar la referencia por internet." : "Todavía no tiene una referencia habilitada para asignar cuentas y cuidadores."}</p><div className="cloud-actions"><button className="resident-button" onClick={onPrepare}>Revisar preparación</button><button className="resident-button" onClick={() => setRevision(n => n + 1)} title="Comprobar vínculo" aria-label="Comprobar vínculo"><RefreshCw size={17}/></button></div></section>;
+  if (!current.link) return <section className="person-link-empty"><h3>{current.failed ? "Vínculo sin verificar" : "Ficha guardada solo en esta PC"}</h3><p>{current.failed ? "No se pudo comprobar la referencia por internet." : "Todavía no tiene una referencia habilitada para asignar cuentas y cuidadores."}</p><div className="cloud-actions"><button className="resident-button" onClick={() => { if (confirmTeamDraftExit()) onPrepare(); }}>Revisar preparación</button><button className="resident-button" onClick={() => setRevision(n => n + 1)} title="Comprobar vínculo" aria-label="Comprobar vínculo"><RefreshCw size={17}/></button></div></section>;
   return <AccessApp key={`${current.link.space_id}:${current.link.resident_id}`} embedded activeResidentId={localId} initialView="people" personContext={current.link}/>;
 }

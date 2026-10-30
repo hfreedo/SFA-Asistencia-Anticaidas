@@ -1,7 +1,9 @@
-import { useEffect, useState, type FormEvent, type SelectHTMLAttributes } from "react";
+import { Children, isValidElement, useEffect, useState, type FormEvent, type SelectHTMLAttributes } from "react";
+import * as Select from "@radix-ui/react-select";
 import type { Session } from "@supabase/supabase-js";
 import { Building2, Check, ChevronDown, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X, type LucideIcon } from "lucide-react";
 import { accessDataClient } from "./accessClient";
+import { registerTeamDraft } from "./teamDraftGuard";
 import "./peopleTeam.css";
 
 type Space = { space_id: string; name: string; role: string };
@@ -11,8 +13,13 @@ type Invitation = { id: string; email: string; role: string; expires_at: string 
 type Resident = { id: string; full_name: string };
 const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
 
-function TeamSelect({ icon: LeadingIcon, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
-  return <span className="team-select"><LeadingIcon className="team-select-icon" size={17} aria-hidden="true"/><select {...props}>{children}</select><ChevronDown className="team-select-chevron" size={16} aria-hidden="true"/></span>;
+function TeamSelect({ icon: LeadingIcon, children, id, value, disabled, onChange }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
+  const options = Children.toArray(children).filter(isValidElement<{ value: string; children: string } >).map(option => option.props);
+  const placeholder = options.find(option => option.value === "")?.children;
+  return <span className="team-select"><Select.Root value={String(value ?? "")} disabled={disabled} onValueChange={next => {
+    // Keep the existing field handlers; they consume only the selected value.
+    onChange?.({ target: { value: next }, currentTarget: { value: next } } as React.ChangeEvent<HTMLSelectElement>);
+  }}><Select.Trigger id={id} className="team-select-trigger"><LeadingIcon size={17} aria-hidden="true"/><Select.Value placeholder={placeholder}/><Select.Icon className="team-trigger-chevron"><ChevronDown size={16}/></Select.Icon></Select.Trigger><Select.Portal><Select.Content className="team-select-menu" position="popper" sideOffset={6} collisionPadding={12}><Select.Viewport>{options.filter(option => option.value !== "").map(option => <Select.Item key={option.value} value={String(option.value)} className="team-select-option"><Select.ItemText>{option.children}</Select.ItemText><Select.ItemIndicator><Check size={16}/></Select.ItemIndicator></Select.Item>)}</Select.Viewport></Select.Content></Select.Portal></Select.Root></span>;
 }
 
 export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId, initialSpaceId, initialSection = "team" }: { session: Session; spaces: Space[]; onAccessChanged: () => void; initialResidentId?: string; initialSpaceId?: string; initialSection?: "people" | "team" }) {
@@ -32,6 +39,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
   const [section, setSection] = useState<"people" | "team">(initialSection);
   const [personId, setPersonId] = useState(initialResidentId ?? "");
   const [formOpen, setFormOpen] = useState(initialSection === "team");
+  const [addingCaregiver, setAddingCaregiver] = useState(false);
   const [uniformConsent, setUniformConsent] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -40,6 +48,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("caregiver");
@@ -49,8 +58,15 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
   const [editing, setEditing] = useState<Member | null>(null);
   const [confirmation, setConfirmation] = useState<{ text: string; action: () => Promise<void> } | null>(null);
   useEffect(() => {
+    if (!formOpen) return;
+    const unregister = registerTeamDraft();
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => { unregister(); window.removeEventListener("beforeunload", warn); };
+  }, [formOpen]);
+  useEffect(() => {
     let active = true;
-    setLoading(true); setError(""); setMembers([]); setInvitations([]); setResidents([]);
+    setLoading(true); setError(""); setLoadFailed(false); setMembers([]); setInvitations([]); setResidents([]);
     const api = accessDataClient(session.access_token);
     void (async () => {
       try {
@@ -59,7 +75,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
         const people = await api.from("sfa_residents").select("id,full_name").eq("space_id", space.space_id).is("archived_at", null).order("full_name");
         if (people.error) throw people.error;
         if (active) { setMembers(team.data.members); setInvitations(team.data.invitations); setResidents(people.data ?? []); }
-      } catch { if (active) setError("No se pudo consultar el equipo. Revisa la sesión y que la etapa de permisos esté habilitada."); }
+      } catch { if (active) { setLoadFailed(true); setError("No se pudo consultar el equipo. Revisa la sesión y la conexión; no podemos confirmar las asignaciones."); } }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
@@ -76,11 +92,13 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     const { error: problem } = await accessDataClient(session.access_token).rpc(name, body);
     if (problem) throw problem;
   }
-  function reset() { setEditing(null); setEmail(""); setRole("caregiver"); setChosen([]); setConfigure(false); setShare(false); setUniformConsent(false); setFormOpen(false); }
+  function reset() { setEditing(null); setEmail(""); setRole("caregiver"); setChosen([]); setConfigure(false); setShare(false); setUniformConsent(false); setFormOpen(false); setAddingCaregiver(false); }
   function edit(member: Member) {
+    if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return false;
     setFormOpen(true); setUniformConsent(false);
     setEditing(member); setEmail(member.email); setRole(member.role); setChosen(member.access.map(a => a.resident_id));
     setConfigure(member.access.some(a => a.can_configure)); setShare(member.access.some(a => a.can_share_location));
+    return true;
   }
   async function save() {
     const selected = role === "admin" ? [] : chosen;
@@ -113,26 +131,30 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
   const availableCaregivers = person ? members.filter(m => m.role === "caregiver" && !m.access.some(a => a.resident_id === person.id)) : [];
   function inviteForPerson(nextRole: "caregiver" | "resident") {
     if (!person) return;
+    if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return;
     reset(); setRole(nextRole); setChosen([person.id]); setShare(nextRole === "resident"); setFormOpen(true);
     window.setTimeout(() => document.getElementById("team-email")?.focus(), 0);
   }
   return <>
     {error && <p role="alert" className="cloud-warning">{error}</p>}
+    {loadFailed && <button className="access-secondary" disabled={busy} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16}/>Reintentar consulta</button>}
     {notice && <p role="status" className="team-notice"><Check size={18} />{notice}</p>}
-    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { reset(); setSection("people"); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { reset(); setSection("team"); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
+    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section === "people") return; if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; reset(); setSection("people"); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section === "team") return; if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; reset(); setSection("team"); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
     {section === "people" && <section className="person-access-summary" aria-label="Cuidado y acceso de la persona">
-      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { setPersonId(e.target.value); reset(); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
+      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { if (formOpen && !window.confirm("Hay un formulario abierto. ¿Descartar los cambios sin guardar?")) return; setPersonId(e.target.value); reset(); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
       {loading && <p role="status">Consultando cuidadores y acceso…</p>}
-      {!loading && initialResidentId && !person && <p role="alert" className="cloud-warning">La ficha vinculada no está disponible en este espacio. No se seleccionará otra persona automáticamente.</p>}
-      {person && <><h3>{person.full_name}</h3><div className="person-access-columns"><section><h4>Quiénes la cuidan</h4>
-        {related.some(m => m.role === "caregiver") ? <ul>{related.filter(m => m.role === "caregiver").map(m => <li key={m.user_id}><span>{m.email}</span><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p>Sin cuidadores asignados.</p>}
-        {availableCaregivers.length > 0 && <div className="team-field"><label htmlFor="team-caregiver">Cuidador existente</label><TeamSelect icon={UsersRound} id="team-caregiver" value="" disabled={busy || loading} onChange={e => { const member = availableCaregivers.find(m => m.user_id === e.target.value); if (member) { edit(member); setChosen([...new Set([...member.access.map(a => a.resident_id), person.id])]); } }}><option value="">Seleccionar del equipo</option>{availableCaregivers.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}</TeamSelect></div>}
-        <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("caregiver")}><UserPlus size={16}/>Agregar cuidador</button></section>
-        <section><h4>Su acceso a la app</h4>{related.some(m => m.role === "resident") ? <ul>{related.filter(m => m.role === "resident").map(m => <li key={m.user_id}><div><span>{m.email}</span><small>Esta cuenta corresponde a {person.full_name}</small></div><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p>Sin cuenta personal vinculada.</p>}
+      {!loading && !loadFailed && initialResidentId && !person && <p role="alert" className="cloud-warning">La ficha vinculada no está disponible en este espacio. No se seleccionará otra persona automáticamente.</p>}
+      {person && !loadFailed && <><h3>{person.full_name}</h3><div className="person-access-columns"><section><h4>Cuidadores asignados</h4>
+        {related.some(m => m.role === "caregiver") ? <ul>{related.filter(m => m.role === "caregiver").map(m => <li key={m.user_id}><span>{m.email}</span><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuentas de cuidador asignadas. Los administradores del espacio también tienen acceso.</p>}
+        {!addingCaregiver && <button className="access-secondary" disabled={busy || loading} onClick={() => setAddingCaregiver(true)}><UserPlus size={16}/>Añadir cuidador</button>}
+        {addingCaregiver && <div className="caregiver-choices">{availableCaregivers.length > 0 && <div className="team-field"><label htmlFor="team-caregiver">Elegir una cuenta existente</label><TeamSelect icon={UsersRound} id="team-caregiver" value="" disabled={busy || loading} onChange={e => { const member = availableCaregivers.find(m => m.user_id === e.target.value); if (member && edit(member)) setChosen([...new Set([...member.access.map(a => a.resident_id), person.id])]); }}><option value="">Seleccionar del equipo</option>{availableCaregivers.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}</TeamSelect></div>}
+        <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("caregiver")}><Mail size={16}/>Invitar una cuenta nueva</button><button className="team-text-action" disabled={busy} onClick={() => setAddingCaregiver(false)}>Cerrar opciones</button></div>}</section>
+        <section><h4>Cuenta de la persona</h4>{related.some(m => m.role === "resident") ? <ul>{related.filter(m => m.role === "resident").map(m => <li key={m.user_id}><div><span>{m.email}</span><small>Esta cuenta corresponde a {person.full_name}</small></div><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuenta personal vinculada.</p>}
         <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("resident")}><Mail size={16}/>Dar acceso a esta persona</button></section></div>
-        <details className="person-admins"><summary>Administradores del espacio ({members.filter(m => m.role === "admin").length})</summary><ul>{members.filter(m => m.role === "admin").map(m => <li key={m.user_id}>{m.email}</li>)}</ul></details></>}
+        <details className="person-admins"><summary>Administradores con acceso ({members.filter(m => m.role === "admin").length})</summary><ul>{members.filter(m => m.role === "admin").map(m => <li key={m.user_id}>{m.email}</li>)}</ul></details>
+        {invitations.length > 0 && <p className="team-pending">Hay {invitations.length} {invitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"} en el espacio. Esta vista no permite confirmar a qué ficha corresponden.</p>}</>}
     </section>}
-    {section === "team" && !formOpen && <button className="access-primary team-new-account" disabled={busy || loading} onClick={() => { reset(); setFormOpen(true); }}><UserPlus size={17}/>Invitar una cuenta</button>}
+    {section === "team" && !formOpen && <button className="access-primary team-new-account" disabled={busy || loading || loadFailed} onClick={() => { reset(); setFormOpen(true); }}><UserPlus size={17}/>Invitar una cuenta</button>}
     <div className={`team-layout${section === "people" ? " person-form-layout" : ""}`}>
       {section === "team" &&
       <div>
@@ -148,7 +170,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
             }); } })}><UserRoundX size={16} />Revocar</button></div>
         </li>)}</ul>}
         <h3>Invitaciones pendientes</h3>
-        {!loading && !invitations.length && <p className="cloud-footnote">Sin invitaciones pendientes.</p>}
+        {!loading && !loadFailed && !invitations.length && <p className="cloud-footnote">Sin invitaciones pendientes.</p>}
         <ul className="team-members">{invitations.map(invite => <li key={invite.id}><div><strong>{invite.email}</strong><span>{roles[invite.role]} · Vence {new Date(invite.expires_at).toLocaleDateString("es")}</span></div>
           <button className="access-secondary" disabled={busy} onClick={() => setConfirmation({ text: `Cancelarás la invitación de ${invite.email}.`, action: async () => { await work(async () => {
             await command("sfa_cancel_team_invite", { p_space: space.space_id, p_invitation: invite.id }); return "Invitación cancelada.";
@@ -156,6 +178,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
       </div>}
       {formOpen && <form className="team-form" onSubmit={submit}>
         <div className="cloud-section-title"><UserPlus size={20} /><h3>{editing ? "Asignar permisos" : "Invitar al equipo"}</h3></div>
+        {editing && person && section === "people" && <p className="team-draft" role="status">Cambios sin guardar para {editing.email}. Revisa las personas y permisos antes de guardar.</p>}
         <div className="team-fields"><div className="team-field"><label htmlFor="team-email">Correo electrónico</label><span className="team-email-field"><Mail size={17} aria-hidden="true"/><input id="team-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} disabled={busy || Boolean(editing)} autoComplete="off" /></span></div>
         <div className="team-field"><label htmlFor="team-role">Rol</label><TeamSelect id="team-role" icon={ShieldCheck} value={role} disabled={busy || Boolean(editing)} onChange={e => { setRole(e.target.value); setChosen([]); setConfigure(false); setShare(e.target.value === "resident"); }}>
           <option value="caregiver">Cuidador</option><option value="resident">Persona cuidada</option><option value="admin">Administrador</option>
@@ -185,6 +208,6 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
       <h3 id="team-confirm-title">Confirmar cambio de acceso</h3><p id="team-confirm-text">{confirmation.text}</p>
       <div className="cloud-actions"><button className="access-secondary" autoFocus disabled={busy} onClick={() => setConfirmation(null)}>Cancelar</button><button className="access-primary" disabled={busy} onClick={() => void confirmation.action()}><Save size={17} />Confirmar</button></div>
     </section></div>}
-    <button className="access-secondary team-refresh-access" disabled={busy} onClick={onAccessChanged}><RefreshCw size={16} />Revalidar mis permisos</button>
+    <button className="access-secondary team-refresh-access" disabled={busy || formOpen} onClick={onAccessChanged}><RefreshCw size={16} />Revalidar mis permisos</button>
   </>;
 }

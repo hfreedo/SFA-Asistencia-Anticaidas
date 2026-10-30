@@ -8,6 +8,7 @@ import { TeamPanel } from "./TeamPanel";
 const session = { access_token: "PRIVATE_SESSION_FIXTURE", user: { id: "admin" } } as Session;
 const spaces = [{ space_id: "space-a", name: "Equipo A", role: "admin" }];
 beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.clearAllMocks();
   mock.rpc.mockImplementation(async (name: string) => name === "sfa_team" ? { data: { members: [
     { user_id: "admin", email: "admin@example.invalid", role: "admin", access: [] },
@@ -44,7 +45,8 @@ it("administrator invitation requires explicit confirmation", async () => {
   render(<TeamPanel session={session} spaces={spaces} onAccessChanged={() => {}} />);
   await screen.findByLabelText("Persona A");
   fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "new@example.invalid" } });
-  fireEvent.change(screen.getByLabelText("Rol"), { target: { value: "admin" } });
+  fireEvent.keyDown(screen.getByLabelText("Rol"), { key: "Enter" });
+  fireEvent.click(screen.getByRole("option", { name: "Administrador" }));
   fireEvent.click(screen.getByRole("button", { name: "Crear invitación" }));
   expect(await screen.findByRole("alertdialog")).toBeTruthy(); expect(mock.invoke).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -73,8 +75,8 @@ it("revocation uses the restricted command only after confirmation", async () =>
 it("person view describes care separately from personal identity and uses a single-choice ficha", async () => {
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
   await screen.findByText("care@example.invalid");
-  expect(screen.getByText("Quiénes la cuidan")).toBeTruthy();
-  expect(screen.getByText("Su acceso a la app")).toBeTruthy();
+  expect(screen.getByText("Cuidadores asignados")).toBeTruthy();
+  expect(screen.getByText("Cuenta de la persona")).toBeTruthy();
   expect(screen.queryByLabelText("Correo electrónico")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Dar acceso a esta persona" }));
   expect(screen.getByText("Ficha a la que corresponde esta cuenta")).toBeTruthy();
@@ -93,13 +95,42 @@ it("context from an unauthorized space never falls back to another administered 
 it("missing context person is not replaced by the first available person", async () => {
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="missing" onAccessChanged={() => {}}/>);
   await screen.findByRole("alert");
-  expect(screen.queryByRole("button", { name: "Agregar cuidador" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Añadir cuidador" })).toBeNull();
   expect(mock.invoke).not.toHaveBeenCalled();
+});
+
+it("failed consultation never implies an empty team or a missing linked person", async () => {
+  mock.rpc.mockResolvedValue({ data: null, error: { message: "offline" } });
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText(/No se pudo consultar el equipo/);
+  expect(screen.queryByText(/La ficha vinculada no está disponible/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Equipo y accesos" }));
+  expect(screen.queryByText("Sin invitaciones pendientes.")).toBeNull();
+  expect(screen.getByRole("button", { name: "Reintentar consulta" })).toBeTruthy();
+});
+it("reports pending invitations as space-wide without guessing a person's identity", async () => {
+  mock.rpc.mockResolvedValue({ data: { members: [], invitations: [{ id: "invite", email: "other@example.invalid", role: "resident", expires_at: "2030-01-01T00:00:00Z" }] }, error: null });
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  expect(await screen.findByText(/Hay 1 invitación pendiente en el espacio/)).toBeTruthy();
+  expect(screen.getByText(/no permite confirmar a qué ficha corresponden/)).toBeTruthy();
+  expect(screen.queryByText("other@example.invalid")).toBeNull();
+});
+it("keeps an open draft when navigation is cancelled", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("care@example.invalid");
+  fireEvent.click(screen.getByRole("button", { name: "Dar acceso a esta persona" }));
+  fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "draft@example.invalid" } });
+  fireEvent.click(screen.getByRole("button", { name: "Equipo y accesos" }));
+  expect((screen.getByLabelText("Correo electrónico") as HTMLInputElement).value).toBe("draft@example.invalid");
+  expect(mock.invoke).not.toHaveBeenCalled();
+  confirm.mockRestore();
 });
 it("assigning an existing caregiver preserves other residents and waits for explicit save", async () => {
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-b" onAccessChanged={() => {}}/>);
-  await screen.findByRole("option", { name: "care@example.invalid" });
-  fireEvent.change(screen.getByLabelText("Cuidador existente"), { target: { value: "caregiver" } });
+  fireEvent.click(await screen.findByRole("button", { name: "Añadir cuidador" }));
+  fireEvent.keyDown(screen.getByLabelText("Elegir una cuenta existente"), { key: "Enter" });
+  fireEvent.click(screen.getByRole("option", { name: "care@example.invalid" }));
   expect((screen.getByLabelText("Persona A") as HTMLInputElement).checked).toBe(true);
   expect((screen.getByLabelText("Persona B") as HTMLInputElement).checked).toBe(true);
   expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);

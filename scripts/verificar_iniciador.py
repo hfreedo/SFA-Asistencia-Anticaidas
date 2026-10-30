@@ -81,7 +81,7 @@ try:
                         assert urlsplit(url).netloc == urlsplit(base).netloc, 'Unexpected external script'
                         with urllib.request.urlopen(url, timeout=5, context=context) as response:
                             bundles.append(response.read().decode('utf-8'))
-                    assert any('Ficha a la que corresponde esta cuenta' in bundle and 'Quiénes la cuidan' in bundle for bundle in bundles), 'Old people/team bundle'
+                    assert any('Ficha a la que corresponde esta cuenta' in bundle and 'Cuidadores asignados' in bundle for bundle in bundles), 'Old people/team bundle'
                     if '--people-style' in sys.argv:
                         styles = []
                         for source in parser.styles:

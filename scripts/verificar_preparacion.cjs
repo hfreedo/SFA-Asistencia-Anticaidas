@@ -60,25 +60,33 @@ const server = http.createServer((req, res) => {
       const role = page.getByLabel('Rol', { exact: true });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await role.focus();
-      await page.waitForFunction(() => document.activeElement?.id === 'team-role' && getComputedStyle(document.activeElement).borderTopColor === 'rgb(13, 148, 136)');
+      await role.press('Space');
+      await page.waitForFunction(() => document.getElementById('team-role')?.getAttribute('data-state') === 'open' && getComputedStyle(document.getElementById('team-role')).borderTopColor === 'rgb(13, 148, 136)');
       const select = await role.evaluate(node => {
         const style = getComputedStyle(node);
         return { height: node.getBoundingClientRect().height, appearance: style.appearance, border: style.borderTopColor, shadow: style.boxShadow };
       });
       assert.equal(select.height, 42, 'Shared selector height');
-      assert.equal(select.appearance, 'none', 'Native select has integrated chrome');
       assert.equal(select.border, 'rgb(13, 148, 136)', 'Teal focus instead of black browser outline');
       assert.notEqual(select.shadow, 'none');
       const emailHeight = await page.getByLabel('Correo electrónico', { exact: true }).evaluate(node => node.getBoundingClientRect().height);
       assert.equal(emailHeight, select.height, 'Email and role align');
       const selected = await page.locator('.team-assignment:has(input:checked)').evaluate(node => getComputedStyle(node).backgroundColor);
       assert.equal(selected, 'rgb(240, 253, 250)', 'Selected person is visibly distinguished');
+      await page.getByRole('listbox').waitFor();
+      await page.screenshot({path:path.join(output,`selector-pulido-${page.viewportSize().width}.png`),fullPage:true});
+      await page.keyboard.press('Escape');
+    }
+    async function choose(label, text) {
+      await page.getByLabel(label, {exact:true}).click();
+      await page.getByRole('option', {name:text,exact:true}).click();
     }
     async function checkTeamDialog() {
       await page.getByRole('button', { name: 'Cerrar formulario', exact: true }).click();
-      await page.getByRole('button', { name: 'Agregar cuidador', exact: true }).click();
+      await page.getByRole('button', { name: 'Añadir cuidador', exact: true }).click();
+      await page.getByRole('button', { name: 'Invitar una cuenta nueva', exact: true }).click();
       await page.getByLabel('Correo electrónico', { exact: true }).fill('prueba@example.invalid');
-      await page.getByLabel('Rol', { exact: true }).selectOption('admin');
+      await choose('Rol', 'Administrador');
       await page.getByRole('button', { name: 'Crear invitación', exact: true }).click();
       const dialog = page.getByRole('alertdialog');
       await dialog.waitFor();
@@ -116,8 +124,8 @@ const server = http.createServer((req, res) => {
       if (portal) {
         await page.goto(`${origin}/acceso.html?qa=${width}`);
         await page.getByRole('button', { name: 'Personas y equipo', exact: true }).click();
-        await page.getByRole('option', { name: 'Residente de demostración', exact: true }).waitFor({ state: 'attached' });
-        await page.getByLabel('Persona cuidada', { exact: true }).selectOption('fixture-person');
+        await page.getByLabel('Persona cuidada', {exact:true}).waitFor();
+        await choose('Persona cuidada', 'Residente de demostración');
         await page.getByText('cuidador@example.invalid', { exact: true }).waitFor();
         await page.getByRole('button', { name: 'Dar acceso a esta persona', exact: true }).click();
         assert.equal(await page.getByRole('radio', { name: 'Residente de demostración', exact: true }).isChecked(), true);
@@ -137,8 +145,9 @@ const server = http.createServer((req, res) => {
         await page.screenshot({ path: path.join(output, `personas-datos-${width}.png`), fullPage: true });
         await page.getByRole('button', { name: 'Cuidadores y acceso', exact: true }).click();
         await page.getByText('cuidador@example.invalid', { exact: true }).waitFor();
-        await page.getByRole('heading', { name: 'Quiénes la cuidan' }).waitFor();
-        await page.getByLabel('Cuidador existente', { exact: true }).selectOption('fixture-spare');
+        await page.getByRole('heading', { name: 'Cuidadores asignados' }).waitFor();
+        await page.getByRole('button', { name: 'Añadir cuidador', exact: true }).click();
+        await choose('Elegir una cuenta existente', 'nuevo-cuidador@example.invalid');
         assert.equal(await page.getByLabel('Correo electrónico', { exact: true }).inputValue(), 'nuevo-cuidador@example.invalid');
         assert.equal(await page.getByRole('checkbox', { name: 'Residente de demostración', exact: true }).isChecked(), true);
         await page.getByRole('button', { name: 'Cancelar edición', exact: true }).click();
@@ -152,6 +161,11 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Account overflow at ${width}`);
         await page.evaluate(() => { window.scrollTo(0,0); return new Promise(resolve => requestAnimationFrame(resolve)); });
         await page.screenshot({ path: path.join(output, `personas-cuenta-${width}.png`), fullPage: true });
+        let draftWarning = false;
+        page.once('dialog', dialog => { draftWarning = true; return dialog.dismiss(); });
+        await page.getByRole('button', { name: 'Datos de Residente de demostración', exact: true }).click();
+        assert.equal(draftWarning, true, 'Leaving an open draft must ask before discarding');
+        assert.equal(await page.getByLabel('Correo electrónico', { exact: true }).isVisible(), true, 'Cancelled navigation preserves the draft');
         await checkTeamDialog();
         await page.getByRole('button', { name: 'Equipo y accesos', exact: true }).click();
         await page.getByText('Cuida a: Residente de demostración', { exact: true }).waitFor();

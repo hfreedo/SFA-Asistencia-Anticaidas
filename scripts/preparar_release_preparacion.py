@@ -8,7 +8,7 @@ from preparar_entrega_actual import digest, validate_archive
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1'), default='1.2.0-rc13.1')
+parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2'), default='1.2.0-rc13.2')
 version = parser.parse_args().version
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 archive = root / 'release' / f'SFA-Asistencia-{version}-Windows.zip'
@@ -44,6 +44,11 @@ if captures.is_dir():
 Extraer TODO el ZIP en una carpeta con permiso de escritura.
 Abrir SFA_Asistencia.exe. No requiere Python ni Node.js instalados.
 No abrir esta copia junto al Centro habitual: cada copia aislada tiene sus datos.
+
+Novedad rc13.2: ficha con cuidadores, cuenta personal y administradores claros.
+Selector accesible, aviso antes de abandonar formularios y consulta fallida
+distinguida de un estado vacio. Invitaciones pendientes se muestran por espacio,
+sin atribuirlas a una ficha cuando faltan datos. Sin cambios cloud ni Android.
 
 Presentacion rc13.1: Personas integrada con el estilo del panel. Selectores con
 iconos, altura comun y foco teal; opciones de ficha con seleccion visible.
