@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const mock = vi.hoisted(() => ({
   getSession: vi.fn(), getUser: vi.fn(), signIn: vi.fn(), reset: vi.fn(), from: vi.fn(),
-  dataClient: vi.fn(), rpc: vi.fn(),
+  dataClient: vi.fn(), rpc: vi.fn(), signOut: vi.fn(),
 }));
 vi.mock("./accessClient", () => ({
   configurationProblem: null,
@@ -14,6 +14,7 @@ vi.mock("./accessClient", () => ({
       getSession: mock.getSession, getUser: mock.getUser,
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
       signInWithPassword: mock.signIn, resetPasswordForEmail: mock.reset,
+      signOut: mock.signOut,
     },
     from: mock.from,
   },
@@ -25,17 +26,78 @@ beforeEach(() => {
   mock.getSession.mockResolvedValue({ data: { session: null }, error: null });
   mock.signIn.mockResolvedValue({ error: { message: "INTERNAL_PROVIDER_DETAIL" } });
   mock.reset.mockResolvedValue({ error: null });
+  mock.signOut.mockResolvedValue({ error: null });
   mock.rpc.mockResolvedValue({ data: { accepted: 0 }, error: null });
   mock.dataClient.mockReturnValue({ from: mock.from, rpc: mock.rpc });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("SFA access screen", () => {
+  it("does not describe a resident as a caregiver or expose team administration", async () => {
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
+    mock.from.mockImplementation((table: string) => table === "sfa_memberships"
+      ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "resident" }], error: null }) }) }) }
+      : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
+    render(<AccessApp embedded activeResidentId={7} />);
+    expect(await screen.findByText(/Tu cuenta corresponde a una persona cuidada/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Personas y equipo" })).toBeNull();
+    expect(screen.queryByText(/Tu acceso permite cuidar/)).toBeNull();
+  });
   it("shows an accessible login without public registration", async () => {
     render(<AccessApp />);
     expect(await screen.findByLabelText("Correo electrónico")).toBeTruthy();
     expect(screen.getByLabelText("Contraseña")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /registrar/i })).toBeNull();
+  });
+  it("embeds the same verified access flow without a second navigation shell", async () => {
+    render(<AccessApp embedded activeResidentId={7} />);
+    expect(await screen.findByLabelText("Correo electrónico")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Acceso por internet" })).toBeTruthy();
+    expect(screen.queryByRole("main")).toBeNull();
+    expect(screen.queryByRole("link", { name: /SFA Asistencia, inicio/ })).toBeNull();
+  });
+  it("a verified caregiver cannot bind the PC through embedded access", async () => {
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
+    mock.from.mockImplementation((table: string) => table === "sfa_memberships"
+      ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "caregiver" }], error: null }) }) }) }
+      : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
+    render(<AccessApp embedded activeResidentId={7} />);
+    expect(await screen.findByText(/necesita intervenir un administrador/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Vincular y sincronizar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Personas y equipo" })).toBeNull();
+  });
+  it("embedded recovery keeps the existing authorized portal return path", async () => {
+    render(<AccessApp embedded />);
+    fireEvent.click(await screen.findByRole("button", { name: "Olvidé mi contraseña" }));
+    fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "test@example.invalid" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar enlace" }));
+    await waitFor(() => expect(mock.reset).toHaveBeenCalledWith("test@example.invalid", {
+      redirectTo: `${window.location.origin}/acceso/acceso.html?flow=recovery`,
+    }));
+  });
+  it("an embedded admin binds the selected profile and pauses before logout without changing URL", async () => {
+    const originalUrl = window.location.href;
+    const fetcher = vi.fn(async (path: string) => ({ ok: true, json: async () => path === "/api/residents"
+      ? [{ id: 7, full_name: "Perfil seleccionado", room: "Sala", is_active: 1 }]
+      : { session_active: false, bindings: [], pending: 0, sent: 0, blocked: 0 } }));
+    vi.stubGlobal("fetch", fetcher);
+    mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
+    mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
+    mock.from.mockImplementation((table: string) => table === "sfa_memberships"
+      ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "admin" }], error: null }) }) }) }
+      : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
+    render(<AccessApp embedded activeResidentId={7} />);
+    await screen.findByRole("option", { name: /Perfil seleccionado/ });
+    expect(screen.queryByText("Monitoreo remoto")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar sesión" }));
+    await screen.findByRole("button", { name: "Iniciar sesión" });
+    expect(fetcher).toHaveBeenCalledWith("/api/cloud/pause", { method: "POST" });
+    expect(mock.signOut).toHaveBeenCalledWith({ scope: "local" });
+    const pauseCall = fetcher.mock.calls.findIndex(call => call[0] === "/api/cloud/pause");
+    expect(fetcher.mock.invocationCallOrder[pauseCall]).toBeLessThan(mock.signOut.mock.invocationCallOrder[0]);
+    expect(window.location.href).toBe(originalUrl);
   });
 
   it("submits credentials only through the auth adapter and sanitizes errors", async () => {

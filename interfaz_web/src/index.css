@@ -110,7 +110,7 @@ aside nav button { align-items: center; border: 0; border-radius: 8px; padding: 
 aside nav button > div { align-items: center; gap: 13px; }
 aside nav button span { font-family: Geist, sans-serif !important; font-style: normal !important; font-size: 16px; font-weight: 600; }
 aside nav button > div > span:first-child { font-size: 12px; color: #0D9488; }
-aside nav button:has(> span) { background: #ECFDF5; box-shadow: inset 3px 0 #0D9488; }
+aside nav button[aria-current="page"] { background: #ECFDF5; box-shadow: inset 3px 0 #0D9488; }
 aside nav button:hover { background: #F0FDFA; }
 header { background: #FFFFFF !important; border-color: #E2E8F0 !important; min-height: 80px; }
 header button { min-height: 42px; font-size: 14px !important; }

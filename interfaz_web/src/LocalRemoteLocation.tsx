@@ -3,7 +3,7 @@ import { Cloud, LogIn, RefreshCw } from "lucide-react";
 import { type RemotePosition } from "./RemoteLocation";
 import { InternetGeofence, type ZoneApi } from "./CloudGeofence";
 
-export function LocalRemoteLocation({ residentId, residentName }: { residentId?: number; residentName: string }) {
+export function LocalRemoteLocation({ residentId, residentName, onPrepare }: { residentId?: number; residentName: string; onPrepare?: () => void }) {
   const [result, setResult] = useState<{ id: number; position: RemotePosition | null; error: string; reference: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [clock, setClock] = useState(Date.now());
@@ -31,8 +31,8 @@ export function LocalRemoteLocation({ residentId, residentName }: { residentId?:
         const data = await response.json();
         if (!response.ok) {
           const code = data?.detail?.code;
-          const error = response.status === 401 ? "Inicia sesión en el acceso de esta PC y reanuda los envíos para habilitar la consulta remota."
-            : response.status === 404 ? "Este perfil local todavía no está vinculado al residente de Supabase. Vincúlalo desde el acceso de esta PC."
+          const error = response.status === 401 ? "Abre Preparación, inicia sesión y reanuda los envíos para habilitar la consulta remota."
+            : response.status === 404 ? "Este perfil local todavía no está vinculado al residente de Supabase. Vincúlalo desde Preparación."
             : response.status === 403 ? "Abre el panel en localhost y comprueba que tu cuenta tenga acceso a este residente."
             : "No se pudo consultar Supabase. Revisa la conexión de esta PC.";
           if (active) setResult({ id: residentId, position: null, error, reference: typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? code : String(response.status) });
@@ -54,7 +54,7 @@ export function LocalRemoteLocation({ residentId, residentName }: { residentId?:
       {!current && <p role="status">Consultando la ubicación remota…</p>}
       {current && <InternetGeofence key={residentId} api={zoneApi} position={current.position} clock={clock} />}
     </>}
-    <div className="geo-actions"><a className="resident-button link-resident" href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer"><LogIn size={17} />Acceso y vínculo de esta PC</a></div>
+    <div className="geo-actions">{onPrepare ? <button className="resident-button link-resident" onClick={onPrepare}><LogIn size={17} />Preparar acceso y vínculo</button> : <a className="resident-button link-resident" href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer"><LogIn size={17} />Acceso y vínculo de esta PC</a>}</div>
     <p className="remote-gps-footnote">Guarda la zona remota aquí para que Android la consulte por internet. La zona local de la PC no se copia automáticamente.</p>
   </section>;
 }

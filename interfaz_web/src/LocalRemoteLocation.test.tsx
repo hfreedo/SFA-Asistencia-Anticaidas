@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 vi.mock("./RemoteLocation", () => ({ RemoteLocation: ({ position }: { position: { latitude: number } | null }) => <div>{position ? `GPS remoto ${position.latitude}` : "Sin ubicación remota"}</div> }));
 import { LocalRemoteLocation } from "./LocalRemoteLocation";
 const fetchMock=vi.fn();
@@ -17,8 +17,17 @@ it("explains a missing cloud session instead of pretending the phone is disconne
   fetchMock.mockResolvedValue({ok:false,status:401,json:async()=>({detail:{code:"session_required"}})});
   render(<LocalRemoteLocation residentId={1} residentName="Prueba"/>);
   expect(await screen.findByRole("alert")).toBeTruthy();
-  expect(screen.getByText(/Inicia sesión en el acceso/)).toBeTruthy();
+  expect(screen.getByText(/Abre Preparación, inicia sesión/)).toBeTruthy();
   expect(screen.getByRole("link").getAttribute("href")).toBe("/acceso/acceso.html");
+});
+it("opens preparation in the same panel when integrated", async()=>{
+  fetchMock.mockResolvedValue({ok:false,status:401,json:async()=>({detail:{code:"session_required"}})});
+  const onPrepare=vi.fn();
+  render(<LocalRemoteLocation residentId={1} residentName="Prueba" onPrepare={onPrepare}/>);
+  await screen.findByRole("alert");
+  fireEvent.click(screen.getByRole("button", {name:"Preparar acceso y vínculo"}));
+  expect(onPrepare).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("link")).toBeNull();
 });
 it("clears a previous residents location when changing profiles", async()=>{
   fetchMock.mockResolvedValueOnce({ok:true,json:async()=>({position:{latitude:12}})})

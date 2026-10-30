@@ -5,7 +5,7 @@ import { accessClient as client, accessDataClient, configurationProblem } from "
 import { accessFailure, accessUrl, callbackMode, passwordProblem, type AccessMode } from "./authPolicy";
 import "./access.css";
 import projectLogo from "../public/assets/sfa-asistencia-logo.png";
-import { RemoteMonitor } from "./RemoteMonitor";
+import { LocalSync, RemoteMonitor } from "./RemoteMonitor";
 import { isLocalPortal } from "./cloudPolicy";
 import { TeamPanel } from "./TeamPanel";
 
@@ -13,7 +13,7 @@ type Membership = { space_id: string; role: string; name: string };
 const INITIAL_MODE = callbackMode(window.location.search, window.location.hash);
 const LABELS: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
 
-export function AccessApp() {
+export function AccessApp({ embedded = false, activeResidentId, initialView = "monitor", personContext }: { embedded?: boolean; activeResidentId?: number; initialView?: "monitor" | "people"; personContext?: { resident_id: string; space_id: string } }) {
   const [mode, setMode] = useState<AccessMode>(INITIAL_MODE);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -28,7 +28,7 @@ export function AccessApp() {
   const [error, setError] = useState(configurationProblem ?? "");
   const [notice, setNotice] = useState("");
   const [errorReference, setErrorReference] = useState("");
-  const [view, setView] = useState<"monitor" | "team">("monitor");
+  const [view, setView] = useState<"monitor" | "people">(initialView);
   const [permissionRevision, setPermissionRevision] = useState(0);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export function AccessApp() {
     try {
       if (mode === "recovery") {
         const { error: problem } = await client.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: accessUrl(window.location.href, true),
+          redirectTo: accessUrl(embedded ? new URL("/acceso/acceso.html", window.location.origin).href : window.location.href, true),
         });
         if (problem) throw new Error("recovery");
         setNotice("Si la cuenta está habilitada, recibirás un correo para recuperar el acceso.");
@@ -114,7 +114,7 @@ export function AccessApp() {
         const { error: problem } = await client.auth.updateUser({ password });
         if (problem) throw new Error("password");
         setMode("login");
-        window.history.replaceState({}, "", accessUrl(window.location.href));
+        if (!embedded) window.history.replaceState({}, "", accessUrl(window.location.href));
         setNotice("Contraseña guardada. Tu sesión está activa.");
       } else {
         const { error: problem } = await client.auth.signInWithPassword({ email: email.trim(), password });
@@ -131,14 +131,14 @@ export function AccessApp() {
     if (!client) return;
     setBusy(true); setError("");
     try {
-      if (isLocalPortal(window.location)) {
+      if (isLocalPortal(window.location) || (embedded && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname))) {
         const paused = await fetch("/api/cloud/pause", { method: "POST" });
         if (!paused.ok) throw new Error("pause");
       }
       const { error: problem } = await client.auth.signOut({ scope: "local" });
       if (problem) throw problem;
       setSession(null); setUser(null); setMemberships([]); setMode("login"); setNotice("");
-      window.history.replaceState({}, "", accessUrl(window.location.href));
+      if (!embedded) window.history.replaceState({}, "", accessUrl(window.location.href));
     } catch { setError("No se pudo cerrar la sesión. Inténtalo de nuevo."); }
     finally { setBusy(false); }
   }
@@ -151,28 +151,34 @@ export function AccessApp() {
     "Elige una contraseña personal para proteger tu cuenta." : mode === "recovery" ?
       "Te enviaremos un enlace al correo de tu cuenta." : "Ingresa con la cuenta que recibió la invitación.";
 
-  return <main className="sfa-access">
-    <div className="access-topline"><a className="access-brand" href={accessUrl(window.location.href)} aria-label="SFA Asistencia, inicio">
+  const accountIdentity = <><p className="access-account-email"><Mail size={18} />{user?.email}</p>
+    {memberships.length ? <ul>{memberships.map(link => <li key={link.space_id}><ShieldCheck size={20} /><div><strong>{link.name}</strong><span>{LABELS[link.role] ?? "Acceso autorizado"}</span></div></li>)}</ul> :
+      <p className="access-no-membership">Tu cuenta está verificada, pero aún no tiene un espacio asignado. El administrador debe autorizar tu vínculo.</p>}</>;
+  return <div role={embedded ? undefined : "main"} className={`${embedded ? "sfa-access embedded-access" : "sfa-access"}${personContext ? " person-context" : ""}`}>
+    {!embedded && <div className="access-topline"><a className="access-brand" href={accessUrl(window.location.href)} aria-label="SFA Asistencia, inicio">
       <img src={projectLogo} alt="" />
       <span><b>SFA</b><em>Asistencia</em></span>
-    </a><span className="access-context"><ShieldCheck size={17} /> Acceso personal</span></div>
+    </a><span className="access-context"><ShieldCheck size={17} /> Acceso personal</span></div>}
     <section className={`access-workspace${signedIn ? " is-account" : ""}`} aria-labelledby="access-title">
-      <div className="access-heading"><span className="access-symbol"><ShieldCheck size={25} /></span>
+      {!(personContext && signedIn) && <div className="access-heading"><span className="access-symbol"><ShieldCheck size={25} /></span>
         <p className="access-eyebrow">PLATAFORMA DE TELEASISTENCIA</p>
-        <h1 id="access-title">{title}</h1><p>{subtitle}</p></div>
+        {embedded ? <h2 id="access-title">Acceso por internet</h2> : <h1 id="access-title">{title}</h1>}<p>{subtitle}</p></div>}
+      {personContext && signedIn && <h2 id="access-title" className="sr-only">Cuidadores y acceso de esta ficha</h2>}
       <div className="access-form-area">
         {error && <div className="access-feedback is-error" role="alert"><WifiOff size={18} /><span>{error}{errorReference && <small>Referencia de soporte: {errorReference}</small>}</span></div>}
         {notice && <div className="access-feedback" role="status"><Check size={18} /><span>{notice}</span></div>}
         {pending ? <div className="access-progress" role="status"><LoaderCircle className="access-spin" size={24} /> Verificando acceso…</div> :
-          signedIn ? <div className="access-account"><p className="access-account-email"><Mail size={18} />{user?.email}</p>
-            {memberships.length ? <ul>{memberships.map(link => <li key={link.space_id}><ShieldCheck size={20} /><div><strong>{link.name}</strong><span>{LABELS[link.role] ?? "Acceso autorizado"}</span></div></li>)}</ul> :
-              <p className="access-no-membership">Tu cuenta está verificada, pero aún no tiene un espacio asignado. El administrador debe autorizar tu vínculo.</p>}
+          signedIn ? <div className="access-account">{personContext ? <details className="person-account-details"><summary>Sesión de {user?.email}</summary>{accountIdentity}</details> : accountIdentity}
             {memberships.length > 0 && session && <>
-              <nav className="portal-navigation" aria-label="Vistas del espacio">
-                <button aria-pressed={view === "monitor"} onClick={() => setView("monitor")}><LayoutDashboard size={18} />Monitoreo</button>
-                {memberships.some(m => m.role === "admin") && <button aria-pressed={view === "team"} onClick={() => setView("team")}><UsersRound size={18} />Equipo y permisos</button>}
-              </nav>
-              {view === "team" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : <RemoteMonitor session={session} spaces={memberships} />}
+              {!personContext && <nav className="portal-navigation" aria-label="Vistas del espacio">
+                <button aria-pressed={view === "monitor"} onClick={() => setView("monitor")}><LayoutDashboard size={18} />{embedded ? "Vincular esta PC" : memberships.some(m => m.role === "admin" || m.role === "caregiver") ? "Monitoreo" : "Mi estado"}</button>
+                {memberships.some(m => m.role === "admin") && <button aria-pressed={view === "people"} onClick={() => setView("people")}><UsersRound size={18} />Personas y equipo</button>}
+              </nav>}
+              {view === "people" && memberships.some(m => m.role === "admin") ? <TeamPanel session={session} spaces={memberships} initialResidentId={personContext?.resident_id} initialSpaceId={personContext?.space_id} initialSection="people" onAccessChanged={() => setPermissionRevision(n => n + 1)} /> : embedded
+                ? memberships.some(m => m.role === "admin")
+                  ? activeResidentId ? <LocalSync key={`${user?.id}:${activeResidentId}`} session={session} spaces={memberships.filter(m => m.role === "admin")} activeResidentId={activeResidentId} /> : <p className="access-stage-note">Selecciona un perfil local antes de vincular esta PC.</p>
+                  : <p className="access-stage-note">{memberships.some(m => m.role === "caregiver") ? "Tu acceso permite cuidar." : "Tu cuenta corresponde a una persona cuidada."} {personContext ? "Solo un administrador puede gestionar el equipo y las cuentas de esta ficha." : "Para vincular esta PC necesita intervenir un administrador del espacio."}</p>
+                : <RemoteMonitor session={session} spaces={memberships} />}
             </>}
             <button type="button" className="access-secondary" disabled={busy} onClick={() => void logout()}><LogOut size={18} />Cerrar sesión</button>
           </div> : <form onSubmit={event => void submit(event)}>
@@ -185,6 +191,6 @@ export function AccessApp() {
       </div>
       <div className="access-bottom"><ShieldCheck size={16} /><span>Solo personas autorizadas. Sin registro público.</span></div>
     </section>
-    <footer className="access-footer">SFA Asistencia<span>Entorno de pruebas</span></footer>
-  </main>;
+    {!embedded && <footer className="access-footer">SFA Asistencia<span>Entorno de pruebas</span></footer>}
+  </div>;
 }

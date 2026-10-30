@@ -5,8 +5,12 @@ import { EmailSettings, LocationHistory, LocationPanel, locationLabel, showBrows
 import { LocalRemoteLocation } from "./LocalRemoteLocation";
 import { LocalIncidentPanel } from "./LocalIncidentPanel";
 import { IncidentNavIndicator } from "./IncidentNavIndicator";
-import type { IncidentAttention } from "./IncidentWorkspace";
+import type { IncidentAttention, IncidentFeed } from "./IncidentWorkspace";
+import { CareActivity, CareLocationSummary, CareSignal, mergeCareActivity, useRemoteHomePosition, type LocationSource } from "./CareOverview";
 import { PushTestSettings } from "./PushTestSettings";
+import { Preparation, type SettingsEntry } from "./Preparation";
+import { PreparationIndicator, usePreparationStatus, type PreparationCheck } from "./preparationStatus";
+import { LocalPersonAccess } from "./LocalPersonAccess";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -16,7 +20,7 @@ import {
   useState,
 } from "react";
 
-type View = "home" | "map" | "settings";
+type View = "home" | "map" | "settings" | "setup" | "people";
 type RiskState =
   | "NORMAL"
   | "EVENTO_INERCIAL"
@@ -223,8 +227,11 @@ function isRealPayload(payload: {
 }
 
 export function SfaDashboardApp() {
-  const [view, setView] = useState<View>("home");
-  const [settingsEntry, setSettingsEntry] = useState<"residents" | "hardware">("residents");
+  const preparationCheck = usePreparationStatus();
+  const [focusPreparationAccess, setFocusPreparationAccess] = useState(false);
+  const openPreparationAccess = () => { setFocusPreparationAccess(true); setView("setup"); };
+  const [view, setView] = useState<View>(() => window.location.hash === "#preparacion" ? "setup" : "home");
+  const [settingsEntry, setSettingsEntry] = useState<SettingsEntry>("residents");
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectedPort, setConnectedPort] = useState<string | null>(null);
@@ -247,8 +254,15 @@ export function SfaDashboardApp() {
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
   const [cloudAttention,setCloudAttention]=useState<IncidentAttention>({pending:0,followup:false});
+  const [cloudFeed,setCloudFeed]=useState<{id:number;value:IncidentFeed}|null>(null);
+  const reportFeed=useCallback((id:number,value:IncidentFeed)=>setCloudFeed({id,value}),[]);
+  const currentFeed = cloudFeed?.id === profile?.id ? cloudFeed?.value ?? null : null;
+  const [locationSources,setLocationSources]=useState<Record<number,LocationSource>>({});
+  const locationSource = profile?.id ? locationSources[profile.id] ?? "remote" : "remote";
+  const chooseLocationSource = (source:LocationSource) => { const id=profile?.id; if (id) setLocationSources(current=>({...current,[id]:source})); };
   const reportAttention=useCallback((value:IncidentAttention)=>setCloudAttention(value),[]);
   useEffect(()=>setCloudAttention({pending:0,followup:false}),[profile?.id]);
+  useEffect(()=>{ setFirstMotion(null); setTelemetry(null); lastFallReading.current=null; },[profile?.id]);
   const locationSnapshot = useResidentLocation(profile?.id);
   const [mutedGeofence, setMutedGeofence] = useState("");
   const geofenceIncident = locationSnapshot?.status === "outside" ? `${profile?.id}:${locationSnapshot.events.find(event => event.event_type === "GEOCERCA_SALIDA")?.id ?? "outside"}` : "";
@@ -474,23 +488,30 @@ export function SfaDashboardApp() {
 
   return (
     <AppShell
+      preparationCheck={preparationCheck}
       view={view}
-      onViewChange={next => { if (next === "settings") setSettingsEntry("residents"); setView(next); }}
+      onViewChange={next => { setFocusPreparationAccess(false); if (next === "settings") setSettingsEntry("notifications"); setView(next); }}
       connected={connected}
       attention={{pending:cloudAttention.pending,followup:cloudAttention.followup || Boolean(geofenceIncident && notificationConfig.notify_geofence)}}
       residents={residents}
       activeProfile={profile}
       onSelectResident={selectResident}
-      onOpenNewResidentModal={() => setView("settings")}
+      onOpenNewResidentModal={() => setView("people")}
     >
+      {view === "home" && <ResidentIdentity profile={profile}/>}
+      {view === "home" && profile?.id && preparationCheck.status?.session_active === false && <section className="care-connection-notice" role="status" aria-label="Conexión de esta PC"><Icon name="cloud-off" size={20}/><div><strong>Sesión de esta PC pausada</strong><p>Reanuda el acceso para consultar información por internet.</p></div><button className="resident-button" onClick={openPreparationAccess}>Revisar conexión<Icon name="arrow-right" size={17}/></button></section>}
       {view === "home" && geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
-        <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona de referencia</strong><p>Salida confirmada con las lecturas recibidas. Requiere comprobar su situación.</p></div>
-        <button type="button" onClick={() => setView("map")}><Icon name="map" size={17} />Ver ubicación</button>
+        <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona local</strong><p>Salida confirmada por el seguimiento local. Requiere comprobar su situación.</p></div>
+        <button type="button" onClick={() => { chooseLocationSource("local"); setView("map"); }}><Icon name="map" size={17} />Ver ubicación</button>
         {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
       </section>}
-      <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} onAttentionChange={reportAttention}/>
+      <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} connectionPaused={preparationCheck.status?.session_active === false} onAttentionChange={reportAttention} onSnapshotChange={reportFeed} onPrepare={openPreparationAccess}/>
+      {view === "setup" && <Preparation profile={profile} connected={connected} check={preparationCheck} focusAccess={focusPreparationAccess}
+        onSettings={tab => { setSettingsEntry(tab); setView(tab === "residents" ? "people" : "settings"); }}
+        onMap={() => setView("map")} onMonitor={() => setView("home")} />}
       {view === "home" && (
         <HomeScreen
+          connectionPaused={preparationCheck.status?.session_active === false}
           profile={profile}
           locationSnapshot={locationSnapshot}
           telemetry={telemetry}
@@ -499,9 +520,12 @@ export function SfaDashboardApp() {
           events={events}
           accelHistory={accelHistory}
           geofence={geofence}
-          onOpenSettings={() => { setSettingsEntry(profile ? "hardware" : "residents"); setView("settings"); }}
+          locationSource={locationSource}
+          onLocationSourceChange={chooseLocationSource}
+          remoteFeed={currentFeed}
+          onOpenSettings={openPreparationAccess}
+          onOpenDevice={() => { setSettingsEntry("hardware"); setView("settings"); }}
           onOpenMap={() => setView("map")}
-          onTriggerFallSimulation={() => setEmergencyStartedAt(new Date())}
         />
       )}
       {view === "map" && (
@@ -510,11 +534,18 @@ export function SfaDashboardApp() {
           profile={profile}
           locationSnapshot={locationSnapshot}
           onUpdateGeofence={(updated) => setGeofence(updated)}
+          onPrepare={() => setView("setup")}
+          source={locationSource}
+          onSourceChange={chooseLocationSource}
         />
       )}
-      {view === "settings" && (
+      {(view === "settings" || view === "people") && (
         <SettingsScreen
-          initialTab={settingsEntry}
+          key={view}
+          peopleOnly={view === "people"}
+          initialTab={view === "people" ? "residents" : settingsEntry}
+          onPrepare={() => setView("setup")}
+          onTriggerFallSimulation={() => setEmergencyStartedAt(new Date())}
           residents={residents}
           profile={profile}
           geofence={geofence}
@@ -543,6 +574,7 @@ export function SfaDashboardApp() {
 }
 
 function AppShell({
+  preparationCheck,
   view,
   attention,
   onViewChange,
@@ -553,6 +585,7 @@ function AppShell({
   onOpenNewResidentModal,
   children,
 }: {
+  preparationCheck: PreparationCheck;
   view: View;
   attention: IncidentAttention;
   onViewChange: (view: View) => void;
@@ -582,6 +615,8 @@ function AppShell({
   const navItems: { id: View; icon: string; label: string }[] = [
     { id: "home", icon: "layout-dashboard", label: "Panel principal" },
     { id: "map", icon: "map-pin", label: "Ubicación" },
+    { id: "people", icon: "users-round", label: "Personas" },
+    { id: "setup", icon: "list-checks", label: "Preparación" },
     { id: "settings", icon: "settings-2", label: "Ajustes" },
   ];
 
@@ -647,6 +682,7 @@ function AppShell({
                     </span>
                   </div>
                   {item.id === "home" && <IncidentNavIndicator attention={attention}/>}
+                  {item.id === "setup" && <PreparationIndicator check={preparationCheck} id={activeProfile?.id}/>}
                   {active && !(item.id === "home" && (attention.pending || attention.followup)) && (
                     <span className="size-1.5 rounded-full bg-[#0F766E]" />
                   )}
@@ -664,7 +700,7 @@ function AppShell({
                 connected ? "bg-[#2F8F5B]" : "bg-[#B7791F]"
               }`}
             />
-            <div><p className="font-semibold">{view === "home" ? "Perfil de cuidado" : "Cinturón wearable"}</p><p>{view === "home" ? activeProfile?.full_name || "Sin residente vinculado" : connected ? "Puerto serial conectado" : "Dispositivo desconectado"}</p></div>
+            <div><p className="font-semibold">Perfil de cuidado</p><p>{activeProfile?.full_name || "Sin residente vinculado"}</p></div>
           </div>
         </div>
       </aside>
@@ -675,12 +711,12 @@ function AppShell({
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#DED8CC] bg-[#F5F2EC]/95 backdrop-blur-xs px-6 sm:px-10">
           <div className="min-w-0">
             <p className="care-eyebrow hidden sm:block">SFA · Plataforma de teleasistencia</p>
-            <p className="font-semibold text-lg"><img src="/static/assets/sfa-asistencia-logo.png" alt="" className="mobile-project-logo lg:hidden" />{view === "map" ? "Ubicación y geocerca" : view === "settings" ? "Ajustes de asistencia" : "Centro de monitoreo"}</p>
+            <p className="font-semibold text-lg"><img src="/static/assets/sfa-asistencia-logo.png" alt="" className="mobile-project-logo lg:hidden" />{view === "people" ? "Personas y equipo" : view === "map" ? "Ubicación y geocerca" : view === "settings" ? "Ajustes de asistencia" : view === "setup" ? "Preparar la asistencia" : "Centro de monitoreo"}</p>
             <span className="sr-only">{nowText}</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {view !== "home" && <span className={`shell-connection ${connected ? "connected" : ""}`}><Icon name={connected ? "plug" : "unplug"} size={16} />{connected ? "Puerto conectado" : "Sin conexión IoT"}</span>}
+            {view !== "home" && <span className={`shell-connection ${connected ? "connected" : ""}`}><Icon name={connected ? "plug" : "unplug"} size={16} />{connected ? "Cinturón conectado" : "Cinturón no conectado"}</span>}
             {/* Selector de Residente */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -763,13 +799,13 @@ function AppShell({
           </div>
         </header>
 
-        <main className="sfa-workspace mx-auto w-full max-w-[1600px] p-6 sm:p-10 flex-1">
+        <main className={`sfa-workspace mx-auto w-full max-w-[1600px] p-6 sm:p-10 flex-1${view === "home" ? " home-composition" : ""}`}>
           {children}
         </main>
       </div>
 
       {/* Navegación Móvil Flotante */}
-      <nav className="fixed inset-x-4 bottom-4 z-30 flex items-center justify-around rounded-full border border-[#DED8CC] bg-[#14201D] text-white p-2.5 lg:hidden shadow-xl">
+      <nav className="mobile-app-navigation fixed inset-x-4 bottom-4 z-30 flex items-center justify-around rounded-full border border-[#DED8CC] bg-[#14201D] text-white p-2.5 lg:hidden shadow-xl">
         {navItems.map((item) => {
           const active = view === item.id;
           return (
@@ -784,6 +820,7 @@ function AppShell({
               <Icon name={item.icon} size={18} />
               <span>{item.id === "home" ? "Panel" : item.label}</span>
               {item.id === "home" && <IncidentNavIndicator attention={attention}/>}
+              {item.id === "setup" && <PreparationIndicator check={preparationCheck} id={activeProfile?.id}/>}
             </button>
           );
         })}
@@ -792,9 +829,17 @@ function AppShell({
   );
 }
 
+function ResidentIdentity({profile}:{profile:ResidentProfile|null}) {
+  return <section aria-labelledby="resident-heading" className="focus-profile resident-identity">
+    <div className="resident-avatar">{profile?.photo_url ? <img src={profile.photo_url} alt={`Foto de ${profile.full_name}`} /> : <Icon name="user-round" size={32}/>}</div>
+    <div className="focus-identity"><h1 id="resident-heading" className="font-serif">{profile?.full_name || "Tu puesto de monitoreo"}</h1><p>{profile?.room || "Selecciona a la persona que vas a cuidar."}</p>{profile?.medical_notes && <p className="focus-care-note">Nota de cuidado: {profile.medical_notes}</p>}</div>
+    {profile?.phone && <a href={`tel:${profile.phone.replace(/\s+/g, "")}`} className="resident-button link-resident"><Icon name="phone" size={17}/>Llamar a {profile.full_name.split(" ")[0]}</a>}
+  </section>;
+}
+
 function HomeScreen({
   profile, telemetry, connected, firstMotion, events, accelHistory,
-  onOpenMap, onTriggerFallSimulation, onOpenSettings, geofence, locationSnapshot,
+  onOpenMap, onOpenSettings, onOpenDevice, locationSnapshot, locationSource, onLocationSourceChange, remoteFeed, connectionPaused,
 }: {
   profile: ResidentProfile | null;
   telemetry: Telemetry | null;
@@ -803,10 +848,14 @@ function HomeScreen({
   events: SystemEvent[];
   accelHistory: number[];
   onOpenMap: () => void;
-  onTriggerFallSimulation: () => void;
   onOpenSettings: () => void;
+  onOpenDevice: () => void;
+  connectionPaused: boolean;
   geofence: GeofenceConfig;
   locationSnapshot: LocationSnapshot | null;
+  locationSource: LocationSource;
+  onLocationSourceChange: (source:LocationSource)=>void;
+  remoteFeed: IncidentFeed|null;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -817,63 +866,22 @@ function HomeScreen({
   const age = Number.isFinite(received) ? Math.max(0, Math.floor((now - received) / 1000)) : null;
   const live = connected && age != null && age <= 5 && !telemetry?.simulated;
   const state = telemetry?.state ?? "NORMAL";
-  const status = !profile ? "Vincula un residente"
-    : !connected ? "Dispositivo desconectado"
-    : telemetry?.simulated ? "Lectura de simulación"
-    : !live ? "Esperando señal reciente"
-    : state === "NORMAL" ? "Sin alertas activas" : STATE_TITLES[state];
+  const status = state === "NORMAL" ? "Movimiento estable" : STATE_TITLES[state];
   const time = (date: Date) => date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
   const today = new Date(now).toDateString();
   const motionToday = firstMotion?.toDateString() === today ? firstMotion : null;
-  const todayEvents = events.filter(e => new Date(e.at).toDateString() === today && (!e.residentId || e.residentId === profile?.id));
-  const recent = [...todayEvents].sort((a,b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 4);
-  const sos = todayEvents.filter(e => e.type.includes("SOS")).length;
+  const activity = mergeCareActivity(events,remoteFeed,profile?.id,now);
+  const remoteGps = useRemoteHomePosition(profile?.id,locationSource === "remote");
   const battery = telemetry?.battery_percent;
-  const gps = Boolean(locationSnapshot?.position);
   const points = accelHistory.map((value, i) =>
     `${i * 480 / Math.max(1, accelHistory.length - 1)},${Math.max(8, Math.min(72, 40 - (value - 1) * 30))}`).join(" ");
-  const titleId = "resident-heading";
 
   return (
     <div className={`care-home care-focused ${live ? "monitoring-live" : "monitoring-waiting"}`}>
-      <section aria-labelledby={titleId} className="focus-profile">
-        <div className="resident-avatar">
-          {profile?.photo_url ? <img src={profile.photo_url} alt={`Foto de ${profile.full_name}`} /> : <Icon name="user-round" size={32} />}
-        </div>
-        <div className="focus-identity">
-          <h1 id={titleId} className="font-serif">{profile?.full_name || "Tu puesto de monitoreo"}</h1>
-          <p>{profile?.room || "Selecciona a la persona que utiliza el cinturón."}</p>
-          {profile?.medical_notes && <p className="focus-care-note">Nota de cuidado: {profile.medical_notes}</p>}
-        </div>
-        {profile?.phone && <a href={`tel:${profile.phone.replace(/\s+/g, "")}`} className="resident-button link-resident"><Icon name="phone" size={17} />Llamar a {profile.full_name.split(" ")[0]}</a>}
-      </section>
-
-      {!live ? <section className="focus-connection" aria-labelledby="connection-heading">
-        <div className="connection-symbol"><Icon name={!profile ? "user-round-plus" : "unplug"} size={26} /></div>
-        <div className="connection-copy">
-          <h2 id="connection-heading">{!profile ? "Vincula un residente para comenzar" : !connected ? "Conecta el cinturón para iniciar el monitoreo" : telemetry?.simulated ? "Se está mostrando una lectura de simulación" : "El cinturón no está enviando señal reciente"}</h2>
-          <p>{!profile ? "Registra o selecciona el perfil que corresponde a este dispositivo." : !connected ? "Selecciona el puerto USB o Bluetooth desde los ajustes del dispositivo." : "Revisa el enlace antes de interpretar las mediciones."}</p>
-          {age != null && <p className="connection-age">Última lectura recibida hace {age < 60 ? age + " s" : Math.floor(age / 60) + " min"}.</p>}
-        </div>
-        <button onClick={onOpenSettings} className="care-action"><Icon name={!profile ? "users-round" : "plug"} size={18} />{!profile ? "Gestionar residentes" : "Configurar conexión"}<Icon name="arrow-right" size={17} /></button>
-      </section> : <section className="focus-live-strip">
-        <div><Icon name={state === "NORMAL" ? "shield-check" : "triangle-alert"} size={23} /><strong>{status}</strong></div>
-        <span>Última señal · hace {age} s</span>
-      </section>}
-
-      <div className="focus-daily">
-        <section className="focus-events">
-          <div className="focus-heading"><h2 className="font-serif">Qué ocurrió hoy</h2>{todayEvents.length > 0 && <span className="care-count">{todayEvents.length} eventos</span>}</div>
-          {recent.length ? <ol className="care-timeline">
-            {recent.map(event => <li key={event.id}><time dateTime={event.at}>{time(new Date(event.at))}</time><span className="timeline-dot" /><div><p className="font-semibold text-sm">{event.type.replaceAll("_", " ")}</p><p className="mt-1 text-sm text-[#55625E] break-words">{event.detail}</p></div></li>)}
-          </ol> : <div className="focus-empty"><Icon name="clock-3" size={21} /><div><p>Sin eventos registrados hoy</p><span>{live ? "Los próximos eventos aparecerán aquí." : "El registro de actividad espera datos del cinturón."}</span></div></div>}
-          {(todayEvents.length > 0 || telemetry) && <div className="care-event-footer"><span><Icon name="bell" size={16} />{sos} solicitudes SOS hoy</span>{telemetry?.fall_count != null && <span>{telemetry.fall_count} caídas reportadas por el dispositivo</span>}</div>}
-        </section>
-        <section className="focus-first-motion">
-          <div className="focus-heading"><h2 className="font-serif">Primera actividad</h2><Icon name="sunrise" size={23} className="text-[#0D9488]" /></div>
-          {motionToday ? <><p className="care-big-time">{time(motionToday)}</p><p className="text-sm text-[#55625E]">Primer movimiento registrado hoy.</p></> : <div className="focus-empty"><div><p>Aún no registrada</p><span>{live ? "Se registrará al detectar el primer movimiento del día." : "Pendiente de recibir actividad del dispositivo."}</span></div></div>}
-        </section>
-      </div>
+      <CareLocationSummary residentId={profile?.id} source={locationSource} onSourceChange={onLocationSourceChange} local={locationSnapshot} remote={remoteGps.reading} feed={remoteFeed} now={now} onMap={onOpenMap} onPrepare={onOpenSettings} onRefresh={remoteGps.refresh} connectionPaused={connectionPaused}/>
+      <CareSignal connected={connected} fresh={live} riskLabel={status} age={age} onPrepare={onOpenDevice}/>
+      {motionToday && <section className="care-first-motion"><Icon name="sunrise" size={20}/><strong>Primera actividad · {time(motionToday)}</strong><span>Registrada por el cinturón</span></section>}
+      <CareActivity entries={activity} feed={remoteFeed}/>
 
       {telemetry && <details className="focus-telemetry" open={live}>
         <summary><span><Icon name="activity" size={20} /><strong>{live ? "Mediciones del cinturón" : "Consultar la última lectura"}</strong></span><span className="measurement-state">{live ? "En vivo" : "Sin actualizar"}<Icon name="chevron-down" size={17} /></span></summary>
@@ -887,12 +895,6 @@ function HomeScreen({
         </div>
       </details>}
 
-      <section className="focus-location">
-        <Icon name="map-pin" size={23} />
-        <div><h2>{locationLabel(locationSnapshot?.status || "no_fix")}</h2><p>{gps ? `${locationSnapshot!.position!.latitude.toFixed(5)}, ${locationSnapshot!.position!.longitude.toFixed(5)}` : geofence.address_name || "Sin zona configurada"}</p></div>
-        <button onClick={onOpenMap} className="resident-button link-resident"><Icon name="map" size={17} />{gps ? "Ver ubicación" : "Ver geocerca"}<Icon name="arrow-right" size={16} /></button>
-      </section>
-      <div className="focus-test"><button onClick={onTriggerFallSimulation} className="care-text-action text-sm"><Icon name="flask-conical" size={16} />Probar alerta de caída</button></div>
     </div>
   );
 }
@@ -1027,18 +1029,26 @@ export function MapScreen({
   profile,
   locationSnapshot,
   onUpdateGeofence,
+  onPrepare,
+  source,
+  onSourceChange,
 }: {
   geofence: GeofenceConfig;
   profile: ResidentProfile | null;
   locationSnapshot: LocationSnapshot | null;
   onUpdateGeofence: (updated: GeofenceConfig) => void;
+  onPrepare?: () => void;
+  source?: LocationSource;
+  onSourceChange?: (source:LocationSource)=>void;
 }) {
   const [selectedRadius, setSelectedRadius] = useState<number>(geofence.radius_m);
   const [tempLat, setTempLat] = useState<number>(geofence.home_lat);
   const [tempLng, setTempLng] = useState<number>(geofence.home_lng);
   const [tempName, setTempName] = useState(geofence.address_name);
   const [saving, setSaving] = useState(false);
-  const [locationSource, setLocationSource] = useState<"remote" | "local">("remote");
+  const [internalSource, setInternalSource] = useState<LocationSource>("remote");
+  const locationSource = source ?? internalSource;
+  const setLocationSource = (next:LocationSource) => { setInternalSource(next); onSourceChange?.(next); };
 
   useEffect(() => {
     setSelectedRadius(geofence.radius_m);
@@ -1077,7 +1087,7 @@ export function MapScreen({
     <div className="location-workspace">
       <div className="page-heading"><div><p className="care-eyebrow">Ubicación y seguridad</p><h1 className="font-serif">Un entorno de cuidado</h1><p>Seguimiento de {residentName}.</p></div>{locationSource === "local" && <span className={`care-status ${locationSnapshot?.status === "inside" ? "is-safe" : "is-waiting"}`}><Icon name="map-pin" size={17} />{locationLabel(locationSnapshot?.status || "no_fix")}</span>}</div>
       <div className="geo-source-selector" role="group" aria-label="Fuente de ubicación"><button type="button" aria-pressed={locationSource === "remote"} onClick={() => setLocationSource("remote")}><Icon name="cloud" size={18} />Por internet</button><button type="button" aria-pressed={locationSource === "local"} onClick={() => setLocationSource("local")}><Icon name="wifi" size={18} />Red local y geocerca</button></div>
-      {locationSource === "remote" ? <LocalRemoteLocation key={profile?.id || "none"} residentId={profile?.id} residentName={residentName} /> : <>
+      {locationSource === "remote" ? <LocalRemoteLocation key={profile?.id || "none"} residentId={profile?.id} residentName={residentName} onPrepare={onPrepare} /> : <>
       <LocationPanel key={profile?.id || "none"} residentId={profile?.id} snapshot={locationSnapshot} />
       <div className="location-layout">
         <section className="location-controls">
@@ -1379,7 +1389,10 @@ function ConfigurationCopies() {
 }
 
 function SettingsScreen({
+  peopleOnly = false,
   initialTab,
+  onPrepare,
+  onTriggerFallSimulation,
   residents,
   profile,
   geofence,
@@ -1396,7 +1409,10 @@ function SettingsScreen({
   onOpenMap,
   onUpdateNotifications,
 }: {
-  initialTab: "residents" | "hardware";
+  peopleOnly?: boolean;
+  initialTab: SettingsEntry;
+  onPrepare: () => void;
+  onTriggerFallSimulation: () => void;
   residents: ResidentProfile[];
   profile: ResidentProfile | null;
   geofence: GeofenceConfig;
@@ -1416,6 +1432,7 @@ function SettingsScreen({
   const [activeTab, setActiveTab] = useState<
     "residents" | "notifications" | "geofence" | "mobile" | "hardware" | "backup"
   >(initialTab);
+  const [personTab, setPersonTab] = useState<"data" | "access">("data");
 
   const [profileForm, setProfileForm] = useState<ResidentProfile>(
     profile || {
@@ -1536,12 +1553,12 @@ function SettingsScreen({
   ] as const;
 
   return (
-    <div className="settings-workspace">
+    <div className={`settings-workspace${peopleOnly ? " people-workspace" : ""}`}>
       {/* Sub-índice editorial vertical */}
-      <div className="settings-navigation">
+      {!peopleOnly && <div className="settings-navigation">
         <h1 className="sr-only">Configuración de asistencia</h1>
         <nav className="settings-tabs" aria-label="Apartados de ajustes">
-          {subtabs.map((tab) => {
+          {subtabs.filter(tab => tab.id !== "residents").map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
@@ -1558,7 +1575,7 @@ function SettingsScreen({
             );
           })}
         </nav>
-      </div>
+      </div>}
 
       {/* Contenido según pestaña */}
       <div className="min-w-0">
@@ -1568,7 +1585,7 @@ function SettingsScreen({
             <div className="flex items-baseline justify-between border-b border-[#DED8CC] pb-4">
               <div>
                 <h3 className="font-serif text-3xl font-light text-[#14201D]">
-                  Directorio de Residentes
+                  Personas cuidadas
                 </h3>
                 <p className="text-xs text-[#55625E] mt-1">
                   Personas registradas para el monitoreo de caídas y teleasistencia.
@@ -1608,7 +1625,7 @@ function SettingsScreen({
                           onClick={() => r.id && onSelectResident(r.id)}
                           className="resident-button link-resident"
                         >
-                          <Icon name="link" size={16} /> Vincular
+                          <Icon name="user-round" size={16} /> Abrir ficha
                         </button>
                       )}
                     </div>
@@ -1632,7 +1649,10 @@ function SettingsScreen({
               })}
             </div>
 
-            {profile && (
+            <section className="person-detail" aria-label="Ficha y relaciones de la persona">
+            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => setPersonTab("data")}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
+            {profile?.id && personTab === "access" && <div className="preparation-access"><LocalPersonAccess key={profile.id} localId={profile.id} onPrepare={onPrepare}/></div>}
+            {profile && personTab === "data" && (
               <form onSubmit={handleSaveProfile} className="sfa-editorial-card p-6 space-y-4">
                 {profile.id && <ResidentPhotoEditor profile={profile} onPhotoChange={onPhotoChange} />}
                 <p className="font-serif text-lg font-normal text-[#14201D]">
@@ -1716,6 +1736,7 @@ function SettingsScreen({
               </form>
             )}
 
+            </section>
             {/* Modal de alta */}
             {showNewModal && (
               <div className="fixed inset-0 z-50 grid place-items-center bg-[#14201D]/40 p-4">
@@ -1880,7 +1901,8 @@ function SettingsScreen({
               </div>
             </div>
 
-            <PushTestSettings residentId={profile?.id}/>
+            <PushTestSettings residentId={profile?.id} onPrepare={onPrepare}/>
+            <section className="notification-channel"><h3>Pruebas de esta PC</h3><button type="button" className="resident-button" onClick={onTriggerFallSimulation}><Icon name="flask-conical" size={17}/>Simular alerta de caída en esta PC</button></section>
             <EmailSettings />
             {/* Telegram */}
             <div className="notification-channel space-y-4">
@@ -1956,7 +1978,7 @@ function SettingsScreen({
               <div><h3>Cuenta SFA</h3><p>Autenticación y datos remotos requieren internet.</p></div>
               <div>
                 <a href="https://hfreedo.github.io/SFA-Asistencia-Anticaidas/acceso.html" target="_blank" rel="noopener noreferrer"><Icon name="external-link" size={18} />Acceso HTTPS</a>
-                <a href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer"><Icon name="laptop" size={18} />Acceso desde esta PC</a>
+                <button className="resident-button" onClick={onPrepare}><Icon name="laptop" size={18} />Preparar acceso de esta PC</button>
               </div>
             </section>
             <MobileAccess initialInfo={networkInfo} />

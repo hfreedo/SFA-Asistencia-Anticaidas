@@ -10,6 +10,8 @@ import tempfile
 import time
 import urllib.request
 import zipfile
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit
 
 root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root))
@@ -42,6 +44,21 @@ if startup is not None:
     startup.wShowWindow = 0
 process = subprocess.Popen([str(exe), '--port', '18786', '--no-browser', *(['--lan'] if mobile else [])], cwd=folder, startupinfo=startup)
 passed = False
+
+
+class Scripts(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.sources = []
+        self.styles = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'script' and dict(attrs).get('src'):
+            self.sources.append(dict(attrs)['src'])
+        if tag == 'link' and dict(attrs).get('rel') == 'stylesheet' and dict(attrs).get('href'):
+            self.styles.append(dict(attrs)['href'])
+
+
 try:
     for _ in range(90):
         try:
@@ -52,6 +69,28 @@ try:
             with urllib.request.urlopen(base + '/acceso/acceso.html', timeout=2, context=context) as response:
                 assert response.status == 200
             assert status['connected'] is False
+            if '--people' in sys.argv:
+                for page in ('/', '/acceso/acceso.html'):
+                    with urllib.request.urlopen(base + page, timeout=5, context=context) as response:
+                        parser = Scripts()
+                        parser.feed(response.read().decode('utf-8'))
+                    assert parser.sources, 'Missing packaged script'
+                    bundles = []
+                    for source in parser.sources:
+                        url = urljoin(base + page, source)
+                        assert urlsplit(url).netloc == urlsplit(base).netloc, 'Unexpected external script'
+                        with urllib.request.urlopen(url, timeout=5, context=context) as response:
+                            bundles.append(response.read().decode('utf-8'))
+                    assert any('Ficha a la que corresponde esta cuenta' in bundle and 'Quiénes la cuidan' in bundle for bundle in bundles), 'Old people/team bundle'
+                    if '--people-style' in sys.argv:
+                        styles = []
+                        for source in parser.styles:
+                            url = urljoin(base + page, source)
+                            assert urlsplit(url).netloc == urlsplit(base).netloc, 'Unexpected external stylesheet'
+                            with urllib.request.urlopen(url, timeout=5, context=context) as response:
+                                styles.append(response.read().decode('utf-8'))
+                        assert any('.team-select' in style and '.team-assignment' in style for style in styles), 'Old people/team styles'
+                print('PASS: packaged dashboard and portal contain the new people/team flow')
             if mobile:
                 def request(path, body=None, token=None, method=None):
                     req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Activity, Bell, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
+import { Activity, Bell, CheckCircle2, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
 import { accessDataClient } from "./accessClient";
 import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
 import { type RemotePosition } from "./RemoteLocation";
@@ -12,7 +12,7 @@ type Sample = { id: string; observed_at: string; received_at: string; payload: {
 type Event = { id: string; event_type: string; observed_at: string; simulated: boolean; detail: { text?: string } };
 type Space = { space_id: string; name: string; role: string };
 type LocalResident = { id: number; full_name: string; room: string; is_active: number };
-type SyncStatus = { session_active: boolean; pending: number; sent: number; blocked: number; last_error: string | null; bindings: { local_resident_id: number }[] };
+type SyncStatus = { session_active: boolean; pending: number; sent: number; blocked: number; last_error: string | null; bindings: { local_resident_id: number; space_id: string; enabled: number | boolean }[] };
 
 const STATE: Record<string, string> = { NORMAL: "Movimiento estable", EVENTO_INERCIAL: "Movimiento brusco", POSIBLE_CAIDA: "Posible caída", CAIDA_CONFIRMADA: "Caída informada", ALERTA_SILENCIADA: "Alerta silenciada" };
 function time(value: string) { return new Date(value).toLocaleString("es", { dateStyle: "short", timeStyle: "medium" }); }
@@ -34,34 +34,47 @@ async function localRequest(path: string, token?: string, body?: object) {
   return response.json();
 }
 
-function LocalSync({ session, spaces }: { session: Session; spaces: Space[] }) {
+export function LocalSync({ session, spaces, activeResidentId }: { session: Session; spaces: Space[]; activeResidentId?: number }) {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [residents, setResidents] = useState<LocalResident[]>([]);
   const [resident, setResident] = useState(0);
   const [space, setSpace] = useState(spaces[0]?.space_id ?? "");
-  const [consent, setConsent] = useState(false);
+  const [authorization, setAuthorization] = useState<{ resident: number; space: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const consent = authorization?.resident === resident && authorization.space === space;
+  const linked = Boolean(status?.bindings.some(b => b.local_resident_id === resident && b.space_id === space && (b.enabled === 1 || b.enabled === true)));
   useEffect(() => {
     let active = true;
+    setAuthorization(null);
     void localRequest("/api/residents").then((data: LocalResident[]) => {
-      if (active) { const list = data.filter(r => r.is_active); setResidents(list); setResident(list[0]?.id ?? 0); }
+      if (active) {
+        const list = data.filter(r => r.is_active && (activeResidentId === undefined || r.id === activeResidentId));
+        setResidents(list); setResident(list[0]?.id ?? 0);
+      }
     }).catch(() => { if (active) setError("El servidor local no está disponible."); });
     const load = async () => {
-      try { const data = await localRequest("/api/cloud/status"); if (active) setStatus(data); }
+      try {
+        const data = await localRequest("/api/cloud/status");
+        if (!Array.isArray(data.bindings)) throw new Error();
+        if (active) setStatus(data);
+      }
       catch { if (active) { setStatus(null); setError("No se pudo consultar la sincronización local."); } }
     };
     void load();
     const interval = window.setInterval(() => void load(), 4000);
     return () => { active = false; window.clearInterval(interval); };
-  }, []);
+  }, [activeResidentId]);
   async function act(kind: "connect" | "session" | "pause") {
+    if (busy || (kind === "connect" && (!status || linked || !consent || !resident || !spaces.some(s => s.space_id === space))) || (kind === "session" && !linked)) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const data = await localRequest(`/api/cloud/${kind}`, session.access_token,
         kind === "connect" ? { resident_id: resident, space_id: space, consent } : {});
+      if (!Array.isArray(data.bindings)) throw new Error();
       setStatus(data);
+      if (kind === "connect") setAuthorization(null);
       setNotice(kind === "pause" ? "Envíos pausados. Los pendientes se conservan." : "Sesión de envío habilitada.");
     } catch (failure) {
       const reference = failure instanceof Error && /^\d{3}( · [a-zA-Z0-9_]{1,60})?$/.test(failure.message) ? failure.message : "red";
@@ -73,11 +86,13 @@ function LocalSync({ session, spaces }: { session: Session; spaces: Space[] }) {
     <div className="cloud-section-title"><CloudUpload size={21} /><h2 id="cloud-local-title">Sincronización de esta PC</h2></div>
     {error && <p className="cloud-warning" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
-    <div className="cloud-controls"><label>Perfil local activo<select value={resident} onChange={e => setResident(Number(e.target.value))}>{!residents.length && <option value={0}>Sin perfil activo</option>}{residents.map(r => <option key={r.id} value={r.id}>{r.full_name} · {r.room}</option>)}</select></label>
-      <label>Espacio autorizado<select value={space} onChange={e => setSpace(e.target.value)}>{spaces.map(s => <option key={s.space_id} value={s.space_id}>{s.name}</option>)}</select></label></div>
-    <label className="cloud-consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />Autorizar nombre, referencia, nuevos eventos y telemetría. Sin teléfonos, notas médicas, fotos ni ubicación.</label>
-    <div className="cloud-actions"><button className="access-primary" disabled={busy || !consent || !resident || !space} onClick={() => void act("connect")}><Link2 size={18} />Vincular y sincronizar</button>
-      <button className="access-secondary" disabled={busy || !status?.bindings.length} onClick={() => void act("session")}><RefreshCw size={17} />Reanudar envíos</button>
+    <div className="cloud-controls"><label>Perfil local activo<select value={resident} disabled={busy} onChange={e => { setResident(Number(e.target.value)); setAuthorization(null); setNotice(""); }}>{!residents.length && <option value={0}>Sin perfil activo</option>}{residents.map(r => <option key={r.id} value={r.id}>{r.full_name} · {r.room}</option>)}</select></label>
+      <label>Espacio autorizado<select value={space} disabled={busy} onChange={e => { setSpace(e.target.value); setAuthorization(null); setNotice(""); }}>{spaces.map(s => <option key={s.space_id} value={s.space_id}>{s.name}</option>)}</select></label></div>
+    {linked ? <div className="cloud-binding-saved" role="status"><CheckCircle2 size={21} /><div><strong>Vínculo de este perfil guardado</strong><p>Nombre, referencia, nuevos eventos y telemetría. Sin teléfonos, notas médicas, fotos ni ubicación. No necesitas volver a autorizar este vínculo.</p></div></div>
+      : status ? <label className="cloud-consent"><input type="checkbox" checked={consent} disabled={busy || !resident || !spaces.some(s => s.space_id === space)} onChange={e => setAuthorization(e.target.checked ? { resident, space } : null)} />Autorizar nombre, referencia, nuevos eventos y telemetría. Sin teléfonos, notas médicas, fotos ni ubicación.</label>
+        : <p className="cloud-footnote">Comprobando el vínculo guardado. No se habilita una nueva vinculación hasta verificar su estado.</p>}
+    <div className="cloud-actions">{status && !linked && <button className="access-primary" disabled={busy || !consent || !resident || !spaces.some(s => s.space_id === space)} onClick={() => void act("connect")}><Link2 size={18} />Vincular y sincronizar</button>}
+      <button className="access-secondary" disabled={busy || !linked} onClick={() => void act("session")}><RefreshCw size={17} />Reanudar envíos</button>
       <button className="access-secondary" disabled={busy || !status?.session_active} onClick={() => void act("pause")}><Pause size={17} />Pausar envíos</button></div>
     {status && <div className="cloud-sync-counts"><span>{status.session_active ? "Sesión de envío activa" : "Sesión de envío pausada"}</span><span>{status.pending} pendientes</span><span>{status.sent} enviados</span><span>{status.blocked} requieren revisión</span></div>}
     <p className="cloud-footnote">La sesión de envío no se guarda en disco. Al reiniciar la PC o vencer la sesión, los pendientes se conservan y se debe reanudar el envío.</p>

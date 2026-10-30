@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
                         ui.panel_button.invoke()
                         ui.sync_button.invoke()
                         self.assertEqual(browser.call_args_list[0].args[0], f'http://localhost:{port}/')
-                        self.assertEqual(browser.call_args_list[1].args[0], f'http://localhost:{port}/acceso/acceso.html')
+                        self.assertEqual(browser.call_args_list[1].args[0], f'http://localhost:{port}/#preparacion')
                     ui.stop()
                     wait_for(lambda: ui.status['text'] == 'Servidor detenido')
                     self.assertFalse(launcher.port_busy(port))

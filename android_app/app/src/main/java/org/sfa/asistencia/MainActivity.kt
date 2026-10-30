@@ -69,6 +69,8 @@ class MainActivity : ComponentActivity() {
         var password by remember { mutableStateOf("") }
         var jwt by remember { mutableStateOf<String?>(null) }
         var residents by remember { mutableStateOf(JSONArray()) }
+        var capabilities by remember { mutableStateOf<Map<String, PersonCapabilities>>(emptyMap()) }
+        val canCare = capabilities.values.any { it.care }
         var events by remember { mutableStateOf(JSONArray()) }
         var selected by remember { mutableStateOf("") }
         var devices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -87,11 +89,24 @@ class MainActivity : ComponentActivity() {
         var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
         LaunchedEffect(Unit) { while (true) { delay(1000); clock = System.currentTimeMillis() } }
         LaunchedEffect(message) { if (message.isNotBlank()) { snackbar.showSnackbar(message); message = "" } }
+        LaunchedEffect(canCare, selected, capabilities) {
+            if (tab == 2 && !canCare) tab = 1
+            if (selected.isNotEmpty() && capabilities[selected]?.care != true) { selected = ""; events = JSONArray(); positions = JSONArray() }
+        }
+        suspend fun refreshAccess(token: String) {
+            try {
+                val result = withContext(Dispatchers.IO) { val people = api.remoteResidents(token); people to api.remoteCapabilities(token, people) }
+                residents = result.first; capabilities = result.second
+            } catch (error: Exception) { capabilities = emptyMap(); residents = JSONArray(); throw error }
+        }
         fun work(refreshSession: Boolean = true, block: suspend () -> Unit) {
             if (busy) return
             busy = true
             scope.launch { message = ""; operationError = ""; try {
-                if (refreshSession && jwt != null) jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
+                if (refreshSession && jwt != null) {
+                    jwt = withContext(Dispatchers.IO) { CloudGpsSession.token(api) }
+                    refreshAccess(jwt!!)
+                }
                 block()
             } catch (error: CancellationException) { throw error
             } catch (error: Exception) { operationError = operationErrorMessage(error); message = operationError
@@ -178,8 +193,8 @@ class MainActivity : ComponentActivity() {
                     NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                         NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, label = { Text("Compartir") }, icon = { Icon(Icons.Outlined.LocationOn, null) })
                         NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, label = { Text("Recuerdos") }, icon = { Icon(Icons.Outlined.PhotoLibrary, null) })
-                        NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, label = { Text("Cuidar") }, icon = { Icon(Icons.Outlined.FavoriteBorder, null) })
-                        NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, label = { Text("Pruebas") }, icon = { Icon(Icons.Outlined.Science, null) })
+                        NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, label = { Text(if (canCare) "Cuidar" else "Cuenta") }, icon = { Icon(if (canCare) Icons.Outlined.FavoriteBorder else Icons.Outlined.PersonOutline, null) })
+                        if (canCare) NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, label = { Text("Pruebas") }, icon = { Icon(Icons.Outlined.Science, null) })
                     }
                 }
             }) { padding ->
@@ -194,7 +209,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val incidentResident = if (tab == 0 || tab == 3) cloudResident else selected.ifEmpty { cloudResident }
-                if (jwt != null && incidentResident.isNotEmpty()) IncidentFeed(incidentResident, api)
+                if (jwt != null && capabilities[incidentResident]?.care == true) IncidentFeed(incidentResident, api)
                 if (tab == 3) {
                     MemoryAlbum { message = it }
                 } else if (tab == 0) {
@@ -210,6 +225,7 @@ class MainActivity : ComponentActivity() {
                             Row(verticalAlignment = Alignment.Top) { Checkbox(checked = gpsConsent, onCheckedChange = { gpsConsent = it }, enabled = !state.running); Text("Autorizo compartir la ubicación de este celular con Supabase y mis cuidadores autorizados.", Modifier.weight(1f).padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium, color = SfaMuted) }
                             for (i in 0 until residents.length()) {
                                 val person = residents.getJSONObject(i)
+                                if (capabilities[person.getString("id")]?.emit != true) continue
                                 SfaChoice(person.getString("full_name"), person.optString("room"), Icons.Outlined.PersonOutline,
                                     cloudDevice != null && cloudResident == person.getString("id"), !busy && !state.running && gpsConsent, onClick = { work {
                                     val result = withContext(Dispatchers.IO) { api.rpc("sfa_register_phone", jwt!!, org.json.JSONObject().put("p_resident", person.getString("id"))) }
@@ -266,7 +282,7 @@ class MainActivity : ComponentActivity() {
                     }
                     TextButton(onClick = { showTrackingHelp = !showTrackingHelp }, modifier = Modifier.heightIn(min = 48.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Sobre la continuidad del seguimiento") }
                     if (showTrackingHelp) Text(if (remoteGps) "La sesión se renueva mientras el proceso siga activo; al reiniciar debes iniciar sesión otra vez. Android puede detener el servicio por cierre forzado o restricciones de batería." else "El modo local necesita la misma red o hotspot que la PC. El GPS no depende del cinturón.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
-                } else if (tab == 2) {
+                } else if (tab == 2 && canCare) {
                     if (jwt != null && pushActive) Row(verticalAlignment = Alignment.Top) {
                         Checkbox(checked = acceptsTests, enabled = !busy, onCheckedChange = { enabled -> work { push.consentTests(jwt!!, enabled); message = if (enabled) "Este celular acepta pruebas de cuidadores autorizados" else "Recepción de pruebas desactivada" } })
                         Text("Aceptar pruebas SOS de las personas a mi cuidado en este celular", Modifier.weight(1f).padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium)
@@ -275,16 +291,19 @@ class MainActivity : ComponentActivity() {
                         localTest = { message = if (localAlarmTest(this@MainActivity)) "Prueba local publicada. Revisa la bandeja de notificaciones; el sonido depende de Android." else "Activa las notificaciones de SFA y su canal de alertas en Ajustes de Android." },
                         remoteTest = { work { push.test(jwt!!, selected); message = "Prueba en cola para este celular. Esperando a la PC emisora; esto todavía no confirma recepción." } })
                 } else {
-                    SfaHeading(if (jwt == null) "Tu espacio de cuidado" else "Personas a tu cuidado", if (jwt == null) "Acceso privado para personas autorizadas." else "Ubicación, eventos y avisos del celular.")
+                    SfaHeading(if (jwt == null) "Acceso a SFA" else if (canCare) "Personas a tu cuidado" else "Mi cuenta", if (jwt == null) "Acceso privado para personas autorizadas." else if (canCare) "Ubicación, eventos y avisos del celular." else "Permisos de esta cuenta y envío de ubicación.")
                     if (jwt == null) {
                         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo electrónico") }, leadingIcon = { Icon(Icons.Outlined.MailOutline, null) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy)
                         OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña") }, leadingIcon = { Icon(Icons.Outlined.Lock, null) }, trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") } }, visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !busy)
                         SfaButton("Iniciar sesión", Icons.Outlined.Login, onClick = { val enteredPassword = password; password = ""; work {
-                            val result = withContext(Dispatchers.IO) { val token = api.login(email.trim(), enteredPassword); token to api.remoteResidents(token) }
-                            jwt = result.first; residents = result.second; message = "Sesión verificada; acceso limitado por Supabase"
+                            val token = withContext(Dispatchers.IO) { api.login(email.trim(), enteredPassword) }
+                            refreshAccess(token); jwt = token; message = "Sesión verificada; permisos de la cuenta recibidos"
                         } }, enabled = !busy && !state.running && email.isNotBlank() && password.isNotBlank())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Icon(Icons.Outlined.VerifiedUser, null, Modifier.size(16.dp), tint = SfaMuted); Text("Sin registro público. Tus permisos determinan qué residentes puedes consultar.", style = MaterialTheme.typography.bodySmall, color = SfaMuted) }
                     } else {
+                        SfaButton("Actualizar permisos", Icons.Outlined.Refresh, { work { message = "Permisos consultados" } }, !busy, secondary = true)
+                        if (!canCare) Text(if (capabilities.values.any { it.emit }) "Cuenta emisora. Puedes compartir ubicación y enviar SOS desde Compartir." else "Esta cuenta no tiene funciones de cuidado o emisión habilitadas. Consulta al administrador.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
+                        if (canCare) {
                         SfaSection("Alertas en este celular", Icons.Outlined.Notifications, trailing = { SfaBadge(if (pushActive && !push.renewalPending) "Registrado" else "Pendiente", pushActive && !push.renewalPending) })
                         Text(if (!push.configured) "Esta compilación no incluye configuración Firebase" else if (pushActive && push.renewalPending) "El registro necesita actualizarse" else if (pushActive) "Registro activo. La recepción depende del emisor y de los permisos de Android." else "Los avisos están desactivados en este celular.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
                         SfaButton(if (pushActive && !push.renewalPending) "Desactivar avisos" else "Activar o actualizar avisos", Icons.Outlined.Notifications, onClick = {
@@ -297,6 +316,7 @@ class MainActivity : ComponentActivity() {
                         if (residents.length() == 0) Text("No hay residentes autorizados para esta cuenta.", style = MaterialTheme.typography.bodyMedium, color = SfaMuted)
                         for (i in 0 until residents.length()) {
                             val resident = residents.getJSONObject(i)
+                            if (capabilities[resident.getString("id")]?.care != true) continue
                             SfaChoice(resident.getString("full_name"), resident.optString("room"), Icons.Outlined.PersonOutline, selected == resident.getString("id"), !busy) { val residentId = resident.getString("id"); selected = residentId; positions = JSONArray(); events = JSONArray(); work { val result = withContext(Dispatchers.IO) { api.remoteEvents(jwt!!, residentId) to api.remotePositions(jwt!!, residentId) }; if (selected == residentId) { events = result.first; positions = result.second } } }
                         }
                         if (selected.isNotEmpty()) SfaButton("Actualizar ubicación y eventos", Icons.Outlined.Refresh, { work { val result = withContext(Dispatchers.IO) { api.remoteEvents(jwt!!, selected) to api.remotePositions(jwt!!, selected) }; events = result.first; positions = result.second } }, !busy, secondary = true)
@@ -323,11 +343,12 @@ class MainActivity : ComponentActivity() {
                             }
                             HorizontalDivider(color = SfaBorder)
                         }
-                        SfaButton("Cerrar sesión", Icons.Outlined.Logout, onClick = { work {
+                        }
+                        SfaButton("Cerrar sesión", Icons.Outlined.Logout, onClick = { work(refreshSession = false) {
                             if (pushActive) { push.update(jwt!!, false); pushActive = false }
                             stopService(Intent(this@MainActivity, TrackingService::class.java))
                             CloudGpsSession.clear(); cloudDevice = null; cloudResident = ""; gpsConsent = false
-                            jwt = null; residents = JSONArray(); events = JSONArray(); positions = JSONArray(); selected = ""
+                            jwt = null; capabilities = emptyMap(); residents = JSONArray(); events = JSONArray(); positions = JSONArray(); selected = ""
                         } }, enabled = !busy, secondary = true)
                     }
                 }

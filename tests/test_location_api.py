@@ -93,6 +93,21 @@ class LocationApiTests(unittest.TestCase):
         body['consent'] = True
         self.assertEqual(self.request('/api/cloud/connect','POST',body)[0],401)
 
+    def test_lan_boundary_preserves_scoped_phone_but_blocks_operator_routes(self):
+        # Uvicorn trusts the test loopback proxy; production LAN clients cannot set their own identity this way.
+        lan = {'X-Forwarded-For': '192.0.2.10', 'X-Forwarded-Proto': 'https'}
+        for path, method, body in [('/api/residents', 'GET', None), ('/api/residents', 'POST', {'full_name':'Forbidden','room':'Test','phone':''}),
+                                    ('/api/profile', 'PUT', {'full_name':'Forbidden','room':'Test','phone':''}),
+                                    ('/api/configuration/export', 'GET', None), ('/api/simulate/fall', 'POST', {})]:
+            with self.subTest(path=path):
+                self.assertEqual(self.request(path, method, body, lan)[0], 403)
+        self.assertEqual(self.request('/api/location/context', headers=lan)[0], 401)
+        phone = {**lan, 'Authorization': 'Bearer ' + self.token}
+        self.assertEqual(self.request('/api/location/context', headers=phone)[0], 200)
+        self.assertEqual(self.request('/api/location', 'POST', self.position(), phone)[0], 200)
+        self.assertEqual(self.request('/api/residents', headers={'Host': 'evil.invalid'})[0], 403)
+        self.assertEqual(self.request('/api/residents', headers={'Origin': 'https://evil.invalid'})[0], 403)
+
     def test_cloud_pause_preserves_queue(self):
         self.assertEqual(self.request('/api/cloud/pause','POST',{})[0],200)
         self.assertEqual(self.request('/api/cloud/status')[1]['pending'],0)

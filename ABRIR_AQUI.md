@@ -1,13 +1,18 @@
 # Empieza aqui
 
-**Para revisar lo que se puede entregar:** `distribucion/actual/LEEME.md`.
+**Ultima candidata local Windows:** `release/SFA_Asistencia_v1.2.0-rc13.1/LEEME.txt`.
+**Entrega de revision anterior (rc9):** `distribucion/actual/LEEME.md`.
 **Para conocer la arquitectura:** `README.md`.
 **Para desarrollar:** `docs/DESARROLLO.md`.
+**Descargas publicadas:** Windows rc13.1 y Android 0.7.1 en
+[Releases de GitHub](https://github.com/hfreedo/SFA-Asistencia-Anticaidas/releases).
 La firma Android esta en `docs/ANDROID_RELEASE.md`. Android 0.7.0 conserva
 la firma release de 0.6.2; no desinstalar para actualizar entre ambas.
 Si todavia usas debug, revisa primero la migracion de firma.
 
-Version actual: **Centro Windows 1.2.0-rc9** y **Android 0.7.0-release (10)**.
+Version local actual: **Centro Windows 1.2.0-rc13.1** y **Android 0.7.1-release (11)**.
+APK local: `release/SFA-Asistencia-Android-0.7.1-release.apk`.
+Roles y limites de demostracion: `docs/ROLES_DEMOSTRACION.md`.
 Recuerdos esta en la navegacion inferior de Android. Es un album de este celular,
 sin copia en la nube. Guia y limites: `docs/RECUERDOS_ANDROID.md`.
 La rc9 corrige el cierre de alerta del cinturon. No exige nuevo firmware ni APK.
@@ -17,10 +22,31 @@ se conservan como historial y no fueron reemplazados retroactivamente.
 
 ## Usar el proyecto en esta PC
 
-Abre **SFA Asistencia.lnk**, el acceso directo con el logo del proyecto.
-Inicia el centro general: `dist/SFA_Centro.exe`. Desde alli puedes iniciar o
-detener el servidor y abrir el panel local o el portal remoto. No abras otros
-ejecutables ni necesitas usar BAT para el funcionamiento normal.
+La copia de trabajo incorpora **Preparacion unificada (etapa 1)**. Desde el
+Centro actualizado usa **Preparar sistema**: el acceso y el vinculo de esta PC
+estan dentro del panel, junto a los accesos a mapa, dispositivo y pruebas.
+Recorrido: [Preparacion unificada](docs/PREPARACION_UNIFICADA.md).
+Paquete local: `release/SFA-Asistencia-1.2.0-rc13.1-Windows.zip`.
+rc13.1 integra los controles, opciones y formulario de Personas con la estetica del panel.
+rc13 unifica el recorrido Personas > ficha > Datos / Cuidadores y acceso.
+Ver [Personas y equipo](docs/PERSONAS_Y_EQUIPO.md).
+rc11 reorganiza el principal y muestra GPS remoto y actividad con su origen;
+ver [Panel principal centrado en la persona](docs/PANEL_PRINCIPAL_PERSONA.md).
+rc10.1 reconoce el vinculo guardado sin repetir la casilla al volver a Preparacion.
+rc11.1 diferencia Atencion y Ubicacion y compacta las acciones secundarias.
+rc11.2 agrega indicadores de Preparacion por perfil y diagnostico compacto.
+rc11.3 unifica el estilo y reduce avisos/acciones repetidos en el principal.
+rc12 reserva la gestion a localhost y Android 0.7.1 diferencia cuidado/emision.
+Las candidatas anteriores se conservan; GitHub destaca rc13.1 y Android 0.7.1
+con enlaces directos en el README.
+
+Para probar rc13.1, cierra el Centro anterior y abre
+`release/SFA_Asistencia_v1.2.0-rc13.1/SFA_Asistencia.exe`.
+El acceso directo habitual y `dist/SFA_Centro.exe` pueden apuntar a una copia
+anterior. No se reemplazan automaticamente ni se migran datos personales.
+Para actualizar una instalacion con tus fichas, respalda y conserva su carpeta
+`data/`, `.env` y certificados; reemplaza solo el EXE con el Centro detenido.
+No necesitas BAT para el funcionamiento normal.
 
 La candidata actual requiere sesion de esta PC reanudada y perfil local
 vinculado al mismo residente cloud del celular. Ubicacion > Por internet no

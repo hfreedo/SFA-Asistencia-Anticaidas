@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck, Clock3, Hand, MapPin, RefreshCw, ShieldAlert, TestTube2, X } from "lucide-react";
+import { Bell, CheckCheck, Clock3, Hand, MapPin, MoreHorizontal, RefreshCw, ShieldAlert, TestTube2, X } from "lucide-react";
 import "./incidents.css";
 import { ZoneSituation, zoneNeedsFollowup, type ZoneStatus } from "./ZoneSituation";
+import { relativeAge } from "./timeLabels";
 
 type Incident = { id: string; event_type: string; observed_at: string; simulated: boolean; detail: { text?: string };
   actor_id: string | null; outcome: "attending" | "attended" | "false_alarm" | null; updated_at: string | null };
@@ -9,6 +10,7 @@ const labels: Record<string, string> = { SOS: "Solicitud SOS", PRUEBA_SOS: "Prue
 export type IncidentSnapshot = { events: Incident[]; can_attend: boolean; viewer_id: string; zone_status?: ZoneStatus|null };
 export type IncidentApi = { load: () => Promise<IncidentSnapshot>; attend: (id: string, expected: string | null, outcome: string) => Promise<void> };
 export type IncidentAttention = { pending:number; followup:boolean };
+export type IncidentFeed = { events: IncidentSnapshot["events"]; zone: ZoneStatus|null; checkedAt: number|null; error: string };
 const browserAllowed = () => typeof Notification !== "undefined" && window.isSecureContext && Notification.permission === "granted";
 const isPending = (item: Incident) => !item.outcome || item.outcome === "attending";
 function elapsed(stamp: string, now: number) {
@@ -17,7 +19,7 @@ function elapsed(stamp: string, now: number) {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
 
-export function IncidentWorkspace({ api, compact = false, onAttentionChange }: { api: IncidentApi; compact?: boolean; onAttentionChange?:(summary:IncidentAttention)=>void }) {
+export function IncidentWorkspace({ api, compact = false, connectionPaused = false, onAttentionChange, onSnapshotChange, onPrepare }: { api: IncidentApi; compact?: boolean; connectionPaused?: boolean; onAttentionChange?:(summary:IncidentAttention)=>void; onSnapshotChange?:(value:IncidentFeed)=>void; onPrepare?:()=>void }) {
   const [items, setItems] = useState<Incident[]>([]);
   const [zone, setZone] = useState<ZoneStatus|null>(null);
   const [canAttend, setCanAttend] = useState(false);
@@ -26,6 +28,7 @@ export function IncidentWorkspace({ api, compact = false, onAttentionChange }: {
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
+  const [expanded,setExpanded] = useState(!compact);
   const [desktop, setDesktop] = useState(browserAllowed);
   const [now, setNow] = useState(Date.now);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
@@ -95,31 +98,41 @@ export function IncidentWorkspace({ api, compact = false, onAttentionChange }: {
   const realPending = pending.filter(item => !item.simulated);
   const followup = zoneNeedsFollowup(zone,now,!error);
   useEffect(()=>{ onAttentionChange?.({pending:realPending.length,followup}); },[realPending.length,followup,onAttentionChange]);
+  useEffect(()=>{ onSnapshotChange?.({events:items,zone,checkedAt,error}); },[items,zone,checkedAt,error,onSnapshotChange]);
   const visible = [...(showHistory ? items : pending)].sort((a,b) =>
     Number(isPending(b) && !b.simulated) - Number(isPending(a) && !a.simulated) || Date.parse(a.observed_at) - Date.parse(b.observed_at));
   const exits = realPending.filter(item => item.event_type === "GEOCERCA_SALIDA").length;
   const oldest = realPending.reduce<Incident | null>((first,item) => !first || Date.parse(item.observed_at) < Date.parse(first.observed_at) ? item : first, null);
-  return <section className="incident-workspace" aria-labelledby="incidents-title">
-    <ZoneSituation zone={zone} now={now} connected={!error} closedExit={!realPending.some(item=>item.event_type==="GEOCERCA_SALIDA") && items.some(item=>!item.simulated && item.event_type==="GEOCERCA_SALIDA" && !isPending(item))}/>
+  return <section className={`incident-workspace${compact ? " is-compact" : ""}`} aria-labelledby="incidents-title">
+    <div className="cloud-section-title"><ShieldAlert size={21}/><h3 id="incidents-title">Incidentes y atención</h3>
+      <button className="access-secondary incident-refresh" title="Consultar incidentes" aria-label="Consultar incidentes" disabled={busy} onClick={()=>setRevision(n=>n+1)}><RefreshCw size={17}/></button>
+      <details className="incident-options" onKeyDown={event=>{if(event.key === "Escape"){event.currentTarget.open=false;event.currentTarget.querySelector("summary")?.focus();}}}><summary title="Opciones de atención" aria-label="Opciones de atención"><MoreHorizontal size={20}/></summary><div>
+        {supportsDesktop && <button className="access-secondary" aria-pressed={desktop} onClick={()=>{if(desktop){notify.current=false;setDesktop(false);}else void enableDesktop();}}><Bell size={16}/>{desktop ? "Desactivar avisos en esta PC" : "Activar avisos en esta PC"}</button>}
+        {onPrepare && <button className="access-secondary" onClick={onPrepare}>Preparar acceso y sincronización</button>}
+        {compact && error && <details><summary>Ver detalle del diagnóstico</summary><p>{error}</p></details>}
+        <p>Los avisos del navegador son opcionales. Los incidentes permanecen en este panel.</p>
+      </div></details>
+    </div>
+    {compact && <p className="incident-scope">Por internet · perfil seleccionado</p>}
+    {(!compact || followup) && <ZoneSituation zone={zone} now={now} connected={!error} closedExit={!realPending.some(item=>item.event_type==="GEOCERCA_SALIDA") && items.some(item=>!item.simulated && item.event_type==="GEOCERCA_SALIDA" && !isPending(item))}/>}
     {realPending.length > 0 && <div className="persistent-incident-alert" role="alert" aria-label="Atención pendiente">
       <span className="incident-priority-icon">{exits ? <MapPin size={28} /> : <ShieldAlert size={28} />}</span><div className="incident-priority-copy"><span className="incident-eyebrow">Requiere atención del cuidador</span>
         <strong>{exits && exits === realPending.length ? "Salida de geocerca pendiente de atención" : "Hay solicitudes de asistencia pendientes"}</strong>
         <div className="incident-summary"><span>Geocerca <b>{exits}</b></span><span>SOS <b>{realPending.filter(item => item.event_type === "SOS").length}</b></span><span>Caídas <b>{realPending.filter(item => item.event_type === "CAIDA_CONFIRMADA").length}</b></span></div>
         <p>Reingresar a la zona o descartar el aviso no cierra la atención.</p></div>
       <div className="incident-priority-action"><span><Clock3 size={16} />Pendiente desde hace</span><strong>{oldest ? elapsed(oldest.observed_at, now) : "00:00"}</strong>
-        <button onClick={() => { setShowHistory(false); firstPending.current?.focus(); firstPending.current?.scrollIntoView({block:"nearest",behavior:"smooth"}); }}>Revisar pendientes</button></div>
+        <button onClick={() => { setShowHistory(false); setExpanded(true); window.setTimeout(()=>{firstPending.current?.focus(); firstPending.current?.scrollIntoView?.({block:"nearest",behavior:"smooth"});},0); }}>Revisar pendientes</button></div>
     </div>}
-    <div className="cloud-section-title"><ShieldAlert size={21} /><h3 id="incidents-title">Incidentes y atención</h3>
-      <button className="access-secondary" disabled={busy} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16} />Actualizar incidentes</button>
+    {!error && checkedAt !== null && !visible.length && !followup && <p className="incident-empty-state">{showHistory ? "Sin incidentes registrados" : "Sin incidentes pendientes"}<span>En la última consulta por internet de este perfil.</span></p>}
+    {error && <div role={compact ? "status" : "alert"} className={compact ? "incident-unavailable" : "cloud-warning incident-connection-warning"}><strong>Consulta de incidentes sin verificar</strong><p>{compact ? "No se puede confirmar si hay nuevos incidentes." : "Revisa la conexión, la sesión de esta PC y los permisos del perfil."}</p>
+      {onPrepare && !connectionPaused && <button className="access-secondary" onClick={onPrepare}>Revisar preparación</button>}
+      {!compact && <details><summary>Ver detalle del diagnóstico</summary><p>{error}</p></details>}</div>}
+    <div className="incident-tools"><button className="access-secondary" aria-pressed={showHistory} onClick={() => setShowHistory(v => !v)}>{showHistory ? "Ver pendientes" : error || checkedAt === null ? "Ver historial" : `Ver historial (${items.length})`}</button>
+      {(!compact || !error) && <span className={error ? "incident-sync is-stale" : "incident-sync"} role="status">{error ? "Consulta sin verificar" : checkedAt ? `Consulta al servidor ${relativeAge((now-checkedAt)/1000)}` : "Consultando incidentes…"}</span>}
     </div>
-    <div className="incident-tools"><button className="access-secondary" aria-pressed={showHistory} onClick={() => setShowHistory(v => !v)}>{showHistory ? "Ver pendientes" : `Ver historial (${items.length})`}</button>
-      {supportsDesktop && <button className="access-secondary" aria-pressed={desktop} onClick={() => { if (desktop) { notify.current = false; setDesktop(false); } else void enableDesktop(); }}><Bell size={16} />{desktop ? "Desactivar avisos en esta PC" : "Activar avisos en esta PC"}</button>}
-      <span className={error ? "incident-sync is-stale" : "incident-sync"} role="status">{error ? "Canal sin actualizar" : checkedAt ? `Consulta verificada hace ${Math.max(0,Math.floor((now-checkedAt)/1000))} s` : "Conectando al canal de incidentes"}</span>
-    </div>
-    {error && <p role="alert" className="cloud-warning">{error}</p>}
     {feedback && <p role="status" className="cloud-footnote">{feedback}</p>}
-    {!error && !visible.length && <p className="cloud-footnote">No hay incidentes {showHistory ? "registrados" : "pendientes"} para este residente.</p>}
-    <ol className="incident-list">{visible.map(item => <li key={item.id} ref={item.id === visible.find(event => !event.simulated && isPending(event))?.id ? firstPending : undefined} tabIndex={-1} className={`incident-row ${item.simulated ? "is-test" : isPending(item) ? "is-priority" : "is-resolved"}`}>
+    {compact && expanded && <button className="access-secondary" onClick={()=>{setExpanded(false);setShowHistory(false);}}>Ocultar detalle de atención</button>}
+    <ol className="incident-list" hidden={compact && !expanded && !showHistory && realPending.length>0}>{visible.map(item => <li key={item.id} ref={item.id === visible.find(event => !event.simulated && isPending(event))?.id ? firstPending : undefined} tabIndex={-1} className={`incident-row ${item.simulated ? "is-test" : isPending(item) ? "is-priority" : "is-resolved"}`}>
       <div className="incident-copy"><strong>{item.simulated ? <TestTube2 size={20} /> : item.event_type === "GEOCERCA_SALIDA" ? <MapPin size={23} /> : <ShieldAlert size={23} />}{labels[item.event_type] ?? "Incidente de asistencia"}</strong>
         <p>{item.simulated ? "PRUEBA · No es una emergencia" : item.detail.text ?? ""}</p>
         <time dateTime={item.observed_at}>{new Date(item.observed_at).toLocaleString("es")}</time>

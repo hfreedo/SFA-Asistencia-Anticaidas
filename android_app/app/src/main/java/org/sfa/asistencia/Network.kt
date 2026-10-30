@@ -92,7 +92,20 @@ class NativeApi(private val context: Context) {
         require(resident.matches(Regex("[0-9a-fA-F-]{36}")))
         return JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_positions?select=latitude,longitude,accuracy_m,observed_at&resident_id=eq.$resident&simulated=eq.false&order=observed_at.desc&limit=1", token))
     }
-    fun remoteResidents(token: String): JSONArray = JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_residents?select=id,full_name,room&archived_at=is.null&order=full_name", token))
+    fun remoteResidents(token: String): JSONArray = JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_residents?select=id,space_id,full_name,room&archived_at=is.null&order=full_name", token))
+    fun remoteCapabilities(token: String, residents: JSONArray): Map<String, PersonCapabilities> {
+        val base = "https://lxymfaoraayccmxwiubw.supabase.co"
+        val user = JSONObject(request("$base/auth/v1/user", token)).getString("id")
+        require(user.matches(Regex("[0-9a-fA-F-]{36}")))
+        val members = JSONArray(request("$base/rest/v1/sfa_memberships?select=space_id,role&user_id=eq.$user&revoked_at=is.null", token))
+        val access = JSONArray(request("$base/rest/v1/sfa_resident_access?select=space_id,resident_id,can_share_location&user_id=eq.$user&revoked_at=is.null", token))
+        val memberships = (0 until members.length()).map { members.getJSONObject(it).let { row -> MembershipGrant(row.getString("space_id"), row.getString("role")) } }
+        val grants = (0 until access.length()).map { access.getJSONObject(it).let { row -> PersonGrant(row.getString("space_id"), row.getString("resident_id"), row.optBoolean("can_share_location")) } }
+        return (0 until residents.length()).associate { residents.getJSONObject(it).let { person ->
+            val id = person.getString("id")
+            id to RolePolicy.capabilities(person.getString("space_id"), id, memberships, grants)
+        } }
+    }
     fun remoteEvents(token: String, resident: String): JSONArray {
         require(resident.matches(Regex("[0-9a-fA-F-]{36}")))
         return JSONArray(request("https://lxymfaoraayccmxwiubw.supabase.co/rest/v1/sfa_events?select=event_type,observed_at,simulated&resident_id=eq.$resident&order=observed_at.desc&limit=12", token))

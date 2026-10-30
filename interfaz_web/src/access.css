@@ -78,7 +78,7 @@ body:has(.sfa-access) { margin:0; }
 .team-workspace .team-danger { color:#9a3412; border-color:#fed7aa; }
 .team-form { padding-left:24px; border-left:1px solid #e2e8f0; display:flex; flex-direction:column; gap:16px; min-width:0; }
 .team-form label,.team-space { display:flex; flex-direction:column; gap:7px; color:#334155; font-size:14px; font-weight:600; }
-.team-form input:not([type="checkbox"]),.team-form select,.team-space select { width:100%; min-height:44px; padding:10px 12px; font:inherit; background:#fff; color:#14201d; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box; }
+.team-form input:not([type="checkbox"]):not([type="radio"]),.team-form select,.team-space select { width:100%; min-height:44px; padding:10px 12px; font:inherit; background:#fff; color:#14201d; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box; }
 .team-form fieldset { border:0; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
 .team-form legend { font-size:14px; font-weight:650; color:#334155; margin-bottom:8px; }
 .team-form .team-check { display:flex; flex-direction:row; align-items:flex-start; gap:9px; padding-block:6px; line-height:1.5; font-weight:400; cursor:pointer; }
@@ -113,6 +113,10 @@ body:has(.sfa-access) { margin:0; }
 .cloud-controls select, .cloud-resident-picker select { display:block; border:1px solid #cbd5e1; background:white; color:#14201d; border-radius:6px; padding:11px; width:100%; font:inherit; margin-top:6px; min-height:44px; }
 .cloud-consent { display:flex !important; align-items:flex-start; gap:10px; margin:18px 0; max-width:720px; font-weight:450 !important; }
 .cloud-consent input { accent-color:#0d9488; margin-top:4px; flex-shrink:0; }
+.cloud-binding-saved { display:flex; align-items:flex-start; gap:12px; margin:18px 0; padding:14px 16px; background:#f0fdfa; border:1px solid #99e2d8; border-radius:6px; color:#0f766e; }
+.cloud-binding-saved > svg { flex-shrink:0; margin-top:2px; }
+.cloud-binding-saved strong { display:block; font-size:14px; font-weight:650; }
+.cloud-binding-saved p { margin:5px 0 0; font-size:13px; line-height:1.5; color:#475569; }
 .cloud-actions { display:flex; flex-wrap:wrap; gap:10px; }
 .cloud-actions button { width:auto; }
 .cloud-sync-counts { display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:18px; font-size:13px; color:#475569; }

@@ -5,17 +5,17 @@ type Device={installation_id:string;updated_at:string;last_test:{state:'pending'
 type Snapshot={devices:Device[];emitter_configured:boolean;emitter_error:boolean};
 const delivery={pending:'En cola o en reintento',sent:'Aceptada por FCM; recepción no confirmada',expired:'Prueba vencida',invalid:'Registro del celular no válido'};
 function failureText(status:number,code:string) {
-  if(status===401 || status===403) return 'Abre Acceso y sincronización de esta PC, inicia sesión y reanuda los envíos con la cuenta del celular.';
+  if(status===401 || status===403) return 'Abre Preparación, inicia sesión y reanuda los envíos con la cuenta del celular.';
   if(code==='22023') return 'Espera al menos un minuto entre pruebas antes de volver a enviar.';
   if(code==='push_not_configured') return 'El emisor FCM de esta PC no está configurado.';
   if(status===404) return 'No está disponible el vínculo o el celular registrado. Actualiza y revisa el registro en Android.';
   return 'No se pudo confirmar la operación. Actualiza el estado antes de repetir la prueba.';
 }
-export function PushTestSettings({residentId}:{residentId?:number}) {
+export function PushTestSettings({residentId,onPrepare}:{residentId?:number;onPrepare?:()=>void}) {
   if(!residentId) return <section className="notification-channel push-test-settings"><h3>Avisos al celular · Firebase</h3><p>Selecciona un residente para consultar los celulares de tu cuenta.</p></section>;
-  return <PushTestPanel key={residentId} residentId={residentId}/>;
+  return <PushTestPanel key={residentId} residentId={residentId} onPrepare={onPrepare}/>;
 }
-function PushTestPanel({residentId}:{residentId:number}) {
+function PushTestPanel({residentId,onPrepare}:{residentId:number;onPrepare?:()=>void}) {
   const [data,setData]=useState<Snapshot|null>(null);
   const [selected,setSelected]=useState('');
   const [confirmed,setConfirmed]=useState(false);
@@ -67,7 +67,7 @@ function PushTestPanel({residentId}:{residentId:number}) {
     {!!data?.devices.length && <label>Celular destinatario<select aria-label="Celular destinatario" value={selected} disabled={busy} onChange={e=>{setSelected(e.target.value);setConfirmed(false);setMessage('');}}>{data.devices.map((item,index)=><option key={item.installation_id} value={item.installation_id}>Celular {index+1} · registro {new Date(item.updated_at).toLocaleString('es')}</option>)}</select></label>}
     {device?.last_test && <p className="push-last-test" role="status">Última prueba: {delivery[device.last_test.state]} · {new Date(device.last_test.observed_at).toLocaleString('es')}</p>}
     <label className="push-test-consent"><input type="checkbox" checked={confirmed} disabled={busy||!device||!data?.emitter_configured} onChange={e=>setConfirmed(e.target.checked)}/>Enviar una notificación de PRUEBA. No es una emergencia.</label>
-    <div className="push-test-actions"><button type="button" onClick={()=>void send()} disabled={busy||loading||!confirmed||!device||!data?.emitter_configured}><Send size={17}/>{busy?'Solicitando…':'Enviar prueba al celular'}</button><button type="button" onClick={()=>{setLoading(true);setRevision(n=>n+1);}} disabled={busy||loading}><RefreshCw size={17}/>Actualizar estado</button><a href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer">Acceso y sincronización</a></div>
+    <div className="push-test-actions"><button type="button" onClick={()=>void send()} disabled={busy||loading||!confirmed||!device||!data?.emitter_configured}><Send size={17}/>{busy?'Solicitando…':'Enviar prueba al celular'}</button><button type="button" onClick={()=>{setLoading(true);setRevision(n=>n+1);}} disabled={busy||loading}><RefreshCw size={17}/>Actualizar estado</button>{onPrepare?<button type="button" onClick={onPrepare}>Preparar acceso y sincronización</button>:<a href="/acceso/acceso.html" target="_blank" rel="noopener noreferrer">Acceso y sincronización</a>}</div>
     {message && <p role="status">{message}</p>}
   </section>;
 }

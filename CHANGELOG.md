@@ -1,5 +1,125 @@
 # Changelog
 
+## Windows 1.2.0-rc13.1 - Presentacion integrada de Personas (local)
+
+- Pestanas, tipografia y botones de Personas alineados con los ajustes del panel.
+- Selectores nativos con iconos Lucide, altura de 42 px y foco teal consistente;
+  se conservan teclado, etiquetas accesibles y opciones del sistema en movil.
+- Correo y rol alineados; fichas elegidas con radio/casilla y resaltado suave.
+  Permisos separados de la identidad y acciones secundarias menos dominantes.
+- Directorio compacto con mas espacio para los datos y relaciones de la ficha.
+  El editor de cuidadores comparte el fondo blanco y borde de la ficha de datos.
+- Sin cambios de permisos, Supabase, FCM ni APK. rc13 conservada sin reemplazar.
+- Pruebas funcionales y capturas del panel y portal con datos ficticios.
+
+## Windows 1.2.0-rc13 - Personas, fichas y equipo (local)
+
+- Entrada Personas en el panel: Datos y Cuidadores y acceso desde la ficha.
+  Las fichas dejan de estar escondidas entre los ajustes tecnicos.
+- Portal: Personas y equipo permite consultar quien cuida a cada persona,
+  su cuenta personal y los administradores del espacio, sin duplicar identidades.
+- Cuidador: seleccion multiple de personas que puede cuidar. Persona cuidada:
+  seleccion unica de la ficha que representa su cuenta, no personas a su cargo.
+- Cuidador existente: conserva sus otras asignaciones al agregar una ficha.
+  Cambiar la identidad de una cuenta residente requiere confirmacion explicita.
+  Permisos heterogeneos no se uniforman sin consentimiento adicional.
+- Referencia local/cloud por identificadores persistidos. Una ficha sin vinculo,
+  no disponible o sin permiso no se sustituye por otra de nombre parecido.
+- Sin migraciones Supabase, cambios FCM, APK nueva, reasignaciones automaticas
+  ni publicacion remota. PC de confianza conservada para demostraciones.
+- Guia: docs/PERSONAS_Y_EQUIPO.md.
+
+## Windows 1.2.0-rc12 y Android 0.7.1 - Roles en demostracion (local)
+
+- Servidor local: gestion, perfiles, configuraciones, consultas y WebSocket
+  reservados a localhost con origen valido. Bloqueo de Host ajeno y solicitudes
+  cross-site. CORS deja de aceptar cualquier origen.
+- LAN conserva solo pagina/recursos emisores y GET/POST GPS con su vinculo
+  existente. La consulta en otro equipo se realiza en el portal autenticado.
+- Android: Cuenta para emisor residente, Cuidar/Pruebas solo para personas con
+  capacidades de cuidado. Asignaciones y permisos de emision diferenciados por
+  espacio y persona; rol admin de otro espacio no eleva al residente.
+- Web integrada: identifica al residente sin describirlo como cuidador.
+- Sin nuevas contrasenas locales: PC de operador de confianza, no identidad
+  diferenciada de quienes comparten la misma sesion de Windows.
+- Sin migraciones Supabase, cambios FCM, planes de pago ni publicacion remota.
+  Relevo administrativo de incidentes queda pendiente de otra etapa.
+
+## Windows 1.2.0-rc11.3 - Lenguaje visual del principal (release local)
+
+- Titulos y estados con escala comun. Selector GPS compacto sin marco interior,
+  actualizacion en cabeceras y mapa como accion principal teal.
+- Sesion pausada confirmada por el servidor en un unico aviso contextual.
+  Las zonas mantienen sus estados sin repetir el remedio. Un fallo independiente
+  conserva su acceso correctivo, sin inferir una causa comun no verificada.
+- Historial secundario y diagnostico en opciones. Sin contador cero cuando
+  falta consulta ni mensajes duplicados de consulta sin verificar.
+- Incidentes reales, seguimiento de geocerca, permisos y atencion persistente
+  conservados. Sin cambios cloud, FCM, APK ni publicacion remota.
+
+## Windows 1.2.0-rc11.2 - Preparacion visible y avisos claros (release local)
+
+- Indicador en navegacion de escritorio y movil con acciones por perfil:
+  vinculo habilitado, sesion pausada y errores del emisor FCM.
+- Consulta no disponible diferenciada de un estado listo; cinturon y emisor
+  sin configurar son opcionales para GPS y no inflan el contador.
+- Preparacion muestra iconos y accesos contextuales a vinculo, sesion,
+  dispositivo y avisos. Los avisos del principal enfocan el acceso integrado.
+- Encabezados alineados, botones coherentes y diagnostico desplegable.
+  No se muestra historial (0) si la consulta falla o aun no se verifico.
+- Sin migraciones, cambios FCM, APK ni publicacion remota. rc11.1 conservada.
+
+## Windows 1.2.0-rc11.1 - Claridad visual del principal (release local)
+
+- Atencion y Ubicacion delimitadas sobre blanco, en dos columnas de escritorio
+  y una en movil. Perfil compacto, sin franjas vacias ni doble separacion.
+- Estado principal antes de acciones; consultar incidentes mediante icono con
+  nombre accesible, y preparacion/avisos del navegador en opciones secundarias.
+- GPS antiguo en ambar y tiempos legibles. Consulta al servidor y ultima
+  posicion se identifican como datos distintos; precision historica rotulada.
+- Estado vacio solo despues de consulta verificada. Un seguimiento de geocerca
+  pendiente sigue visible y no compite con un mensaje de ausencia de incidentes.
+- Sin cambios cloud ni APK; rc11 conservada. No publicada en GitHub.
+
+## Windows 1.2.0-rc11 - Panel principal centrado en la persona (release local)
+
+- Perfil antes de incidentes; alerta persistente con detalle de atencion
+  desplegable. Se conservan confirmaciones, permisos e indicadores laterales.
+- GPS por internet en el resumen, con fuente explicita compartida con el mapa,
+  precision y antiguedad. Sin sustitucion silenciosa por coordenadas locales.
+- Actividad de hoy local y remota reunida, con origen y pruebas identificados;
+  fallos de consulta no equivalen a ausencia de incidentes.
+- Movimiento estable del cinturon deja de anunciar Sin alertas activas generales.
+  Primera actividad sin panel vacio fijo. Simulacion local trasladada a Notificaciones.
+- Sin cambios cloud ni APK nueva. rc10 y rc10.1 conservadas, sin publicar en GitHub.
+- Guia de alcance y verificacion: docs/PANEL_PRINCIPAL_PERSONA.md.
+
+## Windows 1.2.0-rc10.1 - Vinculo guardado en Preparacion (release local)
+
+- La vista consulta el vinculo persistido para el perfil y espacio seleccionados.
+  Si esta habilitado muestra Vinculo de este perfil guardado, sin repetir casilla
+  ni boton de alta. Reanudar y pausar siguen siendo acciones independientes.
+- La autorizacion de un alta nueva no se reutiliza al cambiar de destino ni se
+  infiere de un vinculo deshabilitado, de otro perfil o de otro espacio.
+- Sin cambios de permisos Supabase, almacenamiento de sesiones ni FCM.
+- rc10 original conservada. Paquete corregido local rc10.1, sin publicar en GitHub.
+
+## Windows 1.2.0-rc10 - Preparacion unificada, etapa 1 (release local)
+
+- Preparacion dentro del panel: acceso, vinculo de esta PC y equipo sin otra
+  pestana; conserva el perfil seleccionado y exige consentimiento explicito.
+- Accesos contextuales al dispositivo, mapa y notificaciones en el mismo panel.
+  El Centro ofrece Abrir SFA y Preparar sistema; LAN es una opcion independiente.
+- Estados separados de cinturon, vinculo, sesion y emisor FCM. No se interpreta
+  configuracion como entrega ni la ausencia del cinturon como falta de GPS.
+- Navegacion movil de cuatro opciones y disposicion responsive verificada.
+- Configuracion publica compartida entre builds local y acceso. Recuperacion
+  conserva el retorno existente; cerrar sesion pausa antes los envios locales.
+- Sin migraciones Supabase, cambios FCM o nueva APK. Los releases publicados
+  anteriormente no incluyen esta etapa. Guia: docs/PREPARACION_UNIFICADA.md.
+- Paquete local en release/SFA-Asistencia-1.2.0-rc10-Windows.zip, con driver
+  CH340/CH341 opcional, documentacion y sumas SHA-256. Sin publicar en GitHub.
+
 ## Android 0.7.0 release - Recuerdos
 
 - Album local independiente de cuentas y de la telemetria: alta de fotos con

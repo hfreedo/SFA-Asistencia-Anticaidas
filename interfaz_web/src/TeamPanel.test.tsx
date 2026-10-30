@@ -14,7 +14,7 @@ beforeEach(() => {
     { user_id: "caregiver", email: "care@example.invalid", role: "caregiver", access: [{ resident_id: "person-a", can_configure: false, can_share_location: false }] },
   ], invitations: [] }, error: null } : { data: { updated: true }, error: null });
   mock.invoke.mockResolvedValue({ data: { invitation_id: "invite", mail_sent: true }, error: null });
-  mock.client.mockReturnValue({ rpc: mock.rpc, functions: { invoke: mock.invoke }, from: () => ({ select: () => ({ eq: () => ({ is: () => ({ order: () => Promise.resolve({ data: [{ id: "person-a", full_name: "Persona A" }], error: null }) }) }) }) }) });
+  mock.client.mockReturnValue({ rpc: mock.rpc, functions: { invoke: mock.invoke }, from: () => ({ select: () => ({ eq: () => ({ is: () => ({ order: () => Promise.resolve({ data: [{ id: "person-a", full_name: "Persona A" }, { id: "person-b", full_name: "Persona B" }], error: null }) }) }) }) }) });
 });
 afterEach(cleanup);
 it("caregivers cannot open team administration or cause data requests", () => {
@@ -32,7 +32,7 @@ it("invites carry explicit role, space, resident and independent GPS capability"
   await screen.findByLabelText("Persona A");
   fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "new@example.invalid" } });
   fireEvent.click(screen.getByLabelText("Persona A"));
-  fireEvent.click(screen.getByLabelText("Permitir vincular este celular como emisor GPS"));
+  fireEvent.click(screen.getByLabelText("Permitir vincular un celular de esta cuenta como emisor GPS"));
   fireEvent.click(screen.getByRole("button", { name: "Crear invitación" }));
   await waitFor(() => expect(mock.invoke).toHaveBeenCalledWith("sfa-team-invite", {
     headers: { Authorization: "Bearer PRIVATE_SESSION_FIXTURE" },
@@ -68,4 +68,68 @@ it("revocation uses the restricted command only after confirmation", async () =>
   fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
   await waitFor(() => expect(mock.rpc).toHaveBeenCalledWith("sfa_revoke_team_member", { p_space: "space-a", p_user: "caregiver" }));
   expect(await screen.findByText(/Los registros se conservan/)).toBeTruthy();
+});
+
+it("person view describes care separately from personal identity and uses a single-choice ficha", async () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("care@example.invalid");
+  expect(screen.getByText("Quiénes la cuidan")).toBeTruthy();
+  expect(screen.getByText("Su acceso a la app")).toBeTruthy();
+  expect(screen.queryByLabelText("Correo electrónico")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Dar acceso a esta persona" }));
+  expect(screen.getByText("Ficha a la que corresponde esta cuenta")).toBeTruthy();
+  expect((screen.getByLabelText("Persona A") as HTMLInputElement).checked).toBe(true);
+  expect(screen.getAllByRole("radio")).toHaveLength(2);
+  fireEvent.click(screen.getByLabelText("Persona B"));
+  expect((screen.getByLabelText("Persona A") as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByLabelText("Persona B") as HTMLInputElement).checked).toBe(true);
+  expect(mock.invoke).not.toHaveBeenCalled();
+});
+it("context from an unauthorized space never falls back to another administered space", () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSpaceId="other-space" initialResidentId="other-person" onAccessChanged={() => {}}/>);
+  expect(screen.getByRole("status").textContent).toContain("No se mostrarán asignaciones de otro espacio");
+  expect(mock.client).not.toHaveBeenCalled();
+});
+it("missing context person is not replaced by the first available person", async () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="missing" onAccessChanged={() => {}}/>);
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("button", { name: "Agregar cuidador" })).toBeNull();
+  expect(mock.invoke).not.toHaveBeenCalled();
+});
+it("assigning an existing caregiver preserves other residents and waits for explicit save", async () => {
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-b" onAccessChanged={() => {}}/>);
+  await screen.findByRole("option", { name: "care@example.invalid" });
+  fireEvent.change(screen.getByLabelText("Cuidador existente"), { target: { value: "caregiver" } });
+  expect((screen.getByLabelText("Persona A") as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText("Persona B") as HTMLInputElement).checked).toBe(true);
+  expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Guardar permisos" }));
+  await waitFor(() => expect(mock.rpc).toHaveBeenCalledWith("sfa_set_team_access", { p_space: "space-a", p_user: "caregiver", p_residents: ["person-a", "person-b"], p_configure: false, p_share: false }));
+});
+it("heterogeneous permissions cannot be silently normalized", async () => {
+  mock.rpc.mockResolvedValue({ data: { members: [{ user_id: "mixed", email: "mixed@example.invalid", role: "caregiver", access: [
+    { resident_id: "person-a", can_configure: false, can_share_location: false },
+    { resident_id: "person-b", can_configure: true, can_share_location: true },
+  ] }], invitations: [] }, error: null });
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("mixed@example.invalid");
+  fireEvent.click(screen.getByRole("button", { name: "Permisos" }));
+  expect((screen.getByRole("button", { name: "Guardar permisos" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByLabelText(/Las asignaciones actuales tienen permisos distintos/)).toBeTruthy();
+  expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
+});
+
+it("changing the ficha represented by an existing resident requires confirmation", async () => {
+  mock.rpc.mockResolvedValue({ data: { members: [{ user_id: "self-person", email: "self@example.invalid", role: "resident", access: [
+    { resident_id: "person-a", can_configure: false, can_share_location: true },
+  ] }], invitations: [] }, error: null });
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
+  await screen.findByText("self@example.invalid");
+  fireEvent.click(screen.getByRole("button", { name: "Permisos" }));
+  fireEvent.click(screen.getByLabelText("Persona B"));
+  fireEvent.click(screen.getByRole("button", { name: "Guardar permisos" }));
+  expect(await screen.findByRole("alertdialog")).toBeTruthy();
+  expect(mock.rpc.mock.calls.some(call => call[0] === "sfa_set_team_access")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+  await waitFor(() => expect(mock.rpc).toHaveBeenCalledWith("sfa_set_team_access", { p_space: "space-a", p_user: "self-person", p_residents: ["person-b"], p_configure: false, p_share: true }));
 });

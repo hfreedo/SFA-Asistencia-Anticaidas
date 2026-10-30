@@ -56,7 +56,7 @@ it("failed refresh clears old actionable data", async () => {
   render(<IncidentPanel resident="person" session={session} />);
   await screen.findByRole("button", { name: "Tomar atención" });
   mock.rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
-  fireEvent.click(screen.getByRole("button", { name: "Actualizar incidentes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Consultar incidentes" }));
   await screen.findByRole("alert");
   expect(screen.queryByRole("button", { name: "Tomar atención" })).toBeNull();
 });
@@ -73,7 +73,7 @@ it("a transient connection failure cannot dismiss a previously received pending 
   render(<IncidentPanel resident="person" session={session} />);
   await screen.findByRole("alert",{name:"Atención pendiente"});
   mock.rpc.mockResolvedValue({data:null,error:{code:"network"}});
-  fireEvent.click(screen.getByRole("button",{name:"Actualizar incidentes"}));
+  fireEvent.click(screen.getByRole("button",{name:"Consultar incidentes"}));
   await screen.findByText(/No se pudieron actualizar/);
   expect(screen.getByRole("alert",{name:"Atención pendiente"})).toBeTruthy();
   expect(screen.queryByRole("button",{name:"Tomar atención"})).toBeNull();
@@ -107,7 +107,8 @@ it("uses existing browser consent for newly received geofence notifications", as
   vi.stubGlobal("isSecureContext",true);
   mock.rpc.mockResolvedValue({data:{can_attend:true,events:[]},error:null});
   render(<IncidentPanel resident="person" session={session}/>);
-  await screen.findByText(/No hay incidentes/);
+  await screen.findByText(/Sin incidentes pendientes/);
+  fireEvent.click(screen.getByLabelText("Opciones de atención"));
   expect(screen.getByRole("button",{name:"Desactivar avisos en esta PC"})).toBeTruthy();
   mock.rpc.mockResolvedValue({data:{can_attend:true,events:[{...incident,event_type:"GEOCERCA_SALIDA",simulated:false,observed_at:new Date().toISOString()}]},error:null});
   fireEvent.focus(window);

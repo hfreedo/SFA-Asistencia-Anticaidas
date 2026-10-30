@@ -31,6 +31,7 @@ from servidor_pc.ubicacion import FenceInput, LocationService, PositionInput
 from servidor_pc.correo import EmailChannel
 from servidor_pc.nube import CloudError, CloudSync
 from servidor_pc.rutas import application_home, database_path
+from servidor_pc.operator_boundary import OperatorBoundary, operator_allowed
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -546,12 +547,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="SFA Alerta Anticaídas", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.add_middleware(OperatorBoundary)
 if ACCESS_DIR.is_dir():
     app.mount("/acceso", StaticFiles(directory=ACCESS_DIR, html=True), name="access")
 
@@ -1026,15 +1028,8 @@ def import_configuration(backup: ConfigurationBackup) -> dict[str, Any]:
 
 
 def require_local_operator(request: Request) -> None:
-    own_addresses = {"127.0.0.1", "::1", *local_addresses()}
-    if not request.client or request.client.host not in own_addresses:
-        raise HTTPException(403, "Esta operación se realiza desde la PC del servidor")
-    origin = request.headers.get("origin")
-    allowed = {f"{request.url.scheme}://{request.url.netloc}"}
-    if request.client.host in {"127.0.0.1", "::1"}:
-        allowed.update({"http://127.0.0.1:5173", "http://localhost:5173"})
-    if origin and origin not in allowed:
-        raise HTTPException(403, "Origen no autorizado")
+    if not operator_allowed(request.scope):
+        raise HTTPException(403, "Esta operación se realiza desde localhost en la PC del servidor")
 
 
 @app.middleware("http")

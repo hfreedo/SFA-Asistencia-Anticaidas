@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type SelectHTMLAttributes } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, X } from "lucide-react";
+import { Building2, Check, ChevronDown, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X, type LucideIcon } from "lucide-react";
 import { accessDataClient } from "./accessClient";
+import "./peopleTeam.css";
 
 type Space = { space_id: string; name: string; role: string };
 type Access = { resident_id: string; can_configure: boolean; can_share_location: boolean };
@@ -10,19 +11,28 @@ type Invitation = { id: string; email: string; role: string; expires_at: string 
 type Resident = { id: string; full_name: string };
 const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
 
-export function TeamPanel({ session, spaces, onAccessChanged }: { session: Session; spaces: Space[]; onAccessChanged: () => void }) {
+function TeamSelect({ icon: LeadingIcon, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { icon: LucideIcon }) {
+  return <span className="team-select"><LeadingIcon className="team-select-icon" size={17} aria-hidden="true"/><select {...props}>{children}</select><ChevronDown className="team-select-chevron" size={16} aria-hidden="true"/></span>;
+}
+
+export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId, initialSpaceId, initialSection = "team" }: { session: Session; spaces: Space[]; onAccessChanged: () => void; initialResidentId?: string; initialSpaceId?: string; initialSection?: "people" | "team" }) {
   const allowed = spaces.filter(s => s.role === "admin");
-  const [selected, setSelected] = useState(allowed[0]?.space_id ?? "");
+  const [selected, setSelected] = useState(initialSpaceId ?? allowed[0]?.space_id ?? "");
   const space = allowed.find(s => s.space_id === selected) ?? allowed[0];
   if (!space) return <p role="alert">La administración de equipo requiere permiso de administrador.</p>;
+  if (initialSpaceId && space.space_id !== initialSpaceId) return <p role="status">Tu cuenta no administra el espacio de esta ficha. No se mostrarán asignaciones de otro espacio.</p>;
   return <section aria-labelledby="team-title" className="team-workspace">
-    <div className="cloud-section-title"><ShieldCheck size={21} /><h2 id="team-title">Equipo y permisos</h2></div>
-    {allowed.length > 1 && <label className="team-space">Espacio<select value={space.space_id} onChange={e => setSelected(e.target.value)}>{allowed.map(s => <option key={s.space_id} value={s.space_id}>{s.name}</option>)}</select></label>}
-    <TeamSpace key={space.space_id} space={space} session={session} onAccessChanged={onAccessChanged} />
+    {initialResidentId ? <h2 id="team-title" className="sr-only">Personas y equipo</h2> : <div className="cloud-section-title"><ShieldCheck size={21} /><h2 id="team-title">Personas y equipo</h2></div>}
+    {allowed.length > 1 && !initialSpaceId && <label className="team-space" htmlFor="team-space">Espacio<TeamSelect id="team-space" icon={Building2} value={space.space_id} onChange={e => setSelected(e.target.value)}>{allowed.map(s => <option key={s.space_id} value={s.space_id}>{s.name}</option>)}</TeamSelect></label>}
+    <TeamSpace key={space.space_id} space={space} session={session} onAccessChanged={onAccessChanged} initialResidentId={initialResidentId} initialSection={initialSection}/>
   </section>;
 }
 
-function TeamSpace({ space, session, onAccessChanged }: { space: Space; session: Session; onAccessChanged: () => void }) {
+function TeamSpace({ space, session, onAccessChanged, initialResidentId, initialSection }: { space: Space; session: Session; onAccessChanged: () => void; initialResidentId?: string; initialSection: "people" | "team" }) {
+  const [section, setSection] = useState<"people" | "team">(initialSection);
+  const [personId, setPersonId] = useState(initialResidentId ?? "");
+  const [formOpen, setFormOpen] = useState(initialSection === "team");
+  const [uniformConsent, setUniformConsent] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -66,8 +76,9 @@ function TeamSpace({ space, session, onAccessChanged }: { space: Space; session:
     const { error: problem } = await accessDataClient(session.access_token).rpc(name, body);
     if (problem) throw problem;
   }
-  function reset() { setEditing(null); setEmail(""); setRole("caregiver"); setChosen([]); setConfigure(false); setShare(false); }
+  function reset() { setEditing(null); setEmail(""); setRole("caregiver"); setChosen([]); setConfigure(false); setShare(false); setUniformConsent(false); setFormOpen(false); }
   function edit(member: Member) {
+    setFormOpen(true); setUniformConsent(false);
     setEditing(member); setEmail(member.email); setRole(member.role); setChosen(member.access.map(a => a.resident_id));
     setConfigure(member.access.some(a => a.can_configure)); setShare(member.access.some(a => a.can_share_location));
   }
@@ -90,18 +101,45 @@ function TeamSpace({ space, session, onAccessChanged }: { space: Space; session:
   }
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!editing && role === "admin") setConfirmation({ text: `Darás acceso administrativo a todo este espacio a ${email}.`, action: async () => { await work(save); } });
+    if (role !== "admin" && (!chosen.length || role === "resident" && chosen.length !== 1 || chosen.some(id => !residents.some(r => r.id === id)))) return;
+    if (mixedPermissions && !uniformConsent) return;
+    if (editing && role === "resident" && (editing.access.length !== 1 || editing.access[0].resident_id !== chosen[0])) setConfirmation({ text: `Cambiarás la ficha que representa ${email} a ${residents.find(r => r.id === chosen[0])?.full_name}. Comprueba que la cuenta corresponde a esa persona.`, action: async () => { await work(save); } });
+    else if (!editing && role === "admin") setConfirmation({ text: `Darás acceso administrativo a todo este espacio a ${email}.`, action: async () => { await work(save); } });
     else void work(save);
+  }
+  const person = residents.find(r => r.id === personId);
+  const mixedPermissions = !!editing && new Set(editing.access.map(a => `${a.can_configure}:${a.can_share_location}`)).size > 1;
+  const related = person ? members.filter(m => m.role !== "admin" && m.access.some(a => a.resident_id === person.id)) : [];
+  const availableCaregivers = person ? members.filter(m => m.role === "caregiver" && !m.access.some(a => a.resident_id === person.id)) : [];
+  function inviteForPerson(nextRole: "caregiver" | "resident") {
+    if (!person) return;
+    reset(); setRole(nextRole); setChosen([person.id]); setShare(nextRole === "resident"); setFormOpen(true);
+    window.setTimeout(() => document.getElementById("team-email")?.focus(), 0);
   }
   return <>
     {error && <p role="alert" className="cloud-warning">{error}</p>}
     {notice && <p role="status" className="team-notice"><Check size={18} />{notice}</p>}
-    <div className="team-layout">
+    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { reset(); setSection("people"); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { reset(); setSection("team"); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
+    {section === "people" && <section className="person-access-summary" aria-label="Cuidado y acceso de la persona">
+      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { setPersonId(e.target.value); reset(); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
+      {loading && <p role="status">Consultando cuidadores y acceso…</p>}
+      {!loading && initialResidentId && !person && <p role="alert" className="cloud-warning">La ficha vinculada no está disponible en este espacio. No se seleccionará otra persona automáticamente.</p>}
+      {person && <><h3>{person.full_name}</h3><div className="person-access-columns"><section><h4>Quiénes la cuidan</h4>
+        {related.some(m => m.role === "caregiver") ? <ul>{related.filter(m => m.role === "caregiver").map(m => <li key={m.user_id}><span>{m.email}</span><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p>Sin cuidadores asignados.</p>}
+        {availableCaregivers.length > 0 && <div className="team-field"><label htmlFor="team-caregiver">Cuidador existente</label><TeamSelect icon={UsersRound} id="team-caregiver" value="" disabled={busy || loading} onChange={e => { const member = availableCaregivers.find(m => m.user_id === e.target.value); if (member) { edit(member); setChosen([...new Set([...member.access.map(a => a.resident_id), person.id])]); } }}><option value="">Seleccionar del equipo</option>{availableCaregivers.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}</TeamSelect></div>}
+        <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("caregiver")}><UserPlus size={16}/>Agregar cuidador</button></section>
+        <section><h4>Su acceso a la app</h4>{related.some(m => m.role === "resident") ? <ul>{related.filter(m => m.role === "resident").map(m => <li key={m.user_id}><div><span>{m.email}</span><small>Esta cuenta corresponde a {person.full_name}</small></div><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p>Sin cuenta personal vinculada.</p>}
+        <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("resident")}><Mail size={16}/>Dar acceso a esta persona</button></section></div>
+        <details className="person-admins"><summary>Administradores del espacio ({members.filter(m => m.role === "admin").length})</summary><ul>{members.filter(m => m.role === "admin").map(m => <li key={m.user_id}>{m.email}</li>)}</ul></details></>}
+    </section>}
+    {section === "team" && !formOpen && <button className="access-primary team-new-account" disabled={busy || loading} onClick={() => { reset(); setFormOpen(true); }}><UserPlus size={17}/>Invitar una cuenta</button>}
+    <div className={`team-layout${section === "people" ? " person-form-layout" : ""}`}>
+      {section === "team" &&
       <div>
         <div className="team-list-heading"><h3>Miembros de {space.name}</h3><button className="access-secondary" disabled={busy || loading} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16} />Actualizar</button></div>
         {loading ? <p role="status">Consultando equipo…</p> : <ul className="team-members">{members.map(member => <li key={member.user_id}>
           <div><strong>{member.email}</strong><span>{roles[member.role]}{member.user_id === session.user.id ? " · Tu cuenta" : ""}</span>
-            <p>{member.role === "admin" ? "Todos los residentes del espacio" : member.access.map(a => residents.find(r => r.id === a.resident_id)?.full_name).filter(Boolean).join(", ") || "Sin residentes asignados"}</p></div>
+            <p>{member.role === "admin" ? "Administra todas las fichas del espacio" : `${member.role === "resident" ? "Esta cuenta corresponde a" : "Cuida a"}: ${member.access.map(a => residents.find(r => r.id === a.resident_id)?.full_name).filter(Boolean).join(", ") || "Sin ficha disponible"}`}</p></div>
           <div className="team-row-actions">{member.role !== "admin" && <button className="access-secondary" disabled={busy} onClick={() => edit(member)}><ShieldCheck size={16} />Permisos</button>}
             <button className="access-secondary team-danger" disabled={busy || member.user_id === session.user.id} onClick={() => setConfirmation({ text: `Revocarás el acceso de ${member.email} a este espacio. No se borran sus registros.`, action: async () => { await work(async () => {
               await command("sfa_revoke_team_member", { p_space: space.space_id, p_user: member.user_id });
@@ -115,24 +153,25 @@ function TeamSpace({ space, session, onAccessChanged }: { space: Space; session:
           <button className="access-secondary" disabled={busy} onClick={() => setConfirmation({ text: `Cancelarás la invitación de ${invite.email}.`, action: async () => { await work(async () => {
             await command("sfa_cancel_team_invite", { p_space: space.space_id, p_invitation: invite.id }); return "Invitación cancelada.";
           }); } })}><X size={16} />Cancelar</button></li>)}</ul>
-      </div>
-      <form className="team-form" onSubmit={submit}>
+      </div>}
+      {formOpen && <form className="team-form" onSubmit={submit}>
         <div className="cloud-section-title"><UserPlus size={20} /><h3>{editing ? "Asignar permisos" : "Invitar al equipo"}</h3></div>
-        <label>Correo electrónico<input type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} disabled={busy || Boolean(editing)} autoComplete="off" /></label>
-        <label>Rol<select value={role} disabled={busy || Boolean(editing)} onChange={e => { setRole(e.target.value); setChosen([]); setConfigure(false); setShare(e.target.value === "resident"); }}>
+        <div className="team-fields"><div className="team-field"><label htmlFor="team-email">Correo electrónico</label><span className="team-email-field"><Mail size={17} aria-hidden="true"/><input id="team-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} disabled={busy || Boolean(editing)} autoComplete="off" /></span></div>
+        <div className="team-field"><label htmlFor="team-role">Rol</label><TeamSelect id="team-role" icon={ShieldCheck} value={role} disabled={busy || Boolean(editing)} onChange={e => { setRole(e.target.value); setChosen([]); setConfigure(false); setShare(e.target.value === "resident"); }}>
           <option value="caregiver">Cuidador</option><option value="resident">Persona cuidada</option><option value="admin">Administrador</option>
-        </select></label>
+        </TeamSelect></div></div>
         {role === "admin" ? <p className="cloud-warning">Este rol administra todos los residentes y permisos del espacio.</p> : <>
-          <fieldset disabled={busy || loading}><legend>Residentes asignados</legend>{!residents.length && <p>No hay residentes disponibles.</p>}
-            {residents.map(resident => <label className="team-check" key={resident.id}><input type="checkbox" checked={chosen.includes(resident.id)} onChange={e => setChosen(previous => e.target.checked ? role === "resident" ? [resident.id] : [...previous, resident.id] : previous.filter(id => id !== resident.id))} />{resident.full_name}</label>)}
+          <fieldset className="team-assignments" disabled={busy || loading}><legend>{role === "resident" ? "Ficha a la que corresponde esta cuenta" : "Personas que podrá cuidar"}</legend>{!residents.length && <p>No hay residentes disponibles.</p>}
+            {residents.map(resident => <label className="team-check team-assignment" key={resident.id}><input type={role === "resident" ? "radio" : "checkbox"} name={role === "resident" ? "resident-identity" : undefined} checked={chosen.includes(resident.id)} onChange={e => setChosen(previous => e.target.checked ? role === "resident" ? [resident.id] : [...previous, resident.id] : previous.filter(id => id !== resident.id))} /><UserRound size={17} aria-hidden="true"/><span>{resident.full_name}</span></label>)}
           </fieldset>
-          {role === "caregiver" && <label className="team-check"><input type="checkbox" checked={configure} disabled={busy} onChange={e => setConfigure(e.target.checked)} />Permitir configuración de los residentes asignados</label>}
-          <label className="team-check"><input type="checkbox" checked={share} disabled={busy} onChange={e => setShare(e.target.checked)} />Permitir vincular este celular como emisor GPS</label>
+          {role === "caregiver" && <label className="team-check team-permission"><input type="checkbox" checked={configure} disabled={busy} onChange={e => setConfigure(e.target.checked)} />Permitir configuración de los residentes asignados</label>}
+          <label className="team-check team-permission"><input type="checkbox" checked={share} disabled={busy} onChange={e => setShare(e.target.checked)} />Permitir vincular un celular de esta cuenta como emisor GPS</label>
         </>}
-        <div className="cloud-actions"><button className="access-primary" disabled={busy || loading || (role !== "admin" && !chosen.length)}><Mail size={17} />{editing ? "Guardar permisos" : "Crear invitación"}</button>
-          {editing && <button type="button" className="access-secondary" disabled={busy} onClick={reset}><X size={16} />Cancelar edición</button>}</div>
+        {mixedPermissions && <label className="team-check cloud-warning"><input type="checkbox" checked={uniformConsent} disabled={busy} onChange={e => setUniformConsent(e.target.checked)} />Aplicar los permisos de configuración y GPS de este formulario a todas las personas seleccionadas. Las asignaciones actuales tienen permisos distintos.</label>}
+        <div className="cloud-actions"><button className="access-primary" disabled={busy || loading || (role !== "admin" && !chosen.length) || mixedPermissions && !uniformConsent}><Mail size={17} />{editing ? "Guardar permisos" : "Crear invitación"}</button>
+          <button type="button" className="access-secondary" disabled={busy} onClick={() => { reset(); setFormOpen(false); }}><X size={16} />{editing ? "Cancelar edición" : "Cerrar formulario"}</button></div>
         <p className="cloud-footnote">La ficha de residente y la cuenta son distintas. Las invitaciones vencen a los siete días. Cambiar permisos no borra historiales.</p>
-      </form>
+      </form>}
     </div>
     {confirmation && <div className="team-dialog-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="team-confirm-title" aria-describedby="team-confirm-text" className="team-dialog" onKeyDown={event => {
       if (event.key === "Escape" && !busy) { event.preventDefault(); setConfirmation(null); }
