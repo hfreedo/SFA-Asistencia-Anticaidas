@@ -5,11 +5,16 @@ const http = require('node:http');
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.SFA_PLAYWRIGHT_MODULE || 'playwright');
 const portal = process.argv.includes('--portal');
+const aesthetic = process.argv.includes('--aesthetic');
+const scrollbar = process.argv.includes('--scrollbar');
+const tableReview = process.argv.includes('--table');
 const root = path.resolve(__dirname, portal ? '../interfaz_web/dist-acceso' : '../interfaz_web/static');
 const output = path.resolve(__dirname, '../build/preparation-qa');
 const linked = process.argv.includes('--linked');
 const people = process.argv.includes('--people');
 const careLink = process.argv.includes('--care-link');
+const savedCare = process.argv.includes('--saved-care');
+const managedPerson = process.argv.includes('--managed-person');
 const quiet = process.argv.includes('--quiet');
 const unverified = process.argv.includes('--unverified');
 const independent = process.argv.includes('--independent');
@@ -29,7 +34,7 @@ const server = http.createServer((req, res) => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   let browser;
   try {
-    browser = await chromium.launch({ headless: true, ...(process.env.SFA_QA_BROWSER ? { executablePath: process.env.SFA_QA_BROWSER } : {}) });
+    browser = await chromium.launch({ headless: true, ...(scrollbar ? {ignoreDefaultArgs:['--hide-scrollbars']} : {}), ...(process.env.SFA_QA_BROWSER ? { executablePath: process.env.SFA_QA_BROWSER } : {}) });
     const page = await browser.newPage();
     const origin = `http://127.0.0.1:${server.address().port}`;
     await page.route('**/*', route => route.request().url().startsWith(origin) ? route.continue() : route.abort());
@@ -51,7 +56,7 @@ const server = http.createServer((req, res) => {
           '/rest/v1/sfa_samples': [],
           '/rest/v1/sfa_memberships': [{ space_id: 'fixture-space', role: 'admin' }],
           '/rest/v1/sfa_spaces': [{ id: 'fixture-space', name: 'Espacio de demostracion' }],
-          '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración', room:'Sala de pruebas' },...(careLink ? [{id:'fixture-long-name',full_name:'María de los Ángeles Fernández de la Cruz',room:'Residencia de demostración · Sector de acompañamiento familiar'}] : [])],
+          '/rest/v1/sfa_residents': [{ id: 'fixture-person', full_name: 'Residente de demostración', room:'Sala de pruebas' },...(tableReview ? [{id:'fixture-person-2',full_name:'Persona de prueba',room:'Sala 102'},{id:'fixture-person-3',full_name:'Otra persona de prueba',room:'Sala 103'}] : []),...(careLink ? [{id:'fixture-long-name',full_name:'María de los Ángeles Fernández de la Cruz',room:'Residencia de demostración · Sector de acompañamiento familiar'}] : [])],
           '/rest/v1/rpc/sfa_team': { members: [
             { user_id: user.id, email: user.email, role: 'admin', access: [] },
             { user_id: 'fixture-care', email: 'cuidador@example.invalid', role: 'caregiver', access: [{ resident_id: 'fixture-person', can_configure: false, can_share_location: false }] },
@@ -88,7 +93,7 @@ const server = http.createServer((req, res) => {
     }
     async function choose(label, text) {
       await page.getByLabel(label, {exact:true}).click();
-      await page.getByRole('option', {name:text,exact:true}).click();
+      await page.getByRole('option', {name:text,exact:false}).click();
     }
     async function checkConnections(width) {
       await page.getByText('Relaciones de cuidado y envío GPS', { exact: true }).click();
@@ -124,10 +129,11 @@ const server = http.createServer((req, res) => {
       else if (url.pathname.endsWith('/geofence')) data = { home_lat: -25.3, home_lng: -57.6, radius_m: 100, address_name: 'Zona de prueba' };
       else if (url.pathname.startsWith('/api/cloud/residents')) { status = 401; data = { detail: { code: 'session_required' } }; }
       else if (url.pathname.endsWith('/location')) data = { resident_id: 7, paired: false, status: 'no_fix', position: null, events: [] };
-      else if (url.pathname === '/api/cloud/status') data = { session_active: linked || independent || home, bindings: linked || home ? [{ local_resident_id: 7, resident_id: 'fixture-person', space_id: 'fixture-space', enabled: 1 }] : [], push: { configured: false, last_error: null }, pending: 0, sent: 0, blocked: 0 };
+      else if (url.pathname === '/api/cloud/status') data = { session_active: linked || independent || home, ...(savedCare ? {monitor_session_active:true,monitor_viewer_id:'11111111-1111-4111-8111-111111111111',monitor_links:[{local_resident_id:7,resident_id:'fixture-person'}]} : {}), bindings: linked || home ? [{ local_resident_id: 7, resident_id: 'fixture-person', space_id: 'fixture-space', enabled: 1 }] : [], push: { configured: false, last_error: null }, pending: 0, sent: 0, blocked: 0 };
       else if (url.pathname === '/api/ports') data = [];
       else if (url.pathname === '/api/notifications/email') data = { configured: false, deliveries: [] };
       else if (url.pathname === '/api/network-info') data = {url:origin,port:server.address().port,addresses:['127.0.0.1'],lan_available:false};
+      if(managedPerson && url.pathname==='/api/cloud/residents/7/location'){status=200;data={position:null,remote_resident_id:'fixture-person',remote_name:'Residente de demostración',remote_room:'Sala de pruebas',remote_space_id:'fixture-space'};}
       if (home && url.pathname === '/api/cloud/residents/7/location') {
         status=200; data={position:{latitude:-25.3,longitude:-57.6,accuracy_m:8,observed_at:new Date(Date.now()-(quiet ? 21711000 : 0)).toISOString()}};
         if (gpsTest) data={position:testPoint()};
@@ -139,8 +145,180 @@ const server = http.createServer((req, res) => {
       }
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
     });
-    for (const [width, height] of [[1920, 1080], [1366, 768], [390, 844]]) {
+    for (const [width, height] of (scrollbar ? [[641,844]] : [[1920, 1080], [1366, 768], [390, 844]])) {
       await page.setViewportSize({ width, height });
+      if(savedCare){
+        await page.goto(`${origin}/?saved-care=${width}#preparacion`);
+        const section=page.getByRole('region',{name:'Monitorear una ficha existente',exact:true});
+        await section.getByText('Ficha que consultas con esta cuenta',{exact:true}).waitFor();
+        const signout=page.getByRole('button',{name:'Cerrar sesión',exact:true});
+        assert.equal(await signout.evaluate(n=>getComputedStyle(n).color),'rgb(185, 28, 28)');
+        await signout.hover();
+        await page.waitForFunction(()=>getComputedStyle(document.querySelector('.access-signout')).backgroundColor==='rgb(254, 242, 242)');
+        assert.equal(await signout.evaluate(n=>getComputedStyle(n).color),'rgb(153, 27, 27)');
+        await signout.screenshot({path:path.join(output,`cerrar-sesion-rojo-${width}.png`)});
+        await signout.focus();
+        assert.equal(await signout.evaluate(n=>getComputedStyle(n).outlineColor),'rgb(185, 28, 28)');
+        await page.keyboard.press('Tab');await page.mouse.move(0,0);
+        const style=await section.locator('.care-link-saved').evaluate(n=>({background:getComputedStyle(n).backgroundColor,border:getComputedStyle(n).borderLeftWidth,nameSize:getComputedStyle(n.querySelector('strong')).fontSize,captionSize:getComputedStyle(n.querySelector('.care-link-caption')).fontSize}));
+        assert.equal(style.background,'rgb(240, 253, 250)');assert.equal(style.border,'3px');assert.equal(style.nameSize,width>600?'22px':'20px');assert.equal(style.captionSize,'13px');
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        await section.screenshot({path:path.join(output,`monitoreo-vinculado-visible-${width}.png`)});
+        await section.getByRole('button',{name:'Cambiar ficha',exact:true}).click();
+        assert.equal(await section.getByRole('checkbox').isChecked(),false);
+        assert.equal(await section.getByRole('button',{name:'Vincular monitoreo',exact:true}).isDisabled(),true);
+        const editorStyle=await section.locator('.care-link-editor').evaluate(n=>({background:getComputedStyle(n).backgroundColor,border:getComputedStyle(n).borderLeftWidth}));
+        assert.equal(editorStyle.background,style.background);assert.equal(editorStyle.border,style.border);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        await section.screenshot({path:path.join(output,`monitoreo-edicion-visible-${width}.png`)});
+        await section.getByRole('button',{name:'Conservar vínculo actual',exact:true}).click();
+        await section.getByText('Ficha que consultas con esta cuenta',{exact:true}).waitFor();
+        const band=await page.locator('.preparation-status').evaluate(n=>({background:getComputedStyle(n).backgroundColor,label:getComputedStyle(n.querySelector('dt')).fontSize,value:getComputedStyle(n.querySelector('dd')).fontSize}));
+        assert.equal(band.background,'rgb(255, 255, 255)');assert.equal(band.label,'13px');assert.equal(band.value,'16px');
+        const statusButtons=page.locator('.preparation-status > div > button');
+        for(const button of await statusButtons.all())assert((await button.boundingBox()).height>=40);
+        await page.evaluate(()=>window.scrollTo(0,0));
+        await page.locator('.preparation-status').screenshot({path:path.join(output,`preparacion-estados-visibles-${width}.png`)});
+        const emitter=page.locator('.access-emitter > summary').first();
+        const emitterStyle=await emitter.evaluate(n=>{const s=getComputedStyle(n);return {size:s.fontSize,border:s.borderTopWidth,background:s.backgroundColor,height:n.getBoundingClientRect().height};});
+        assert.equal(emitterStyle.size,'14px');assert.equal(emitterStyle.border,'1px');assert.equal(emitterStyle.background,'rgb(255, 255, 255)');assert(emitterStyle.height>=52);
+        await emitter.scrollIntoViewIfNeeded();
+        const emitterBounds=await emitter.boundingBox();
+        await emitter.hover();
+        await page.waitForFunction(()=>getComputedStyle(document.querySelector('.access-emitter > summary')).backgroundColor==='rgb(240, 253, 250)');
+        assert.equal(await emitter.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(240, 253, 250)');
+        assert.deepEqual(await emitter.boundingBox(),emitterBounds);
+        await emitter.screenshot({path:path.join(output,`emisor-desplegable-visible-${width}.png`)});
+        await emitter.focus();await page.keyboard.press('Enter');
+        assert.equal(await emitter.evaluate(n=>n.parentElement.open),true);
+        await page.keyboard.press('Enter');
+        assert.equal(await emitter.evaluate(n=>n.parentElement.open),false);
+        continue;
+      }
+      if(aesthetic) {
+        await page.goto(`${origin}/?aesthetic=${width}#preparacion`);
+        const overflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Aesthetic overflow at ${width}`);
+        if(!linked) {
+          for(const section of ['preparacion','personas']) {
+            if(section==='personas')await page.getByRole('button',{name:'Personas y accesos',exact:true}).click();
+            const email=page.getByRole('textbox',{name:'Correo electrónico',exact:true});await email.waitFor();
+            for(const name of ['Correo electrónico','Contraseña']) {
+              const control=page.getByLabel(name,{exact:true});
+              const style=await control.evaluate(n=>{const s=getComputedStyle(n),r=n.getBoundingClientRect(),p=n.parentElement.getBoundingClientRect();return {border:s.borderTopWidth,margin:s.marginTop,radius:s.borderRadius,height:r.height,outer:p.height,box:s.boxShadow,labelWeight:getComputedStyle(n.closest('label')).fontWeight};});
+              assert.equal(style.border,'0px','Only the containing field draws a border');
+              assert.equal(style.margin,'0px');assert.equal(style.height,42);assert.equal(style.outer,44);assert.equal(style.box,'none');
+              assert.equal(style.labelWeight,'500','Labels do not inherit the heavy settings weight');
+            }
+            await page.getByRole('button',{name:'Mostrar contraseña',exact:true}).click();
+            assert.equal(await page.getByLabel('Contraseña',{exact:true}).getAttribute('type'),'text');
+            await page.getByRole('button',{name:'Ocultar contraseña',exact:true}).click();
+            await overflow();await page.screenshot({path:path.join(output,`acceso-${section}-pulido-${width}.png`),fullPage:true});
+          }
+        } else {
+          assert.equal(await page.getByRole('button',{name:'Cuentas y Permisos',exact:true}).count(),0,'Preparation must not duplicate account management');
+          assert.equal(await page.getByLabel('Persona cuidada',{exact:true}).count(),0,'Preparation only selects the monitored ficha');
+          await page.getByRole('button',{name:'Gestionar personas y accesos',exact:true}).waitFor();
+          await page.screenshot({path:path.join(output,`preparacion-sin-gestion-duplicada-${width}.png`),fullPage:true});
+          await page.getByRole('button',{name:'Gestionar personas y accesos',exact:true}).click();
+          await page.getByRole('button',{name:'Personas cuidadas',exact:true}).waitFor();
+          assert.equal(await page.locator('.local-care-link').count(),0,'People management must not embed PC consultation setup');
+          const account=page.locator('.person-account-details > summary');await account.waitFor();await account.click();
+          const signout=page.getByRole('button',{name:'Cerrar sesión',exact:true});
+          const size=await signout.evaluate(n=>({width:n.getBoundingClientRect().width,parent:n.closest('.access-account').getBoundingClientRect().width,weight:getComputedStyle(n).fontWeight,height:n.getBoundingClientRect().height}));
+          assert(size.width<200,'Sign out is compact, not a full-width primary action');assert.equal(size.weight,'500');assert.equal(size.height,36);
+          assert.equal(await signout.evaluate(n=>getComputedStyle(n).color),'rgb(185, 28, 28)');
+          assert.equal(await signout.locator('svg').evaluate(n=>getComputedStyle(n).color),'rgb(185, 28, 28)');
+          await signout.hover();
+          await page.waitForFunction(()=>getComputedStyle(document.querySelector('.person-account-details .access-signout')).backgroundColor==='rgb(254, 242, 242)');
+          await page.mouse.move(0,0);
+          const accountBody=page.locator('.account-details-body');
+          assert.equal(await accountBody.evaluate(n=>getComputedStyle(n).borderTopWidth),'1px');
+          await page.locator('.person-account-details').screenshot({path:path.join(output,`cuenta-desplegada-refinada-${width}.png`)});
+          await account.click();
+          const personPicker=page.getByLabel('Persona cuidada',{exact:true});
+          if(await personPicker.count()){
+            if(managedPerson){
+              await page.getByRole('button',{name:'Añadir cuidador',exact:true}).waitFor();
+              assert.equal(await page.getByRole('button',{name:'Dar acceso a esta persona',exact:true}).count(),1);
+              assert.equal(await page.getByRole('button',{name:'Cuentas y Permisos',exact:true}).count(),1);
+              await page.screenshot({path:path.join(output,`personas-gestion-completa-${width}.png`),fullPage:true});
+            }
+            const pickerLabel=page.locator('.person-picker > label');
+            const headingStyle=await pickerLabel.evaluate(n=>({size:getComputedStyle(n).fontSize,weight:getComputedStyle(n).fontWeight,icon:getComputedStyle(n.querySelector('svg')).color}));
+            assert.equal(headingStyle.size,'18px');assert.equal(headingStyle.weight,'650');assert.equal(headingStyle.icon,'rgb(15, 118, 110)');
+            await page.locator('.person-picker').screenshot({path:path.join(output,`persona-cuidada-destacada-${width}.png`)});
+            await choose('Persona cuidada','Residente de demostración');
+          }
+          const admins=page.locator('.person-admins > summary');await admins.waitFor();
+          for(const control of [account,admins]){
+            const appearance=await control.evaluate(n=>({size:getComputedStyle(n).fontSize,height:n.getBoundingClientRect().height,border:getComputedStyle(n.parentElement).borderTopWidth}));
+            assert.equal(appearance.size,'14px');assert(appearance.height>=48);assert.equal(appearance.border,'1px');
+            await control.scrollIntoViewIfNeeded();const box=await control.boundingBox();await control.hover();
+            await page.waitForFunction(selector=>getComputedStyle(document.querySelector(selector)).backgroundColor==='rgb(240, 253, 250)',control===account ? '.person-account-details > summary' : '.person-admins > summary');
+            assert.deepEqual(await control.boundingBox(),box);
+            await control.focus();await page.keyboard.press('Enter');
+            assert.equal(await control.evaluate(n=>n.parentElement.open),true);
+            await page.keyboard.press('Enter');
+            assert.equal(await control.evaluate(n=>n.parentElement.open),false);
+          }
+          await admins.click();
+          assert.equal(await page.locator('.person-admins li').first().evaluate(n=>getComputedStyle(n).fontSize),'14px');
+          await page.locator('.person-admins').screenshot({path:path.join(output,`administradores-desplegados-refinados-${width}.png`)});
+          await admins.click();await account.click();
+          const rows=page.locator('.person-account-details > summary, .team-connections > summary');
+          assert.deepEqual(await rows.evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).fontWeight)),['500','500']);
+          const disclosure=page.locator('.team-connections > summary');
+          const affordance=await disclosure.evaluate(n=>{const s=getComputedStyle(n),r=n.getBoundingClientRect(),label=n.querySelector('span').getBoundingClientRect(),arrow=n.querySelector('.disclosure-chevron').getBoundingClientRect();return {border:s.borderTopWidth,background:s.backgroundColor,radius:s.borderRadius,width:r.width,parent:n.parentElement.getBoundingClientRect().width,arrowGap:arrow.left-label.right};});
+          assert.equal(affordance.border,'1px');assert.equal(affordance.radius,'6px');assert.notEqual(affordance.background,'rgba(0, 0, 0, 0)');
+          assert(affordance.arrowGap<20,'The disclosure indicator stays next to its title');
+          if(width>600)assert(affordance.width<affordance.parent*.7,'Relations is a compact control, not an ambiguous full-width row');
+          await page.screenshot({path:path.join(output,`relaciones-control-cerrado-${width}.png`),fullPage:true});
+          const beforeHover=await disclosure.boundingBox();
+          await disclosure.hover();
+          await page.waitForFunction(()=>{const n=document.querySelector('.team-connections > summary'),s=getComputedStyle(n);return s.backgroundColor==='rgb(240, 253, 250)' && s.borderTopColor==='rgb(140, 207, 197)';});
+          assert.deepEqual(await disclosure.boundingBox(),beforeHover,'Hover must not move or resize the control');
+          assert.deepEqual(await disclosure.locator('svg').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color)),['rgb(15, 118, 110)','rgb(15, 118, 110)']);
+          await disclosure.screenshot({path:path.join(output,`relaciones-hover-${width}.png`)});
+          await page.getByText('Relaciones de cuidado y envío GPS',{exact:true}).click();
+          await page.waitForFunction(()=>Array.from(document.querySelectorAll('.sfa-disclosure[open] > summary .disclosure-chevron')).every(n=>{const m=new DOMMatrixReadOnly(getComputedStyle(n).transform);return Math.abs(Math.atan2(m.b,m.a)-Math.PI/2)<0.001;}));
+          if(tableReview){
+            const appearance=await page.locator('.team-connections-scroll').evaluate(n=>({surface:getComputedStyle(n).backgroundColor,border:getComputedStyle(n).borderTopWidth,radius:getComputedStyle(n).borderRadius,header:getComputedStyle(n.querySelector('thead th')).backgroundColor,headingWeight:getComputedStyle(n.querySelector('thead th')).fontWeight,minWidth:getComputedStyle(n.querySelector('table')).minWidth,rows:n.querySelectorAll('tbody tr').length}));
+            assert.equal(appearance.surface,'rgb(255, 255, 255)');assert.equal(appearance.border,'1px');assert.equal(appearance.radius,'6px');assert.equal(appearance.header,'rgb(234, 242, 242)');assert.equal(appearance.headingWeight,'600');assert.equal(appearance.rows,3);
+            if(width>640)assert.equal(appearance.minWidth,'760px');
+            assert.equal(await page.locator('.team-connections-intro').evaluate(n=>!!n.closest('.team-connections-scroll')),false,'Explanation never scrolls out of view with table columns');
+            assert.equal(await page.locator('.team-connections-intro').evaluate(n=>getComputedStyle(n).fontSize),'14px');
+            await page.locator('.team-connections').screenshot({path:path.join(output,`relaciones-tabla-refinada-${width}.png`)});
+          }
+          if(scrollbar){
+            const region=page.getByRole('region',{name:'Tabla de relaciones de cuidado',exact:true});
+            await page.mouse.move(0,0);
+            const rail=await region.evaluate(n=>({overflow:n.scrollWidth>n.clientWidth,thumb:getComputedStyle(n,'::-webkit-scrollbar-thumb').backgroundColor,track:getComputedStyle(n,'::-webkit-scrollbar-track').backgroundColor,height:getComputedStyle(n,'::-webkit-scrollbar').height,visibleHeight:n.offsetHeight-n.clientHeight}));
+            assert.equal(rail.overflow,true,'Narrow container actually requires horizontal scrolling');
+            assert.equal(rail.thumb,'rgb(95, 143, 136)');assert.equal(rail.track,'rgb(237, 243, 244)');assert.equal(rail.height,'12px');
+            assert(rail.visibleHeight>=12,'Screenshot must include a visible scrollbar, not hidden headless defaults');
+            await region.focus();await region.press('ArrowRight');
+            await page.waitForFunction(()=>document.querySelector('.team-connections-scroll').scrollLeft>0);
+            await region.screenshot({path:path.join(output,'relaciones-scrollbar.png')});
+          }
+          await overflow();await page.screenshot({path:path.join(output,`cuenta-relaciones-pulidas-${width}.png`),fullPage:true});
+          await page.getByRole('button',{name:'Dar acceso a esta persona',exact:true}).click();
+          await page.getByLabel('Correo electrónico',{exact:true}).fill('borrador@example.invalid');
+          await page.getByRole('button',{name:/^Preparación/}).click();
+          const exitDialog=page.getByRole('alertdialog',{name:'¿Salir de la edición?'});
+          await exitDialog.getByRole('button',{name:'Seguir editando',exact:true}).click();
+          assert.equal(await page.getByLabel('Correo electrónico',{exact:true}).inputValue(),'borrador@example.invalid');
+          await page.getByRole('button',{name:/^Preparación/}).click();
+          await exitDialog.getByRole('button',{name:'Descartar cambios',exact:true}).click();
+          await page.getByRole('heading',{name:'Preparar la asistencia',exact:true}).waitFor();
+          assert.equal(await page.locator('dialog.draft-confirm').count(),0,'Discard closes the dialog and completes navigation in one confirmation');
+          assert.equal(await page.getByLabel('Correo electrónico',{exact:true}).count(),0,'The discarded form is unmounted');
+        }
+        const about=page.getByRole('button',{name:'Información del sistema',exact:true});await about.click();
+        const bounds=await page.getByRole('region',{name:'Información del sistema',exact:true}).boundingBox();
+        assert(bounds.x>=0 && bounds.x+bounds.width<=width+1,'System information stays inside viewport');
+        await about.press('Escape');assert.equal(await page.getByRole('region',{name:'Información del sistema'}).count(),0);
+        await overflow();continue;
+      }
       if (careLink) {
         await page.goto(`${origin}/?care-link=${width}#preparacion`);
         const section=page.getByRole('region',{name:'Monitorear una ficha existente',exact:true});
@@ -188,7 +366,7 @@ const server = http.createServer((req, res) => {
       }
       if (portal) {
         await page.goto(`${origin}/acceso.html?qa=${width}`);
-        await page.getByRole('button', { name: 'Personas y equipo', exact: true }).click();
+        await page.getByRole('button', { name: 'Personas y accesos', exact: true }).click();
         await page.getByLabel('Persona cuidada', {exact:true}).waitFor();
         await choose('Persona cuidada', 'Residente de demostración');
         await page.getByText('cuidador@example.invalid', { exact: true }).waitFor();
@@ -204,7 +382,7 @@ const server = http.createServer((req, res) => {
       }
       if (people) {
         await page.goto(`${origin}/?people=${width}`);
-        await page.getByRole('button', { name: 'Personas', exact: true }).click();
+        await page.getByRole('button', { name: 'Personas y accesos', exact: true }).click();
         await page.getByRole('heading', { name: 'Personas cuidadas', exact: true }).waitFor();
         await page.evaluate(() => document.fonts.ready);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Ficha overflow at ${width}`);
@@ -237,7 +415,7 @@ const server = http.createServer((req, res) => {
         await draftDialog.waitFor({state:'detached'});
         assert.equal(await page.getByLabel('Correo electrónico', { exact: true }).isVisible(), true, 'Cancelled navigation preserves the draft');
         await checkTeamDialog();
-        await page.getByRole('button', { name: 'Equipo y accesos', exact: true }).click();
+        await page.getByRole('button', { name: 'Cuentas y Permisos', exact: true }).click();
         await page.getByText('Cuida a: Residente de demostración', { exact: true }).waitFor();
         assert.equal(await browser.contexts()[0].pages().length, 1);
         continue;
@@ -321,7 +499,7 @@ const server = http.createServer((req, res) => {
       assert.equal(await browser.contexts()[0].pages().length, 1);
     }
     assert.deepEqual(errors, []);
-    console.log(`PASS: 3 viewports, ${portal ? 'portal people/accounts' : people ? 'local ficha/care/accounts' : 'same-tab setup/map/notifications'}, no overflow, no cloud writes.`);
+    console.log(`PASS: ${scrollbar ? '1 narrow viewport, scrollbar styling and keyboard scrolling' : '3 viewports, '+(aesthetic ? 'login borders/session/disclosures/system info' : portal ? 'portal people/accounts' : people ? 'local ficha/care/accounts' : 'same-tab setup/map/notifications')}, no page overflow, no cloud writes.`);
     console.log(output);
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

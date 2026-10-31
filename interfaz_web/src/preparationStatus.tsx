@@ -4,6 +4,7 @@ import { CircleAlert, CircleCheck, CircleHelp } from "lucide-react";
 export type PreparationStatus = {
   session_active: boolean;
   monitor_session_active?: boolean;
+  monitor_viewer_id?: string|null;
   monitor_links?: { local_resident_id: number; resident_id: string }[];
   bindings: { local_resident_id: number; enabled: number | boolean }[];
   push?: { configured: boolean; last_error: string | null };

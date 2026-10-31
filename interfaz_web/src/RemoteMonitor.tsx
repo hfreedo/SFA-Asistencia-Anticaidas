@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Activity, Bell, CheckCircle2, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
+import { Activity, Bell, CheckCircle2, ChevronRight, Clock3, Cloud, CloudUpload, Link2, Pause, RefreshCw, UserRound } from "lucide-react";
 import { accessDataClient } from "./accessClient";
 import { isFreshSample, isLocalPortal, sampleAge } from "./cloudPolicy";
 import { type RemotePosition } from "./RemoteLocation";
@@ -175,7 +175,6 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
   const fresh = sample && isFreshSample(sample.observed_at, Boolean(sample.payload.simulated), clock);
   const age = sample ? sampleAge(sample.observed_at, clock) : null;
   return <div className="cloud-monitor">
-    {isLocalPortal(window.location) && spaces.some(s => s.role === "admin") && <LocalSync session={session} spaces={spaces.filter(s => s.role === "admin")} />}
     <section className="cloud-remote" aria-labelledby="cloud-monitor-title">
       <div className="cloud-section-title"><Cloud size={21} /><h2 id="cloud-monitor-title">Monitoreo remoto</h2>
         <label className="cloud-resident-picker"><UserRound size={18} /><select aria-label="Residente remoto" value={selected} onChange={e => setSelected(e.target.value)} disabled={!residents.length}><option value="">{residents.length ? "Seleccionar persona autorizada" : "Sin residentes vinculados"}</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name} · {r.id.slice(0,8)}</option>)}</select></label></div>
@@ -193,5 +192,6 @@ export function RemoteMonitor({ session, spaces }: { session: Session; spaces: S
         {events.length ? <ol className="cloud-events">{events.map(event => <li key={event.id}><div><strong>{event.event_type.replaceAll("_", " ")}</strong><p>{event.detail.text ?? ""}</p></div><div>{event.simulated && <span>Simulado</span>}<time>{time(event.observed_at)}</time></div></li>)}</ol> : <p className="cloud-footnote">No hay eventos recibidos para este perfil.</p>}
       </>}
     </section>
+    {isLocalPortal(window.location) && spaces.some(s => s.role === "admin") && <details className="access-emitter sfa-disclosure"><summary><CloudUpload size={16}/><span>Emisor de esta PC · opcional para consultar</span><ChevronRight className="disclosure-chevron" size={16}/></summary><LocalSync session={session} spaces={spaces.filter(s => s.role === "admin")} /></details>}
   </div>;
 }

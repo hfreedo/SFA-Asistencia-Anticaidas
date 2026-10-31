@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { CircleAlert, CircleCheck, Link2, LoaderCircle } from "lucide-react";
+import { ArrowLeftRight, CircleAlert, CircleCheck, Link2, LoaderCircle } from "lucide-react";
 import { accessDataClient } from "./accessClient";
 import { TeamSelect } from "./TeamSelect";
 import "./localCareLink.css";
@@ -61,18 +61,18 @@ export function LocalCareLink({ session, localId }: { session: Session; localId?
     } catch(error) { setNotice({ text: error instanceof Error && error.message==="server_version" ? "El servidor activo no incluye esta vinculación. Inicia el Centro más reciente; no es necesario cambiar cuidadores ni crear otra ficha." : error instanceof Error && error.message==="local_access" ? "Acceso rechazado. Comprueba la conexión local y la autorización de tu cuenta para esta ficha. No se confirmó el vínculo." : "No se pudo verificar el vínculo. Comprueba permisos, conexión y la versión del Centro.", success: false }); }
     finally { setBusy(false); }
   }
-  return <section className="local-care-link" aria-labelledby="local-care-title" aria-busy={busy}><h2 id="local-care-title">Monitorear una ficha existente</h2>
+  return <section className="local-care-link" aria-labelledby="local-care-title" aria-busy={busy}><h2 id="local-care-title"><Link2 size={20} aria-hidden="true"/>Monitorear una ficha existente</h2>
     {failed && <div className="care-link-feedback" role="alert"><CircleAlert size={18} aria-hidden="true"/><span>No se pudieron consultar las fichas autorizadas.</span></div>}
     {notice && <div className={`care-link-feedback${notice.success ? " is-success" : ""}`} role={notice.success ? "status" : "alert"}>{notice.success ? <CircleCheck size={18} aria-hidden="true"/> : <CircleAlert size={18} aria-hidden="true"/>}<span>{notice.text}</span></div>}
     {saved && !editing ? <div className="care-link-saved">
       <div><span className="care-link-caption">Ficha que consultas con esta cuenta</span><strong>{saved.full_name}</strong><span>{saved.room}</span><p><CircleCheck size={15} aria-hidden="true"/>Vínculo guardado · consulta habilitada</p></div>
-      <button className="resident-button" onClick={() => { setEditing(true); setConfirmed(false); setNotice(null); }}>Cambiar ficha</button>
-    </div> : <>
+      <button className="resident-button" onClick={() => { setEditing(true); setConfirmed(false); setNotice(null); }}><ArrowLeftRight size={17} aria-hidden="true"/>Cambiar ficha</button>
+    </div> : <div className="care-link-editor">
     <div className="care-link-field"><label htmlFor="monitor-person">Ficha a monitorear</label><TeamSelect id="monitor-person" icon={Link2} value={selected} disabled={busy || !localId} onChange={e => { setSelected(e.target.value); setConfirmed(false); if(!unavailable) setNotice(null); }}><option value="">Seleccionar ficha autorizada</option>{people.map(p => <option key={p.id} value={p.id}>{`${p.full_name} · ${p.room} · ${p.id.slice(0,8)}`}</option>)}</TeamSelect></div>
     <label className="care-link-confirm"><input type="checkbox" checked={confirmed} disabled={!selected || busy} onChange={e => setConfirmed(e.target.checked)}/><span>Confirmo que quiero consultar esta persona desde esta PC.</span></label>
     <button className="access-primary" disabled={!localId || !selected || !confirmed || busy || unavailable} onClick={() => void connect()}>{busy ? <LoaderCircle className="access-spin" size={17} aria-hidden="true"/> : <Link2 size={17} aria-hidden="true"/>}{busy ? "Vinculando…" : "Vincular monitoreo"}</button>
     {saved && <button className="resident-button care-link-cancel" onClick={() => { setEditing(false); setSelected(saved.id); setConfirmed(false); setNotice(null); }}>Conservar vínculo actual</button>}
-    </>}
+    </div>}
     <p className="cloud-footnote">No crea otra ficha, no envía datos del cinturón y no cambia cuidadores. Este vínculo pertenece a tu cuenta en esta PC.</p>
   </section>;
 }

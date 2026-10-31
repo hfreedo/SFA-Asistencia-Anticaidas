@@ -7,7 +7,7 @@ import "./careOverview.css";
 import { relativeAge } from "./timeLabels";
 
 export type LocationSource = "remote" | "local";
-type GpsReading = { id:number; position:RemotePosition|null; error:string; remoteId?:string; remoteName?:string };
+export type GpsReading = { id:number; position:RemotePosition|null; error:string; remoteId?:string; remoteName?:string; remoteRoom?:string; remoteSpace?:string };
 class PositionReadError extends Error {}
 export function validPosition(value: unknown): value is RemotePosition {
   const p = value as RemotePosition | null;
@@ -38,11 +38,11 @@ export function useRemoteHomePosition(id:number|undefined, enabled:boolean) {
       try {
         const response = await fetch(`/api/cloud/residents/${id}/location`,{cache:"no-store"});
         const data = await response.json();
-        if (!response.ok) throw new PositionReadError(response.status === 401 ? "Reanuda la sesión de esta PC desde Preparación."
+        if (!response.ok) throw new PositionReadError(response.status === 401 ? "Verifica tu acceso y la ficha autorizada desde Preparación. Consultar no requiere reanudar envíos."
           : response.status === 404 ? "Este perfil todavía no tiene un vínculo remoto disponible."
           : response.status === 403 ? "No se pudo verificar el permiso de consulta de esta PC." : "No se pudo consultar el GPS por internet.");
         if (data.position != null && !validPosition(data.position)) throw new PositionReadError("La posición recibida no es válida.");
-        if (active) setReading({id,position:data.position ?? null,error:"",remoteId:typeof data.remote_resident_id === "string" ? data.remote_resident_id : undefined,remoteName:typeof data.remote_name === "string" ? data.remote_name : undefined});
+        if (active) setReading({id,position:data.position ?? null,error:"",remoteId:typeof data.remote_resident_id === "string" ? data.remote_resident_id : undefined,remoteName:typeof data.remote_name === "string" ? data.remote_name : undefined,remoteRoom:typeof data.remote_room === "string" ? data.remote_room : undefined,remoteSpace:typeof data.remote_space_id === "string" ? data.remote_space_id : undefined});
       } catch (error) { if (active) setReading({id,position:null,error:error instanceof PositionReadError ? error.message : "No se pudo consultar el GPS por internet."}); }
       finally { pending = false; }
     };

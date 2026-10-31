@@ -16,21 +16,29 @@ body:has(.sfa-access) { margin:0; }
 .access-heading > p:last-child { margin:0; color:#475569; font-size:14px; }
 .access-form-area { padding:26px 32px 28px; }
 .sfa-access form { display:grid; gap:19px; }
-.sfa-access label { display:block; color:#334155; font-size:14px; font-weight:600; }
-.access-input { display:flex; align-items:center; gap:10px; margin-top:7px; border:1px solid #cbd5e1; border-radius:6px; padding:0 12px; color:#64748b; min-height:46px; transition:border-color .15s, box-shadow .15s; }
+.sfa-access label { display:block; color:#475569; font-size:14px; font-weight:500; }
+.sfa-access form > label { font-size:14px; font-weight:500; line-height:1.5; }
+.access-input { display:flex; align-items:center; gap:10px; margin-top:7px; border:1px solid #cbd5e1; border-radius:6px; padding:0 12px; color:#64748b; min-height:44px; background:#fff; transition:border-color .15s, box-shadow .15s; }
 .access-input:focus-within { border-color:#0d9488; box-shadow:0 0 0 3px #0d948814; }
-.access-input input { width:100%; min-width:0; border:0; background:transparent; color:#14201d; font:inherit; font-weight:450; outline:none; padding:12px 0; }
+.sfa-access .access-input > input:not([type="checkbox"]) { width:100%; min-width:0; height:42px; min-height:0; margin:0; border:0; border-radius:0; box-shadow:none; background:transparent; color:#14201d; font:400 14px/1.5 Geist,sans-serif; outline:none; padding:9px 0; }
+.sfa-access .access-input > input:not([type="checkbox"]):focus { border:0; box-shadow:none; outline:none; }
+.sfa-access .access-input > input:-webkit-autofill,.sfa-access .access-input > input:-webkit-autofill:focus { -webkit-box-shadow:0 0 0 1000px #fff inset; -webkit-text-fill-color:#14201d; caret-color:#14201d; }
 .access-input > svg { flex-shrink:0; }
-.access-input button { display:grid; place-items:center; padding:4px; border:0; background:transparent; color:#64748b; cursor:pointer; min-height:32px; min-width:32px; }
+.access-input button { display:grid; place-items:center; padding:4px; border:0; border-radius:4px; background:transparent; color:#64748b; cursor:pointer; height:34px; width:34px; min-height:34px; flex-shrink:0; }
+.access-input button:hover { background:#f1f5f9; color:#334155; }
 .sfa-access button { font-family:inherit; }
 .sfa-access button:focus-visible, .sfa-access a:focus-visible { outline:3px solid #0d9488; outline-offset:3px; }
 .sfa-access button:disabled { opacity:.55; cursor:not-allowed; }
 .access-primary, .access-secondary { display:flex; align-items:center; justify-content:center; gap:9px; border-radius:6px; min-height:46px; padding:11px 16px; cursor:pointer; font-size:14px; font-weight:650; transition:background .15s, border-color .15s; width:100%; }
 .access-primary { border:1px solid #0d9488; background:#0d9488; color:white; }
 .access-primary:hover:not(:disabled) { background:#0f766e; border-color:#0f766e; }
+.sfa-access form > .access-primary { min-height:44px; font-weight:600; padding:10px 16px; }
 .access-secondary { border:1px solid #cbd5e1; background:white; color:#334155; }
 .access-secondary:hover:not(:disabled) { background:#f1f5f9; }
-.access-text-button { display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:0; padding:6px; color:#0f766e; font-weight:600; font-size:13px; cursor:pointer; min-height:32px; }
+.sfa-access .access-signout { display:inline-flex; width:auto; min-height:36px; padding:7px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:#b91c1c; font-size:13px; font-weight:500; gap:8px; }
+.sfa-access .access-signout:hover:not(:disabled) { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
+.sfa-access .access-signout:focus-visible { outline:2px solid #b91c1c; outline-offset:3px; background:#fef2f2; }
+.access-text-button { display:flex; align-items:center; justify-content:center; justify-self:start; gap:8px; background:transparent; border:0; padding:6px 0; color:#0f766e; font-weight:500; font-size:13px; cursor:pointer; min-height:32px; }
 .access-text-button:hover { text-decoration:underline; }
 .access-bottom { border-top:1px solid #e2e8f0; padding:15px 24px; display:flex; justify-content:center; align-items:center; gap:8px; font-size:12px; color:#64748b; background:#fcfdfd; }
 .access-bottom svg { flex-shrink:0; }

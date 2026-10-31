@@ -31,6 +31,7 @@ from servidor_pc.ubicacion import FenceInput, LocationService, PositionInput
 from servidor_pc.correo import EmailChannel
 from servidor_pc.nube import CloudError, CloudSync
 from servidor_pc.rutas import application_home, database_path
+from servidor_pc.version import APP_VERSION
 from servidor_pc.operator_boundary import OperatorBoundary, operator_allowed
 from dotenv import load_dotenv
 
@@ -595,7 +596,7 @@ def ports() -> list[dict[str, Any]]:
 
 @app.get("/api/status")
 def status() -> dict[str, Any]:
-    return bridge.status()
+    return {**bridge.status(), 'version': APP_VERSION}
 
 
 @app.post("/api/connect")

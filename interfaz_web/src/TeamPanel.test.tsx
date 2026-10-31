@@ -20,6 +20,41 @@ beforeEach(() => {
   mock.client.mockReturnValue({ rpc: mock.rpc, functions: { invoke: mock.invoke }, from: () => ({ select: () => ({ eq: () => ({ is: () => ({ order: () => Promise.resolve({ data: [{ id: "person-a", full_name: "Persona A" }, { id: "person-b", full_name: "Persona B" }], error: null }) }) }) }) }) });
 });
 afterEach(cleanup);
+it("restores the monitored person for management without hiding selection or modifying assignments",async()=>{
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" suggestedPerson={{resident_id:"person-a",space_id:"space-a"}} onAccessChanged={()=>{}}/>);
+  expect(await screen.findByText("care@example.invalid")).toBeTruthy();
+  expect(screen.getByLabelText("Persona cuidada")).toBeTruthy();
+  expect(screen.getByRole("button",{name:"Añadir cuidador"})).toBeTruthy();
+  expect(screen.getByRole("button",{name:"Dar acceso a esta persona"})).toBeTruthy();
+  expect(screen.getByRole("button",{name:"Cuentas y Permisos"})).toBeTruthy();
+  expect(screen.getByText("Relaciones de cuidado y envío GPS")).toBeTruthy();
+  expect(mock.invoke).not.toHaveBeenCalled();
+  expect(mock.rpc.mock.calls.every(call=>call[0]==="sfa_team")).toBe(true);
+});
+it("keeps caregiver and personal account sections discoverable before choosing a person",async()=>{
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" onAccessChanged={()=>{}}/>);
+  expect(await screen.findByText(/Selecciona una persona cuidada para ver/)).toBeTruthy();
+  expect(screen.getByRole("heading",{name:"Cuidadores asignados"})).toBeTruthy();
+  expect(screen.getByRole("heading",{name:"Cuenta de la persona"})).toBeTruthy();
+  expect(mock.invoke).not.toHaveBeenCalled();
+});
+it("never uses a suggested person to grant access in another space",async()=>{
+  render(<TeamPanel session={session} spaces={spaces} initialSection="people" suggestedPerson={{resident_id:"person-a",space_id:"other-space"}} onAccessChanged={()=>{}}/>);
+  expect(await screen.findByText(/Selecciona una persona cuidada para ver/)).toBeTruthy();
+  expect(screen.queryByText("care@example.invalid")).toBeNull();
+  expect(mock.rpc.mock.calls.every(call=>call[0]==="sfa_team" && call[1].p_space==="space-a")).toBe(true);
+});
+it("distinguishes equal names by room and reference without changing their IDs",async()=>{
+  const people=[{id:"11111111-person",full_name:"Nombre igual",room:"A"},{id:"22222222-person",full_name:"Nombre igual",room:"B"}];
+  mock.client.mockReturnValue({rpc:mock.rpc,functions:{invoke:mock.invoke},from:()=>({select:()=>({eq:()=>({is:()=>({order:async()=>({data:people,error:null})})})})})});
+  render(<TeamPanel session={session} spaces={spaces} onAccessChanged={()=>{}}/>);
+  const first=await screen.findByLabelText("Nombre igual · A · Ref. 11111111");
+  expect(screen.getByLabelText("Nombre igual · B · Ref. 22222222")).toBeTruthy();
+  fireEvent.click(first);fireEvent.change(screen.getByLabelText("Correo electrónico"),{target:{value:"new@example.invalid"}});
+  fireEvent.click(screen.getByRole("button",{name:"Crear invitación"}));
+  await waitFor(()=>expect(mock.invoke).toHaveBeenCalled());
+  expect(mock.invoke.mock.calls[0][1].body.resident_ids).toEqual(["11111111-person"]);
+});
 it("caregivers cannot open team administration or cause data requests", () => {
   render(<TeamPanel session={session} spaces={[{ ...spaces[0], role: "caregiver" }]} onAccessChanged={() => {}} />);
   expect(screen.getByRole("alert")).toBeTruthy(); expect(mock.client).not.toHaveBeenCalled();
@@ -106,7 +141,7 @@ it("failed consultation never implies an empty team or a missing linked person",
   render(<TeamPanel session={session} spaces={spaces} initialSection="people" initialResidentId="person-a" onAccessChanged={() => {}}/>);
   await screen.findByText(/No se pudo consultar el equipo/);
   expect(screen.queryByText(/La ficha vinculada no está disponible/)).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Equipo y accesos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cuentas y Permisos" }));
   expect(screen.queryByText("Sin invitaciones pendientes.")).toBeNull();
   expect(screen.getByRole("button", { name: "Reintentar consulta" })).toBeTruthy();
 });
@@ -122,7 +157,7 @@ it("keeps an open draft when navigation is cancelled", async () => {
   await screen.findByText("care@example.invalid");
   fireEvent.click(screen.getByRole("button", { name: "Dar acceso a esta persona" }));
   fireEvent.change(screen.getByLabelText("Correo electrónico"), { target: { value: "draft@example.invalid" } });
-  fireEvent.click(screen.getByRole("button", { name: "Equipo y accesos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cuentas y Permisos" }));
   expect(screen.getByRole("alertdialog")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Seguir editando" }));
   expect((screen.getByLabelText("Correo electrónico") as HTMLInputElement).value).toBe("draft@example.invalid");

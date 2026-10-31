@@ -243,7 +243,7 @@ class CloudSync:
         session, resident = self._bound_session(local_id)
         owner, token = session
         # RLS is checked on every request. Never mirror private GPS into the LAN database.
-        people = self.transport('/rest/v1/sfa_residents?select=id,full_name,room&id=eq.' + resident + '&archived_at=is.null', token)
+        people = self.transport('/rest/v1/sfa_residents?select=id,full_name,room,space_id&id=eq.' + resident + '&archived_at=is.null', token)
         if not isinstance(people, list) or not any(p.get('id') == resident for p in people if isinstance(p, dict)):
             raise CloudError(403, 'resident_access')
         try:
@@ -280,7 +280,9 @@ class CloudSync:
                 raise CloudError(503, 'position_response') from None
         person = next(p for p in people if isinstance(p, dict) and p.get('id') == resident)
         return {'source': 'supabase', 'resident_id': local_id, 'remote_resident_id': resident,
-                'remote_name':str(person.get('full_name',''))[:160], 'position': position}
+                'remote_name':str(person.get('full_name',''))[:160],
+                'remote_room':str(person.get('room',''))[:160],
+                'remote_space_id':str(person.get('space_id','')), 'position': position}
 
     def remote_incidents(self, local_id, action=None):
         session, resident = self._bound_session(local_id)
@@ -329,7 +331,7 @@ class CloudSync:
             links = [dict(r) for r in conn.execute('SELECT local_resident_id,resident_id,device_id,space_id,enabled FROM cloud_bindings')]
             monitors = [dict(r) for r in conn.execute('SELECT local_resident_id,resident_id FROM cloud_monitor_links WHERE owner_id=?', (viewer,))] if viewer else []
             last_error = conn.execute("SELECT last_error FROM cloud_outbox WHERE last_error IS NOT NULL ORDER BY rowid DESC LIMIT 1").fetchone()
-        return {'session_active': owner is not None, 'monitor_session_active': viewer is not None, 'bindings': links, 'monitor_links':monitors,
+        return {'session_active': owner is not None, 'monitor_session_active': viewer is not None, 'monitor_viewer_id': viewer, 'bindings': links, 'monitor_links':monitors,
                 'pending': counts.get('pending',0), 'sent': counts.get('sent',0),
                 'blocked': counts.get('blocked',0), 'last_error': last_error[0] if last_error else None,
                 'push': {'configured': bool(os.getenv('SFA_FCM_CREDENTIALS_FILE')), 'last_error': self.push_error}}

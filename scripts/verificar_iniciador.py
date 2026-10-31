@@ -70,6 +70,10 @@ try:
             with urllib.request.urlopen(base + '/acceso/acceso.html', timeout=2, context=context) as response:
                 assert response.status == 200
             assert status['connected'] is False
+            if '--version' in sys.argv:
+                expected_version = sys.argv[sys.argv.index('--version') + 1]
+                assert status.get('version') == expected_version, ('packaged version',status.get('version'),expected_version)
+                print('PASS: packaged server version', expected_version)
             if '--people' in sys.argv:
                 for page in ('/', '/acceso/acceso.html'):
                     with urllib.request.urlopen(base + page, timeout=5, context=context) as response:

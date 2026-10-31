@@ -165,7 +165,7 @@ class CloudSyncTests(unittest.TestCase):
         def transport(path, token, body=None):
             calls.append(path)
             if path == '/auth/v1/user': return {'id': caregiver}
-            if 'sfa_residents?' in path: return [{'id': RESIDENT, 'full_name': 'Remote fixture'}]
+            if 'sfa_residents?' in path: return [{'id': RESIDENT, 'full_name': 'Remote fixture', 'room':'Sala remota', 'space_id':SPACE}]
             if 'sfa_positions?' in path: return []
             raise AssertionError('Monitoring must not create residents or emit data')
         self.cloud.transport = legacy_map(transport)
@@ -174,6 +174,9 @@ class CloudSyncTests(unittest.TestCase):
         result = self.cloud.remote_location(1)
         self.assertEqual(result['remote_resident_id'], RESIDENT)
         self.assertEqual(result['remote_name'], 'Remote fixture')
+        self.assertEqual(result['remote_room'], 'Sala remota')
+        self.assertEqual(result['remote_space_id'], SPACE)
+        self.assertEqual(self.cloud.status()['monitor_viewer_id'], caregiver)
         self.assertEqual(self.cloud.status()['pending'], 0)
         with self.cloud.connection() as conn:
             self.assertEqual(conn.execute('SELECT owner_id FROM cloud_bindings').fetchone()[0], OWNER)

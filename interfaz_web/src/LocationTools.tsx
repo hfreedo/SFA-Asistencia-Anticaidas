@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bell, CheckCircle2, Clock3, Link2, Mail, MapPin, Pause, QrCode, RefreshCw, Send, ShieldCheck, Unlink, X } from "lucide-react";
 import QRCode from "qrcode";
+import { browserNoticesEnabled, enableBrowserNotices, setBrowserNotices, useBrowserNotices } from "./browserNotices";
+import { relativeAge } from "./timeLabels";
 
 export type LocationSnapshot = {
   resident_id: number;
@@ -65,7 +67,7 @@ export function useResidentLocation(id?: number) {
 }
 
 export function showBrowserAlert(title: string, body: string) {
-  if ("Notification" in window && Notification.permission === "granted") {
+    if (browserNoticesEnabled()) {
     try { new Notification(title, { body, tag: "sfa-care-alert" }); } catch { /* Not available in every mobile browser. */ }
   }
 }
@@ -123,9 +125,9 @@ export function LocationPanel({ residentId, snapshot }: { residentId?: number; s
   }
   const position = snapshot?.position;
   return <section className="geo-tracking" aria-label="Seguimiento del residente">
-    <div className={`geo-tracking-status${["outside", "stale", "imprecise", "error"].includes(snapshot?.status || "") ? " is-warning" : ""}`}><MapPin size={22} /><div>
+    <div className={`geo-tracking-status${["outside", "stale", "imprecise", "error", "unlinked", "awaiting_device"].includes(snapshot?.status || "") ? " is-warning" : ""}`}><MapPin size={22} /><div>
       <strong>{locationLabel(snapshot?.status || "no_fix")}</strong>
-      {position && <p>Precisión ±{Math.round(position.accuracy_m)} m · {Math.round(snapshot?.age_seconds || 0)} s desde la lectura · {Math.round(position.distance_m)} m del centro</p>}
+      {position && <p>Última lectura {relativeAge(snapshot?.age_seconds ?? Infinity)} · precisión ±{Math.round(position.accuracy_m)} m · {Math.round(position.distance_m)} m del centro{!snapshot?.paired ? " · dato histórico, sin seguimiento activo" : ""}</p>}
       {snapshot?.evaluation && <p className="geo-evaluation">{locationExplanation(snapshot)}</p>}
     </div><span className="care-status">{snapshot?.paired ? "Celular vinculado" : "Sin vínculo"}</span></div>
     {network && network.addresses.length > 1 && <label className="geo-network">Red del celular<select value={selectedOrigin || network.url} onChange={event => { setSelectedOrigin(event.target.value); setQr(""); }}>{network.addresses.map(address => <option key={address} value={`${window.location.protocol}//${address}:${network.port}`}>{address.startsWith("192.168.137.") ? "Hotspot de Windows" : "Red local"} · {address}</option>)}</select></label>}
@@ -166,6 +168,7 @@ export function LocationHistory({ events }: { events: LocationSnapshot["events"]
 }
 
 export function EmailSettings() {
+  const browserNotices = useBrowserNotices();
   const [status, setStatus] = useState<{ configured: boolean; deliveries: { id: number; status: string; created_at: string; event_type: string }[] } | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -185,12 +188,13 @@ export function EmailSettings() {
   }
   async function browser() {
     if (!("Notification" in window) || !window.isSecureContext) { setMessage("Los avisos del navegador requieren HTTPS y soporte del navegador"); return; }
-    const permission = await Notification.requestPermission();
-    setMessage(permission === "granted" ? "Avisos habilitados mientras el panel permanezca abierto" : "Permiso de avisos no concedido");
+    if (browserNotices.enabled) { setBrowserNotices(false); setMessage("Avisos desactivados en este navegador; los incidentes siguen visibles."); return; }
+    try { const allowed = await enableBrowserNotices(); setMessage(allowed ? "Avisos habilitados mientras el panel permanezca abierto" : "Permiso de avisos no concedido"); }
+    catch { setMessage("No se pudo solicitar el permiso del navegador."); }
   }
   return <section className="geo-email-section">
     <div className="geo-tracking-status"><Mail size={23} /><div><h3>Correo y avisos del navegador</h3><p>{status?.configured ? "SMTP configurado" : "SMTP sin configurar"}</p></div></div>
-    <div className="geo-actions"><button className="resident-button link-resident" disabled={!status?.configured || busy} onClick={test}><Send size={17} />{busy ? "Enviando…" : "Probar correo"}</button><button className="resident-button" onClick={browser}><Bell size={17} />Permitir avisos</button><button className="resident-button" onClick={reload} title="Actualizar estado SMTP" aria-label="Actualizar estado SMTP"><RefreshCw size={17} /></button></div>
+    <div className="geo-actions"><button className="resident-button link-resident" disabled={!status?.configured || busy} onClick={test}><Send size={17} />{busy ? "Enviando…" : "Probar correo"}</button><button className="resident-button" aria-pressed={browserNotices.enabled} onClick={browser}><Bell size={17} />{browserNotices.enabled ? "Desactivar avisos en esta PC" : "Activar avisos en esta PC"}</button><button className="resident-button" onClick={reload} title="Actualizar estado SMTP" aria-label="Actualizar estado SMTP"><RefreshCw size={17} /></button></div>
     {message && <p role="status" className="geo-message">{message}</p>}
     {!!status?.deliveries.length && <ul className="geo-deliveries">{status.deliveries.slice(0, 5).map(row => <li key={row.id}><span>{row.event_type}</span><strong>{row.status === "accepted" ? "Aceptado por SMTP" : "Envío no confirmado"}</strong><time>{new Date(row.created_at).toLocaleTimeString("es")}</time></li>)}</ul>}
   </section>;

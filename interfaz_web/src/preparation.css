@@ -7,9 +7,10 @@
 .preparation-person > div { display:grid; gap:3px; flex:1; min-width:0; overflow-wrap:anywhere; }
 .preparation-person strong { font-size:18px; }
 .preparation-person span { color:#526573; font-size:13px; }
-.preparation-status { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; padding:20px 0; margin:0 0 8px; border-bottom:1px solid #e2e8f0; }
-.preparation-status dt { display:flex; gap:8px; align-items:center; color:#526573; font-size:12px; }
-.preparation-status dd { margin:7px 0 0; font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.preparation-status { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; padding:20px; margin:0 0 8px; border:1px solid #dce5ee; border-radius:6px; background:#fff; }
+.preparation-status > div { min-width:0; }
+.preparation-status dt { display:flex; gap:8px; align-items:center; color:#475569; font-size:13px; line-height:1.5; }
+.preparation-status dd { margin:8px 0 0; font-size:16px; line-height:1.5; font-weight:600; overflow-wrap:anywhere; }
 .preparation-status dd { display:flex; align-items:flex-start; gap:6px; }
 .preparation-state { display:inline-flex; flex-shrink:0; padding-top:2px; }
 .preparation-state.is-ready,.preparation-indicator.is-ready { color:#0f766e; }
@@ -19,7 +20,10 @@
 .preparation-indicator.is-pending { background:#fef3c7; }
 aside nav button[aria-current="page"] .preparation-indicator.is-pending { color:#92400e !important; }
 aside nav button[aria-current="page"] .preparation-indicator.is-unknown { color:#64748b !important; }
-.preparation-status > div > button { display:inline-flex; align-items:center; gap:5px; text-align:left; font-size:12px; color:#0f766e; background:transparent; border:0; margin-top:10px; padding:5px 0; cursor:pointer; }
+.preparation-status > div > button { display:inline-flex; align-items:center; gap:8px; max-width:100%; min-height:40px; text-align:left; font:500 13px/1.5 Geist,sans-serif; color:#0f766e; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; margin-top:12px; padding:8px 11px; cursor:pointer; transition:background .15s,border-color .15s; }
+.preparation-status > div > button > svg { flex-shrink:0; }
+.preparation-status > div > button:hover { background:#f0fdfa; border-color:#8ccfc5; }
+@media(prefers-reduced-motion:reduce) { .preparation-status > div > button { transition:none; } }
 .preparation-access { scroll-margin-top:90px; }
 @media(max-width:1023px) { .mobile-app-navigation .preparation-indicator { position:absolute; top:0; right:0; padding:1px 3px; font-size:10px; } }
 .preparation-columns { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr); gap:32px; align-items:start; }

@@ -1,5 +1,36 @@
 # Changelog
 
+## Windows 1.2.0-rc16 - Estetica y jerarquia de opciones
+
+- Preparacion concentra acceso y conexiones de esta PC; la gestion de personas,
+  cuidadores, cuentas y permisos queda en Personas y accesos, sin formularios duplicados.
+- Personas cuidadas conserva el selector, cuidadores asignados, cuenta personal,
+  administradores y relaciones de cuidado/GPS. La persona monitoreada se propone
+  solo si esta autorizada; gestionar otra no cambia el mapa ni asignaciones.
+- Ficha guardada y formulario de cambio mantienen el mismo resalte. Estados de
+  preparacion y enlaces mas legibles, desplegables con hover y contenido refinado,
+  tablas/scrollbar coherentes y cierre de sesion en rojo.
+- Descarta una sola vez al navegar por comprobaciones anidadas de borrador;
+  cancelar conserva la edicion y las acciones posteriores siguen protegidas.
+
+- Personas por internet separado de perfiles de esta PC, con referencia y
+  habitacion para distinguir fichas homonimas. Controles administrativos
+  limitados al espacio de la ficha y contexto estable ante fallos de consulta.
+- Rutas de mapa con fuente explicita, QR que conserva HTTP/HTTPS, borradores
+  protegidos y preferencias de avisos del navegador compartidas y persistentes.
+- Preparacion diferencia cuenta y sesion del puesto; muestra la activacion de
+  avisos y mantiene emisor/cinturon como opciones avanzadas para consultar.
+- Version y origen consultables, antiguedad GPS legible y modal de alta accesible.
+- Copias con confirmacion integrada y resumen; formulario Telegram protegido
+  del autocompletado de credenciales y prueba bloqueada antes de guardar.
+- Segunda pasada estetica: campos con contorno unico, etiquetas moderadas,
+  cierre de sesion compacto, desplegables coherentes y metadatos en la cabecera.
+- 177 pruebas web aprobadas; panel y portal compilados.
+  Verificacion visual interna 16:9 y movil, mas recorridos aislados en 3 tamanos.
+- Sin cambios de roles, asignaciones, esquema Supabase, FCM o Android.
+  No reemplaza el Centro instalado. La validacion portable se documenta en
+  docs/VALIDACION_RC16_FLUJOS.md; dispositivos fisicos pendientes.
+
 ## Windows 1.2.0-rc15.1 - Preparacion e identidad de consulta
 
 - Recupera el vinculo existente solo si su ID aparece entre las fichas autorizadas

@@ -5,7 +5,7 @@ type Device={installation_id:string;updated_at:string;last_test:{state:'pending'
 type Snapshot={devices:Device[];emitter_configured:boolean;emitter_error:boolean};
 const delivery={pending:'En cola o en reintento',sent:'Aceptada por FCM; recepción no confirmada',expired:'Prueba vencida',invalid:'Registro del celular no válido'};
 function failureText(status:number,code:string) {
-  if(status===401 || status===403) return 'Abre Preparación, inicia sesión y reanuda los envíos con la cuenta del celular.';
+  if(status===401 || status===403) return 'Abre Preparación y verifica la cuenta y la ficha que consultas. Usa la misma cuenta registrada en el celular; el emisor compartido lo prepara un administrador.';
   if(code==='22023') return 'Espera al menos un minuto entre pruebas antes de volver a enviar.';
   if(code==='push_not_configured') return 'El emisor FCM de esta PC no está configurado.';
   if(status===404) return 'No está disponible el vínculo o el celular registrado. Actualiza y revisa el registro en Android.';

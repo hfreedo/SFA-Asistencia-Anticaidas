@@ -1,0 +1,42 @@
+.sfa-disclosure > summary { display:flex; align-items:center; gap:9px; list-style:none; cursor:pointer; padding:10px 0; color:#475569; font:500 13px/1.5 Geist,sans-serif; min-height:40px; }
+.sfa-disclosure > summary::-webkit-details-marker { display:none; }
+.sfa-disclosure > summary::marker { content:""; }
+.sfa-disclosure > summary > svg { width:16px; height:16px; flex-shrink:0; color:#64748b; }
+.sfa-disclosure > summary .disclosure-chevron { margin-left:auto; transition:transform .15s; }
+.sfa-disclosure[open] > summary .disclosure-chevron { transform:rotate(90deg); }
+.sfa-disclosure > summary:hover { color:#0f766e; }
+.sfa-disclosure > summary:focus-visible { outline:2px solid #0d9488; outline-offset:3px; border-radius:4px; }
+.sfa-disclosure > summary > span { min-width:0; overflow-wrap:anywhere; }
+.sfa-disclosure > summary .disclosure-meta { color:#64748b; font:400 12px/1.5 Geist,sans-serif; margin-left:8px; }
+.person-account-details.sfa-disclosure { margin:0 0 16px; }
+.person-account-details.sfa-disclosure,.person-admins.sfa-disclosure { padding:0; border:1px solid #cbd5e1; border-radius:6px; background:#fff; }
+.person-account-details.sfa-disclosure > summary,.person-admins.sfa-disclosure > summary { width:100%; min-height:48px; padding:12px 14px; margin:0; border:0; border-radius:5px; color:#334155; font-size:14px; font-weight:500; transition:background .15s,color .15s; }
+.person-account-details.sfa-disclosure > summary > svg,.person-admins.sfa-disclosure > summary > svg { width:18px; height:18px; color:#0f766e; }
+.person-account-details.sfa-disclosure > summary .disclosure-meta { font-size:13px; color:#526573; }
+.person-account-details.sfa-disclosure > summary:hover,.person-admins.sfa-disclosure > summary:hover,.person-account-details.sfa-disclosure > summary:focus-visible,.person-admins.sfa-disclosure > summary:focus-visible { background:#f0fdfa; color:#0f766e; }
+.person-account-details.sfa-disclosure[open] > summary,.person-admins.sfa-disclosure[open] > summary { margin:0; background:#f0fdfa; color:#0f766e; border-radius:5px 5px 0 0; }
+.person-account-details .account-details-body { padding:16px; border-top:1px solid #dce5ee; }
+.person-account-details .access-account-email { display:none; }
+.person-account-details .account-details-body li { border:0; padding:0 0 14px; align-items:flex-start; }
+.person-account-details .account-details-body li > svg { width:17px; height:17px; margin-top:3px; }
+.person-account-details .account-details-body strong { font-size:14px; font-weight:600; }
+.person-account-details .account-details-body li span { font-size:13px; color:#526573; }
+.sfa-access .person-account-details .account-details-body .access-signout { margin-top:4px; color:#b91c1c; }
+.sfa-access .person-account-details .account-details-body .access-signout > svg { color:currentColor; }
+.sfa-access .person-account-details .account-details-body .access-signout:hover:not(:disabled) { color:#991b1b; background:#fef2f2; border-color:#fecaca; }
+.person-admins.sfa-disclosure > ul { margin:0; padding:0 16px; border-top:1px solid #dce5ee; }
+.person-admins.sfa-disclosure > ul > li { padding:13px 0; color:#334155; font:400 14px/1.6 Geist,sans-serif; overflow-wrap:anywhere; }
+.person-admins.sfa-disclosure > ul > li + li { border-top:1px solid #e2e8f0; }
+.team-connections.sfa-disclosure { margin:0 0 18px; padding:0; border-bottom:0; }
+.team-connections.sfa-disclosure > summary { width:fit-content; max-width:100%; min-height:42px; padding:10px 12px; border:1px solid #dce5ee; border-radius:6px; background:#f8fafc; font-size:13px; font-weight:500; color:#475569; transition:background .15s,border-color .15s,color .15s; }
+.team-connections.sfa-disclosure > summary .disclosure-chevron { margin-left:4px; }
+.team-connections.sfa-disclosure[open] > summary { background:#f0fdfa; border-color:#bdebe5; color:#0f766e; }
+.team-connections.sfa-disclosure > summary:hover,.team-connections.sfa-disclosure > summary:focus-visible { background:#f0fdfa; border-color:#8ccfc5; color:#0f766e; }
+.team-connections.sfa-disclosure > summary:hover > svg,.team-connections.sfa-disclosure > summary:focus-visible > svg { color:#0f766e; }
+.access-emitter.sfa-disclosure > summary,.preparation-optional.sfa-disclosure > summary { width:100%; font-weight:500; }
+.access-emitter.sfa-disclosure > summary { min-height:52px; padding:13px 14px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:#334155; font-size:14px; gap:12px; transition:background .15s,border-color .15s,color .15s; }
+.access-emitter.sfa-disclosure > summary > svg { width:18px; height:18px; color:#0f766e; }
+.access-emitter.sfa-disclosure > summary:hover,.access-emitter.sfa-disclosure > summary:focus-visible { background:#f0fdfa; border-color:#8ccfc5; color:#0f766e; }
+.access-emitter.sfa-disclosure[open] > summary { background:#f0fdfa; border-color:#bdebe5; color:#0f766e; }
+@media(max-width:600px) { .sfa-disclosure > summary .disclosure-meta { display:block; margin:2px 0 0; } }
+@media(prefers-reduced-motion:reduce) { .sfa-disclosure > summary .disclosure-chevron,.team-connections.sfa-disclosure > summary,.access-emitter.sfa-disclosure > summary,.person-account-details.sfa-disclosure > summary,.person-admins.sfa-disclosure > summary { transition:none; } }

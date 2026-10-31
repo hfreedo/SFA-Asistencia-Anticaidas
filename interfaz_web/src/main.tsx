@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { SfaDashboardApp, ToastHost } from "./SfaDashboard";
 import { PhoneLocationSender } from "./LocationTools";
 import "./index.css";
+import "./flowRefinement.css";
 import "@fontsource/geist/400.css";
 import "@fontsource/geist/500.css";
 import "@fontsource/geist/600.css";

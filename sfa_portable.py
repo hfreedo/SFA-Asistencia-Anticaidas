@@ -27,6 +27,7 @@ from servidor_pc.preparar_https import prepare
 from servidor_pc.instancia import acquire, release, focus_existing
 from servidor_pc.red_local import lan_sockets, local_addresses
 from servidor_pc.control_local import server_control, read_control
+from servidor_pc.version import APP_VERSION
 
 REMOTE_URL = 'https://hfreedo.github.io/SFA-Asistencia-Anticaidas/acceso.html'
 BG = '#f8fafc'
@@ -69,7 +70,7 @@ class SfaPortableApp:
         self.home = APP_HOME
         self.tls = {}
         self.root = tk.Tk()
-        self.root.title('SFA Asistencia | Centro de inicio')
+        self.root.title(f'SFA Asistencia {APP_VERSION} | Centro de inicio')
         self.root.geometry('700x690')
         self.root.minsize(680, 670)
         self.root.configure(bg=BG)

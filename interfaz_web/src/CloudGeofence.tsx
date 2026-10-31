@@ -3,6 +3,8 @@ import { LocateFixed, MapPin, Pencil, RefreshCw, Save } from "lucide-react";
 import { GeofenceRadius } from "./GeofenceRadius";
 import { RemoteLocation, type MapGeofence, type RemotePosition } from "./RemoteLocation";
 import "./cloud-geofence.css";
+import { useDraftGuard } from "./useDraftGuard";
+import { withTeamDraftExit } from "./teamDraftGuard";
 
 export type CloudZone = MapGeofence & { address_name: string; updated_at: string };
 type Context = { geofence: CloudZone | null; can_configure: boolean };
@@ -14,6 +16,7 @@ export function InternetGeofence({ api, position, clock }: { api: ZoneApi; posit
   const [lat, setLat] = useState(""); const [lng, setLng] = useState("");
   const [radius, setRadius] = useState(100); const [label, setLabel] = useState("Zona de referencia");
   const [dirty, setDirty] = useState(false); const [editing, setEditing] = useState(false);
+  useDraftGuard(dirty);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   function accept(value: Context) {
@@ -43,7 +46,7 @@ export function InternetGeofence({ api, position, clock }: { api: ZoneApi; posit
   }
   return <section className="internet-geofence" aria-label="Geocerca por internet">
     <div className="cloud-zone-heading"><MapPin size={20} /><h3>Zona de referencia por internet</h3>
-      <button className="resident-button access-secondary" disabled={busy} onClick={() => { setDirty(false); setEditing(false); setRevision(n => n + 1); }}><RefreshCw size={17} />{dirty ? "Descartar cambios y recargar" : "Actualizar zona"}</button></div>
+      <button className="resident-button access-secondary" disabled={busy} onClick={() => withTeamDraftExit(() => { setDirty(false); setEditing(false); setRevision(n => n + 1); })}><RefreshCw size={17} />{dirty ? "Descartar cambios y recargar" : "Actualizar zona"}</button></div>
     {error && <p role="alert" className="cloud-warning">{error}</p>}
     {notice && <p role="status" className="cloud-zone-notice">{notice}</p>}
     {!context && !error && <p role="status">Consultando zona remota…</p>}

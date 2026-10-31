@@ -8,12 +8,12 @@ from preparar_entrega_actual import digest, validate_archive
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14', '1.2.0-rc15', '1.2.0-rc15.1'), default='1.2.0-rc15.1')
+parser.add_argument('--version', choices=('1.2.0-rc10', '1.2.0-rc10.1', '1.2.0-rc11', '1.2.0-rc11.1', '1.2.0-rc11.2', '1.2.0-rc11.3', '1.2.0-rc12', '1.2.0-rc13', '1.2.0-rc13.1', '1.2.0-rc13.2', '1.2.0-rc13.3', '1.2.0-rc14', '1.2.0-rc15', '1.2.0-rc15.1', '1.2.0-rc16'), default='1.2.0-rc16')
 version = parser.parse_args().version
 folder = root / 'release' / ('SFA_Asistencia_v' + version)
 archive = root / 'release' / f'SFA-Asistencia-{version}-Windows.zip'
 checksum = root / 'release' / f'SFA-Asistencia-{version}.sha256'
-source_exe = root / 'dist/preparacion/SFA_Asistencia.exe'
+source_exe = root / ('dist/rc16/SFA_Asistencia.exe' if version == '1.2.0-rc16' else 'dist/preparacion/SFA_Asistencia.exe')
 if any(path.exists() for path in (folder, archive, checksum)):
     raise SystemExit(version + ' already exists; do not overwrite a staged release')
 if not source_exe.is_file():
@@ -44,6 +44,15 @@ if captures.is_dir():
 Extraer TODO el ZIP en una carpeta con permiso de escritura.
 Abrir SFA_Asistencia.exe. No requiere Python ni Node.js instalados.
 No abrir esta copia junto al Centro habitual: cada copia aislada tiene sus datos.
+
+Novedad rc16: estetica y jerarquia de opciones.
+Preparacion configura acceso y conexiones de esta PC. Personas y accesos
+reune personas cuidadas, cuidadores, cuentas, permisos y relaciones GPS.
+Gestionar otra persona no cambia a quien monitorea el mapa de esta PC.
+Desplegables y estados mas visibles; cierre de sesion rojo; descartar cambios
+cierra el dialogo y continua sin repetir confirmaciones de navegacion.
+Guia: Documentacion/VALIDACION_RC16_FLUJOS.md.
+Android sigue en 0.7.3-release. No cambia Supabase, FCM ni asignaciones.
 
 Novedad rc15.1: Preparacion recupera el vinculo autorizado de la cuenta sin
 pedir confirmarlo otra vez. Cambiar ficha sigue requiriendo confirmacion.

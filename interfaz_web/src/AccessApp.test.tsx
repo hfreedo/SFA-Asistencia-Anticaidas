@@ -34,6 +34,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("SFA access screen", () => {
+  it("does not expose administration of a ficha merely because the account administers another space",async()=>{
+    mock.getSession.mockResolvedValue({data:{session:{access_token:"fixture"}},error:null});
+    mock.getUser.mockResolvedValue({data:{user:{id:"fixture-user"}},error:null});
+    mock.from.mockImplementation((table:string)=>table === "sfa_memberships"
+      ? {select:()=>({eq:()=>({is:()=>Promise.resolve({data:[{space_id:"A",role:"admin"},{space_id:"B",role:"caregiver"}],error:null})})})}
+      : {select:()=>({in:()=>Promise.resolve({data:[{id:"A",name:"Espacio A"},{id:"B",name:"Espacio B"}],error:null})})});
+    render(<AccessApp embedded initialView="people" personContext={{resident_id:"remote-B",space_id:"B"}}/>);
+    await screen.findByText(/Un administrador de este espacio gestiona/);
+    expect(mock.rpc.mock.calls.some(call=>call[0] === "sfa_team")).toBe(false);
+    expect(screen.queryByRole("button",{name:"Crear invitación"})).toBeNull();
+    expect(screen.queryByRole("button",{name:"Vincular y sincronizar"})).toBeNull();
+  });
   it("does not describe a resident as a caregiver or expose team administration", async () => {
     mock.getSession.mockResolvedValue({ data: { session: { access_token: "test-session" } }, error: null });
     mock.getUser.mockResolvedValue({ data: { user: { id: "test-user" } }, error: null });
@@ -42,7 +54,7 @@ describe("SFA access screen", () => {
       : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
     render(<AccessApp embedded activeResidentId={7} />);
     expect(await screen.findByText(/Tu cuenta corresponde a una persona cuidada/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Personas y equipo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gestionar personas y accesos" })).toBeNull();
     expect(screen.queryByText(/Tu acceso permite cuidar/)).toBeNull();
   });
   it("shows an accessible login without public registration", async () => {
@@ -67,7 +79,7 @@ describe("SFA access screen", () => {
     render(<AccessApp embedded activeResidentId={7} />);
     expect(await screen.findByText("Monitorear una ficha existente")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Vincular y sincronizar" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Personas y equipo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gestionar personas y accesos" })).toBeNull();
   });
   it("caregiver logout pauses monitoring without stopping the PC emitter", async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true }); vi.stubGlobal("fetch", fetcher);
@@ -102,8 +114,12 @@ describe("SFA access screen", () => {
     mock.from.mockImplementation((table: string) => table === "sfa_memberships"
       ? { select: () => ({ eq: () => ({ is: () => Promise.resolve({ data: [{ space_id: "space", role: "admin" }], error: null }) }) }) }
       : { select: () => ({ in: () => Promise.resolve({ data: [{ id: "space", name: "Pruebas" }], error: null }) }) });
-    render(<AccessApp embedded activeResidentId={7} />);
+    const manage=vi.fn();
+    render(<AccessApp embedded activeResidentId={7} onManagePeople={manage} />);
     await screen.findByRole("option", { name: /Perfil seleccionado/ });
+    fireEvent.click(screen.getByRole("button",{name:"Gestionar personas y accesos"}));
+    expect(manage).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button",{name:"Cuentas y Permisos"})).toBeNull();
     expect(screen.queryByText("Monitoreo remoto")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cerrar sesión" }));
     await screen.findByRole("button", { name: "Iniciar sesión" });

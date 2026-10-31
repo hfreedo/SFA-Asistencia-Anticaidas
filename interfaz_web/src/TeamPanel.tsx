@@ -1,35 +1,37 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Building2, Check, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X } from "lucide-react";
+import { Building2, Check, ChevronRight, HeartHandshake, Mail, RefreshCw, Save, ShieldCheck, UserPlus, UserRoundX, UserRound, UsersRound, X } from "lucide-react";
 import { TeamSelect } from "./TeamSelect";
 export { TeamSelect } from "./TeamSelect";
 import { accessDataClient } from "./accessClient";
 import { registerTeamDraft, withTeamDraftExit } from "./teamDraftGuard";
 import "./peopleTeam.css";
+import "./disclosure.css";
+import { personReference, type PersonReference } from "./personReference";
 
 type Space = { space_id: string; name: string; role: string };
 type Access = { resident_id: string; can_configure: boolean; can_share_location: boolean };
 type Member = { user_id: string; email: string; role: string; access: Access[] };
 type Invitation = { id: string; email: string; role: string; expires_at: string };
-type Resident = { id: string; full_name: string };
+type Resident = PersonReference;
 const roles: Record<string, string> = { admin: "Administrador", caregiver: "Cuidador", resident: "Persona cuidada" };
 const accessSnapshot = (member: Member) => JSON.stringify({ role: member.role, access: member.access.map(a => [a.resident_id, a.can_configure, a.can_share_location]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))) });
 class TeamAccessChanged extends Error {}
 
-export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId, initialSpaceId, initialSection = "team" }: { session: Session; spaces: Space[]; onAccessChanged: () => void; initialResidentId?: string; initialSpaceId?: string; initialSection?: "people" | "team" }) {
+export function TeamPanel({ session, spaces, onAccessChanged, initialResidentId, initialSpaceId, suggestedPerson, initialSection = "team" }: { session: Session; spaces: Space[]; onAccessChanged: () => void; initialResidentId?: string; initialSpaceId?: string; suggestedPerson?: {resident_id:string;space_id:string}; initialSection?: "people" | "team" }) {
   const allowed = spaces.filter(s => s.role === "admin");
-  const [selected, setSelected] = useState(initialSpaceId ?? allowed[0]?.space_id ?? "");
-  const space = allowed.find(s => s.space_id === selected) ?? allowed[0];
+  const [selected, setSelected] = useState(initialSpaceId ?? (allowed.some(s=>s.space_id===suggestedPerson?.space_id) ? suggestedPerson!.space_id : allowed[0]?.space_id) ?? "");
+  const space = initialSpaceId ? allowed.find(s=>s.space_id === initialSpaceId) : allowed.find(s => s.space_id === selected) ?? allowed[0];
+  if (initialSpaceId && !space) return <p role="status">Tu cuenta no administra el espacio de esta ficha. No se mostrarán asignaciones de otro espacio.</p>;
   if (!space) return <p role="alert">La administración de equipo requiere permiso de administrador.</p>;
-  if (initialSpaceId && space.space_id !== initialSpaceId) return <p role="status">Tu cuenta no administra el espacio de esta ficha. No se mostrarán asignaciones de otro espacio.</p>;
   return <section aria-labelledby="team-title" className="team-workspace">
-    {initialResidentId ? <h2 id="team-title" className="sr-only">Personas y equipo</h2> : <div className="cloud-section-title"><ShieldCheck size={21} /><h2 id="team-title">Personas y equipo</h2></div>}
+    {initialResidentId ? <h2 id="team-title" className="sr-only">Personas y accesos</h2> : <div className="cloud-section-title"><ShieldCheck size={21} /><h2 id="team-title">Personas y accesos</h2></div>}
     {allowed.length > 1 && !initialSpaceId && <label className="team-space" htmlFor="team-space">Espacio<TeamSelect id="team-space" icon={Building2} value={space.space_id} onChange={e => setSelected(e.target.value)}>{allowed.map(s => <option key={s.space_id} value={s.space_id}>{s.name}</option>)}</TeamSelect></label>}
-    <TeamSpace key={space.space_id} space={space} session={session} onAccessChanged={onAccessChanged} initialResidentId={initialResidentId} initialSection={initialSection}/>
+    <TeamSpace key={space.space_id} space={space} session={session} onAccessChanged={onAccessChanged} initialResidentId={initialResidentId} suggestedResidentId={suggestedPerson?.space_id===space.space_id ? suggestedPerson.resident_id : undefined} initialSection={initialSection}/>
   </section>;
 }
 
-function TeamSpace({ space, session, onAccessChanged, initialResidentId, initialSection }: { space: Space; session: Session; onAccessChanged: () => void; initialResidentId?: string; initialSection: "people" | "team" }) {
+function TeamSpace({ space, session, onAccessChanged, initialResidentId, suggestedResidentId, initialSection }: { space: Space; session: Session; onAccessChanged: () => void; initialResidentId?: string; suggestedResidentId?:string; initialSection: "people" | "team" }) {
   const [section, setSection] = useState<"people" | "team">(initialSection);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [personId, setPersonId] = useState(initialResidentId ?? "");
@@ -67,7 +69,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
       try {
         const team = await api.rpc("sfa_team", { p_space: space.space_id });
         if (team.error) throw team.error;
-        const people = await api.from("sfa_residents").select("id,full_name").eq("space_id", space.space_id).is("archived_at", null).order("full_name");
+        const people = await api.from("sfa_residents").select("id,full_name,room").eq("space_id", space.space_id).is("archived_at", null).order("full_name");
         if (people.error) throw people.error;
         if (active) { setMembers(team.data.members); setInvitations(team.data.invitations); setResidents(people.data ?? []); }
       } catch { if (active) { setLoadFailed(true); setError("No se pudo consultar el equipo. Revisa la sesión y la conexión; no podemos confirmar las asignaciones."); } }
@@ -75,6 +77,9 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     })();
     return () => { active = false; };
   }, [space.space_id, session.access_token, revision]);
+  useEffect(()=>{
+    if(suggestedResidentId && residents.some(r=>r.id===suggestedResidentId))setPersonId(current=>current || suggestedResidentId);
+  },[suggestedResidentId,residents]);
 
   async function work(action: () => Promise<string | void>) {
     if (busy) return;
@@ -124,7 +129,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     else if (!editing && role === "admin") setConfirmation({ text: `Darás acceso administrativo a todo este espacio a ${email}.`, action: async () => { await work(save); } });
     else void work(save);
   }
-  const person = residents.find(r => r.id === personId);
+  const person = residents.find(r => r.id === (initialResidentId ?? personId));
   const mixedPermissions = !!editing && new Set(editing.access.map(a => `${a.can_configure}:${a.can_share_location}`)).size > 1;
   const related = person ? members.filter(m => m.role !== "admin" && m.access.some(a => a.resident_id === person.id)) : [];
   const availableCaregivers = person ? members.filter(m => m.role === "caregiver" && !m.access.some(a => a.resident_id === person.id)) : [];
@@ -139,20 +144,22 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
     {error && <p role="alert" className="cloud-warning">{error}</p>}
     {loadFailed && <button className="access-secondary" disabled={busy} onClick={() => setRevision(n => n + 1)}><RefreshCw size={16}/>Reintentar consulta</button>}
     {notice && <p role="status" className="team-notice"><Check size={18} />{notice}</p>}
-    {!loading && !loadFailed && <details className="team-connections" onToggle={event => setConnectionsOpen(event.currentTarget.open)}><summary>Relaciones de cuidado y envío GPS</summary>
-      {connectionsOpen && <div className="team-connections-scroll"><table><caption>Las cuentas se comunican cuando comparten la misma ficha remota. Los permisos no activan automáticamente el celular.</caption><thead><tr><th scope="col">Ficha remota</th><th scope="col">Cuidadores asignados</th><th scope="col">Cuenta de la persona cuidada</th><th scope="col">GPS autorizado</th></tr></thead><tbody>
+    {!loading && !loadFailed && <details className="team-connections sfa-disclosure" onToggle={event => setConnectionsOpen(event.currentTarget.open)}><summary><UsersRound size={16}/><span>Relaciones de cuidado y envío GPS</span><ChevronRight className="disclosure-chevron" size={16}/></summary>
+      {connectionsOpen && <><p className="team-connections-intro"><strong>Las cuentas se comunican cuando comparten la misma ficha remota.</strong><span>Los permisos no activan automáticamente el celular.</span></p><div className="team-connections-scroll" role="region" aria-label="Tabla de relaciones de cuidado" tabIndex={0}><table><caption>Relaciones entre fichas y cuentas autorizadas</caption><colgroup><col className="relation-person-column"/><col/><col/><col/></colgroup><thead><tr><th scope="col">Ficha remota</th><th scope="col">Cuidadores asignados</th><th scope="col">Cuenta de la persona cuidada</th><th scope="col">GPS autorizado</th></tr></thead><tbody>
         {residents.filter(r => !initialResidentId || r.id === initialResidentId).map(r => {
           const caregivers = members.filter(m => m.role === "caregiver" && m.access.some(a => a.resident_id === r.id));
           const personal = members.filter(m => m.role === "resident" && m.access.some(a => a.resident_id === r.id));
           const emitters = members.filter(m => m.role !== "admin" && m.access.some(a => a.resident_id === r.id && a.can_share_location));
-          return <tr key={r.id}><th scope="row">{r.full_name}<small>{r.id.slice(0,8)}</small></th><td data-label="Cuidadores asignados">{caregivers.map(m => m.email).join(", ") || "Sin cuidador asignado"}</td><td data-label="Cuenta de la persona cuidada">{personal.map(m => m.email).join(", ") || "Sin cuenta personal"}</td><td data-label="GPS autorizado">{emitters.map(m => m.email).join(", ") || "Sin emisor limitado autorizado"}</td></tr>;
+          const accounts=(items:Member[],empty:string)=>items.length ? <ul className="relations-accounts">{items.map(m=><li key={m.user_id}>{m.email}</li>)}</ul> : <span className="relations-empty">{empty}</span>;
+          return <tr key={r.id}><th scope="row">{r.full_name}<small>{r.room ? `${r.room} · ` : ""}Ref. {r.id.slice(0,8)}</small></th><td data-label="Cuidadores asignados">{accounts(caregivers,"Sin cuidador asignado")}</td><td data-label="Cuenta de la persona cuidada">{accounts(personal,"Sin cuenta personal")}</td><td data-label="GPS autorizado">{accounts(emitters,"Sin emisor limitado autorizado")}</td></tr>;
         })}
-      </tbody></table></div>}<p className="cloud-footnote">Los administradores acceden a todas las fichas de su espacio. Para recibir avisos push, cada cuidador debe registrar su propio celular en Cuidar &gt; Alertas. Las pruebas SOS requieren además aceptar pruebas.</p>
+      </tbody></table></div></>}<p className="cloud-footnote">Los administradores acceden a todas las fichas de su espacio. Para recibir avisos push, cada cuidador debe registrar su propio celular en Cuidar &gt; Alertas. Las pruebas SOS requieren además aceptar pruebas.</p>
     </details>}
-    <nav className="people-team-tabs" aria-label="Personas y equipo"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section !== "people") withTeamDraftExit(() => { reset(); setSection("people"); }); }}><UserRound size={17}/>Fichas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section !== "team") withTeamDraftExit(() => { reset(); setSection("team"); }); }}><UsersRound size={17}/>Equipo y accesos</button></nav>
+    <nav className="people-team-tabs" aria-label="Personas y accesos"><button disabled={busy} aria-pressed={section === "people"} onClick={() => { if (section !== "people") withTeamDraftExit(() => { reset(); setSection("people"); }); }}><UserRound size={17}/>Personas cuidadas</button><button disabled={busy} aria-pressed={section === "team"} onClick={() => { if (section !== "team") withTeamDraftExit(() => { reset(); setSection("team"); }); }}><UsersRound size={17}/>Cuentas y Permisos</button></nav>
     {section === "people" && <section className="person-access-summary" aria-label="Cuidado y acceso de la persona">
-      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person">Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { const id = e.target.value; withTeamDraftExit(() => { setPersonId(id); reset(); }); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</TeamSelect></div>}
+      {!initialResidentId && <div className="team-field person-picker"><label htmlFor="team-person"><HeartHandshake size={21} aria-hidden="true"/>Persona cuidada</label><TeamSelect icon={UserRound} id="team-person" value={personId} disabled={busy || loading} onChange={e => { const id = e.target.value; withTeamDraftExit(() => { setPersonId(id); reset(); }); }}><option value="">Seleccionar ficha</option>{residents.map(r => <option key={r.id} value={r.id}>{personReference(r)}</option>)}</TeamSelect></div>}
       {loading && <p role="status">Consultando cuidadores y acceso…</p>}
+      {!loading && !loadFailed && !person && !initialResidentId && <div className="person-selection-pending"><p>Selecciona una persona cuidada para ver sus cuidadores, vincular cuentas y configurar sus permisos.</p><div className="person-access-columns"><section><h4>Cuidadores asignados</h4><p>Consultar, añadir o invitar cuidadores y editar sus permisos.</p></section><section><h4>Cuenta de la persona</h4><p>Vincular su acceso a la app y revisar el permiso para enviar GPS.</p></section></div></div>}
       {!loading && !loadFailed && initialResidentId && !person && <p role="alert" className="cloud-warning">La ficha vinculada no está disponible en este espacio. No se seleccionará otra persona automáticamente.</p>}
       {person && !loadFailed && <><h3>{person.full_name}</h3><div className="person-access-columns"><section><h4>Cuidadores asignados</h4>
         {related.some(m => m.role === "caregiver") ? <ul>{related.filter(m => m.role === "caregiver").map(m => <li key={m.user_id}><span>{m.email}</span><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuentas de cuidador asignadas. Los administradores del espacio también tienen acceso.</p>}
@@ -161,7 +168,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
         <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("caregiver")}><Mail size={16}/>Invitar una cuenta nueva</button><button className="team-text-action" disabled={busy} onClick={() => setAddingCaregiver(false)}>Cerrar opciones</button></div>}</section>
         <section><h4>Cuenta de la persona</h4>{related.some(m => m.role === "resident") ? <ul>{related.filter(m => m.role === "resident").map(m => <li key={m.user_id}><div><span>{m.email}</span><small>Esta cuenta corresponde a {person.full_name}</small></div><button className="access-secondary" disabled={busy || loading} onClick={() => edit(m)}>Permisos</button></li>)}</ul> : <p className="person-state">Sin cuenta personal vinculada.</p>}
         <button className="access-secondary" disabled={busy || loading} onClick={() => inviteForPerson("resident")}><Mail size={16}/>Dar acceso a esta persona</button></section></div>
-        <details className="person-admins"><summary>Administradores con acceso ({members.filter(m => m.role === "admin").length})</summary><ul>{members.filter(m => m.role === "admin").map(m => <li key={m.user_id}>{m.email}</li>)}</ul></details>
+        <details className="person-admins sfa-disclosure"><summary><ShieldCheck size={16}/><span>Administradores con acceso ({members.filter(m => m.role === "admin").length})</span><ChevronRight className="disclosure-chevron" size={16}/></summary><ul>{members.filter(m => m.role === "admin").map(m => <li key={m.user_id}>{m.email}</li>)}</ul></details>
         {invitations.length > 0 && <p className="team-pending">Hay {invitations.length} {invitations.length === 1 ? "invitación pendiente" : "invitaciones pendientes"} en el espacio. Esta vista no permite confirmar a qué ficha corresponden.</p>}</>}
     </section>}
     {section === "team" && !formOpen && <button className="access-primary team-new-account" disabled={busy || loading || loadFailed} onClick={() => { reset(); setFormOpen(true); }}><UserPlus size={17}/>Invitar una cuenta</button>}
@@ -195,7 +202,7 @@ function TeamSpace({ space, session, onAccessChanged, initialResidentId, initial
         </TeamSelect></div></div>
         {role === "admin" ? <p className="cloud-warning">Este rol administra todos los residentes y permisos del espacio.</p> : <>
           <fieldset className="team-assignments" disabled={busy || loading}><legend>{role === "resident" ? "Ficha a la que corresponde esta cuenta" : "Personas que podrá cuidar"}</legend>{!residents.length && <p>No hay residentes disponibles.</p>}
-            {residents.map(resident => <label className="team-check team-assignment" key={resident.id}><input type={role === "resident" ? "radio" : "checkbox"} name={role === "resident" ? "resident-identity" : undefined} checked={chosen.includes(resident.id)} onChange={e => setChosen(previous => e.target.checked ? role === "resident" ? [resident.id] : [...previous, resident.id] : previous.filter(id => id !== resident.id))} /><UserRound size={17} aria-hidden="true"/><span>{resident.full_name}</span></label>)}
+            {residents.map(resident => <label className="team-check team-assignment" key={resident.id}><input aria-label={residents.filter(p => p.full_name === resident.full_name).length > 1 ? personReference(resident) : resident.full_name} type={role === "resident" ? "radio" : "checkbox"} name={role === "resident" ? "resident-identity" : undefined} checked={chosen.includes(resident.id)} onChange={e => setChosen(previous => e.target.checked ? role === "resident" ? [resident.id] : [...previous, resident.id] : previous.filter(id => id !== resident.id))} /><UserRound size={17} aria-hidden="true"/><span>{resident.full_name}<small className="team-person-reference">{resident.room ? `${resident.room} · ` : ""}Ref. {resident.id.slice(0,8)}</small></span></label>)}
           </fieldset>
           {role === "caregiver" && <label className="team-check team-permission"><input type="checkbox" checked={configure} disabled={busy} onChange={e => setConfigure(e.target.checked)} />Permitir configuración de los residentes asignados</label>}
           <label className="team-check team-permission"><input type="checkbox" checked={share} disabled={busy} onChange={e => setShare(e.target.checked)} />Permitir vincular un celular de esta cuenta como emisor GPS</label>

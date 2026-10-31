@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from "vitest";
-import { withTeamDraftExit, hasTeamDraft, registerTeamDraft } from "./teamDraftGuard";
+import { withTeamDraftExit, hasTeamDraft, registerTeamDraft, confirmAction } from "./teamDraftGuard";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
@@ -38,4 +38,44 @@ it("unmount dismisses pending consent without running a stale action", () => {
   withTeamDraftExit(action); unregister();
   expect(document.querySelector("dialog")).toBeNull();
   expect(action).not.toHaveBeenCalled();
+});
+it("requires integrated confirmation even without an open draft",()=>{
+  const importBackup=vi.fn();
+  confirmAction(importBackup,{title:"Importar copia",description:"Reemplaza perfiles locales",confirmLabel:"Importar"});
+  expect(importBackup).not.toHaveBeenCalled();
+  expect(document.activeElement?.textContent).toBe("Cancelar");
+  document.querySelector<HTMLButtonElement>(".draft-confirm-stay")!.click();
+  expect(importBackup).not.toHaveBeenCalled();
+});
+it("discards once through nested navigation guards without disabling later protection",()=>{
+  const navigate=vi.fn(), later=vi.fn();
+  const unregister=registerTeamDraft();
+  withTeamDraftExit(()=>withTeamDraftExit(navigate));
+  document.querySelector<HTMLButtonElement>(".draft-confirm-actions button:last-child")!.click();
+  expect(navigate).toHaveBeenCalledOnce();
+  expect(document.querySelector("dialog")).toBeNull();
+  expect(hasTeamDraft()).toBe(true);
+  withTeamDraftExit(later);
+  expect(later).not.toHaveBeenCalled();
+  expect(document.querySelector("dialog")).not.toBeNull();
+  unregister();
+});
+it("does not include a newly opened draft in earlier discard consent",()=>{
+  const navigate=vi.fn();
+  const unregister=registerTeamDraft();
+  let unregisterNew=()=>{};
+  withTeamDraftExit(()=>{unregisterNew=registerTeamDraft();withTeamDraftExit(navigate);});
+  document.querySelector<HTMLButtonElement>(".draft-confirm-actions button:last-child")!.click();
+  expect(navigate).not.toHaveBeenCalled();
+  expect(document.querySelector("dialog")).not.toBeNull();
+  unregister();unregisterNew();
+});
+it("does not bypass explicit action confirmation after accepting draft discard",()=>{
+  const action=vi.fn();
+  const unregister=registerTeamDraft();
+  withTeamDraftExit(()=>confirmAction(action,{title:"Confirmar operación",description:"Otra acción",confirmLabel:"Confirmar"}));
+  document.querySelector<HTMLButtonElement>(".draft-confirm-actions button:last-child")!.click();
+  expect(action).not.toHaveBeenCalled();
+  expect(document.querySelector("h2")?.textContent).toBe("Confirmar operación");
+  unregister();
 });

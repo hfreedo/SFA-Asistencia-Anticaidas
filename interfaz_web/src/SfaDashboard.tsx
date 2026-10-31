@@ -10,8 +10,12 @@ import { CareActivity, CareLocationSummary, CareSignal, RemoteCareIdentity, merg
 import { PushTestSettings } from "./PushTestSettings";
 import { Preparation, type SettingsEntry } from "./Preparation";
 import { PreparationIndicator, usePreparationStatus, type PreparationCheck } from "./preparationStatus";
-import { LocalPersonAccess } from "./LocalPersonAccess";
-import { withTeamDraftExit, hasTeamDraft } from "./teamDraftGuard";
+import { CloudPeople } from "./CloudPeople";
+import { BuildInfo } from "./BuildInfo";
+import { networkAddress } from "./networkAddress";
+import { withTeamDraftExit, hasTeamDraft, confirmAction } from "./teamDraftGuard";
+import { useDraftGuard } from "./useDraftGuard";
+import { backupImpact } from "./backupImpact";
 import { icons } from "lucide-react";
 import {
   type ReactNode,
@@ -261,8 +265,9 @@ export function SfaDashboardApp() {
   const currentFeed = cloudFeed?.id === profile?.id ? cloudFeed?.value ?? null : null;
   const [locationSources,setLocationSources]=useState<Record<number,LocationSource>>({});
   const locationSource = profile?.id ? locationSources[profile.id] ?? "remote" : "remote";
-  const remoteGps = useRemoteHomePosition(profile?.id,view === "home" && locationSource === "remote");
+  const remoteGps = useRemoteHomePosition(profile?.id,locationSource === "remote" || view === "people");
   const chooseLocationSource = (source:LocationSource) => { const id=profile?.id; if (id) setLocationSources(current=>({...current,[id]:source})); };
+  const openMap = (source:LocationSource) => withTeamDraftExit(() => {chooseLocationSource(source);setViewState("map");});
   const reportAttention=useCallback((value:IncidentAttention)=>setCloudAttention(value),[]);
   useEffect(()=>setCloudAttention({pending:0,followup:false}),[profile?.id]);
   useEffect(()=>{ setFirstMotion(null); setTelemetry(null); lastFallReading.current=null; },[profile?.id]);
@@ -510,13 +515,13 @@ export function SfaDashboardApp() {
       {view === "home" && profile?.id && (preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false && <section className="care-connection-notice" role="status" aria-label="Conexión de esta PC"><Icon name="cloud-off" size={20}/><div><strong>Consulta por internet sin sesión</strong><p>Inicia sesión para consultar las fichas autorizadas.</p></div><button className="resident-button" onClick={openPreparationAccess}>Revisar conexión<Icon name="arrow-right" size={17}/></button></section>}
       {view === "home" && geofenceIncident && notificationConfig.notify_geofence && <section className="geofence-incident" role="alert" aria-label="Alerta de salida de geocerca">
         <Icon name="map-pin-off" size={24} /><div><strong>{profile?.full_name || "Residente"} está fuera de la zona local</strong><p>Salida confirmada por el seguimiento local. Requiere comprobar su situación.</p></div>
-        <button type="button" onClick={() => { chooseLocationSource("local"); setView("map"); }}><Icon name="map" size={17} />Ver ubicación</button>
+        <button type="button" onClick={() => openMap("local")}><Icon name="map" size={17} />Ver ubicación</button>
         {notificationConfig.sound_enabled && <button type="button" onClick={() => { if (mutedGeofence === geofenceIncident) { setMutedGeofence(""); emergencyAlarm.start(); } else setMutedGeofence(geofenceIncident); }}><Icon name={mutedGeofence === geofenceIncident ? "volume-2" : "volume-x"} size={17} />{mutedGeofence === geofenceIncident ? "Activar sonido" : "Silenciar aviso"}</button>}
       </section>}
       <LocalIncidentPanel key={profile?.id} residentId={profile?.id} visible={view === "home"} connectionPaused={(preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false} onAttentionChange={reportAttention} onSnapshotChange={reportFeed} onPrepare={openPreparationAccess}/>
       {view === "setup" && <Preparation profile={profile} connected={connected} check={preparationCheck} focusAccess={focusPreparationAccess}
         onSettings={tab => { setSettingsEntry(tab); setView(tab === "residents" ? "people" : "settings"); }}
-        onMap={() => setView("map")} onMonitor={() => setView("home")} />}
+        onMap={() => openMap("remote")} onMonitor={() => setView("home")} onPeople={() => setView("people")} />}
       {view === "home" && (
         <HomeScreen
           connectionPaused={(preparationCheck.status?.monitor_session_active ?? preparationCheck.status?.session_active) === false}
@@ -552,6 +557,7 @@ export function SfaDashboardApp() {
         <SettingsScreen
           key={view}
           peopleOnly={view === "people"}
+          remoteReading={remoteGps.reading}
           initialTab={view === "people" ? "residents" : settingsEntry}
           onPrepare={() => setView("setup")}
           onTriggerFallSimulation={() => setEmergencyStartedAt(new Date())}
@@ -574,7 +580,7 @@ export function SfaDashboardApp() {
             setResidents(current => current.map(r => r.id === id ? { ...r, photo_url: url } : r));
             setProfile(current => current?.id === id ? { ...current, photo_url: url } : current);
           }}
-          onOpenMap={() => setView("map")}
+          onOpenMap={openMap}
           onUpdateNotifications={(updated) => setNotificationConfig(updated)}
         />
       )}
@@ -624,7 +630,7 @@ function AppShell({
   const navItems: { id: View; icon: string; label: string }[] = [
     { id: "home", icon: "layout-dashboard", label: "Panel principal" },
     { id: "map", icon: "map-pin", label: "Ubicación" },
-    { id: "people", icon: "users-round", label: "Personas" },
+    { id: "people", icon: "users-round", label: "Personas y accesos" },
     { id: "setup", icon: "list-checks", label: "Preparación" },
     { id: "settings", icon: "settings-2", label: "Ajustes" },
   ];
@@ -720,11 +726,11 @@ function AppShell({
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#DED8CC] bg-[#F5F2EC]/95 backdrop-blur-xs px-6 sm:px-10">
           <div className="min-w-0">
             <p className="care-eyebrow hidden sm:block">SFA · Plataforma de teleasistencia</p>
-            <p className="font-semibold text-lg"><img src="/static/assets/sfa-asistencia-logo.png" alt="" className="mobile-project-logo lg:hidden" />{view === "people" ? "Personas y equipo" : view === "map" ? "Ubicación y geocerca" : view === "settings" ? "Ajustes de asistencia" : view === "setup" ? "Preparar la asistencia" : "Centro de monitoreo"}</p>
+            <p className="font-semibold text-lg"><img src="/static/assets/sfa-asistencia-logo.png" alt="" className="mobile-project-logo lg:hidden" />{view === "people" ? "Personas y accesos" : view === "map" ? "Ubicación y geocerca" : view === "settings" ? "Ajustes de asistencia" : view === "setup" ? "Preparar la asistencia" : "Centro de monitoreo"}</p>
             <span className="sr-only">{nowText}</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="shell-header-actions flex items-center gap-3">
             {view !== "home" && <span className={`shell-connection ${connected ? "connected" : ""}`}><Icon name={connected ? "plug" : "unplug"} size={16} />{connected ? "Cinturón conectado" : "Cinturón no conectado"}</span>}
             {/* Selector de Residente */}
             <div className="relative" ref={dropdownRef}>
@@ -736,6 +742,7 @@ function AppShell({
                 className="resident-picker-trigger flex items-center gap-2.5 px-3.5 py-1.5 transition cursor-pointer"
               >
                 <Icon name="user-round" size={17} className="text-[#0F766E] shrink-0" />
+                <span className="local-origin-label">Perfil local</span>
                 <span className="font-medium truncate max-w-[150px] sm:max-w-[200px]">
                   {activeProfile?.full_name ? (
                     <>
@@ -755,7 +762,7 @@ function AppShell({
                 <div id="resident-picker-options" className="resident-picker absolute right-0 mt-2 z-50">
                   <div className="px-3 py-1.5 border-b border-[#DED8CC]/60">
                     <p className="font-mono-data text-[10px] uppercase tracking-wider text-[#55625E]">
-                      Residentes
+                      Perfiles locales · origen del cinturón
                     </p>
                   </div>
                   <div className="max-h-56 overflow-y-auto py-1 divide-y divide-[#DED8CC]/40">
@@ -805,6 +812,7 @@ function AppShell({
                 </div>
               )}
             </div>
+            <BuildInfo/>
           </div>
         </header>
 
@@ -822,12 +830,13 @@ function AppShell({
               key={item.id}
               aria-current={active ? "page" : undefined}
               onClick={() => onViewChange(item.id)}
+              aria-label={item.label}
               className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition cursor-pointer ${
                 active ? "bg-white text-[#14201D]" : "text-white/70"
               }`}
             >
               <Icon name={item.icon} size={18} />
-              <span>{item.id === "home" ? "Panel" : item.label}</span>
+              <span>{item.id === "home" ? "Panel" : item.id === "people" ? "Personas" : item.label}</span>
               {item.id === "home" && <IncidentNavIndicator attention={attention}/>}
               {item.id === "setup" && <PreparationIndicator check={preparationCheck} id={activeProfile?.id}/>}
             </button>
@@ -1057,7 +1066,12 @@ export function MapScreen({
   const [saving, setSaving] = useState(false);
   const [internalSource, setInternalSource] = useState<LocationSource>("remote");
   const locationSource = source ?? internalSource;
-  const setLocationSource = (next:LocationSource) => { setInternalSource(next); onSourceChange?.(next); };
+  const localDirty = tempLat !== geofence.home_lat || tempLng !== geofence.home_lng || selectedRadius !== geofence.radius_m || tempName !== geofence.address_name;
+  useDraftGuard(locationSource === "local" && localDirty);
+  const setLocationSource = (next:LocationSource) => { if(next !== locationSource) withTeamDraftExit(() => {
+    setTempLat(geofence.home_lat);setTempLng(geofence.home_lng);setTempName(geofence.address_name);setSelectedRadius(geofence.radius_m);
+    setInternalSource(next);onSourceChange?.(next);
+  }); };
 
   useEffect(() => {
     setSelectedRadius(geofence.radius_m);
@@ -1271,7 +1285,7 @@ function MobileAccess({ initialInfo }: { initialInfo: NetworkInfo | null }) {
   return <section className="mobile-access mobile-access-refined">
     <div className="mobile-access-heading">
       <div><h3>Acceso web por red local</h3><p>Conecta el celular a la misma red de esta PC y escanea el QR con su cámara.
-      <span className="connection-help"><button type="button" className="connection-help-button" aria-label="Cómo conectar el celular a la red local" aria-describedby="local-network-help"><Icon name="circle-help" size={18} /></button>
+      <span className="connection-help"><button type="button" className="connection-help-button" aria-label="Cómo conectar el celular a la red local" aria-describedby="local-network-help"><Icon name="circle-question-mark" size={18} /></button>
         <span id="local-network-help" role="tooltip" className="connection-help-tooltip"><strong>Conectar ambos equipos</strong><span><b>Mismo Wi-Fi:</b> conecta la PC y el celular al mismo router. Evita la red de invitados, que puede aislar los dispositivos.</span><span><b>Hotspot del celular:</b> activa Compartir Internet o Zona Wi-Fi en el teléfono y conecta la PC a esa red.</span><span><b>Hotspot de la PC:</b> activa Zona con cobertura inalámbrica móvil en Windows y conecta el celular a la red creada.</span><span>Después de cambiar de red, vuelve a iniciar el acceso móvil y pulsa Actualizar para generar el QR con la nueva dirección.</span><span>El panel funciona por red local. Si no abre, revisa el firewall de la PC y el aislamiento de dispositivos de la red.</span></span>
       </span>
       </p></div>
@@ -1283,13 +1297,13 @@ function MobileAccess({ initialInfo }: { initialInfo: NetworkInfo | null }) {
     </div>
     <div className="mobile-access-copy">
       <div className={`care-status ${info?.lan_available ? "is-safe" : "is-waiting"}`}><Icon name={info?.lan_available ? "wifi" : "unplug"} size={17} />{info?.lan_available ? "Acceso local disponible" : "Acceso local pendiente"}</div>
-      {info?.addresses && info.addresses.length > 1 && <label className="mobile-interface">Red del celular<select aria-label="Seleccionar red de acceso móvil" value={targetUrl} onChange={e => setCustomAddress(e.target.value)}>{info.addresses.map(address => <option key={address} value={`http://${address}:${info.port}`}>{address.startsWith("192.168.137.") ? "Hotspot de Windows" : "Red local"} · {address}</option>)}{!info.addresses.some(address => targetUrl === `http://${address}:${info.port}`) && <option value={targetUrl}>Dirección manual</option>}</select></label>}
+      {info?.addresses && info.addresses.length > 1 && <label className="mobile-interface">Red del celular<select aria-label="Seleccionar red de acceso móvil" value={targetUrl} onChange={e => setCustomAddress(e.target.value)}>{info.addresses.map(address => <option key={address} value={networkAddress(address,info.port,info.url)}>{address.startsWith("192.168.137.") ? "Hotspot de Windows" : "Red local"} · {address}</option>)}{!info.addresses.some(address => targetUrl === networkAddress(address,info.port,info.url)) && <option value={targetUrl}>Dirección manual</option>}</select></label>}
       <div className="mobile-address"><span>Dirección incluida en el QR</span><div><input aria-label="Dirección de acceso móvil" type="url" value={targetUrl} onChange={e => setCustomAddress(e.target.value)} spellCheck={false} /><button type="button" aria-label="Copiar dirección del panel" title="Copiar dirección" onClick={copy}><Icon name="copy" size={18} /></button></div><p className="mobile-manual-hint">No necesitas escribirla: el QR abre esta dirección.{!usable && " Elige la red del celular para generar un código válido."}</p></div>
       <div className="mobile-connection-steps">
-        {!info?.lan_available && <div><Icon name="monitor" size={20} /><div><strong>En la PC</strong><p>Detén el servidor y ejecuta <code>iniciar_acceso_movil.bat</code>. Luego pulsa Actualizar.</p></div></div>}
+        {!info?.lan_available && <div><Icon name="monitor" size={20} /><div><strong>En la PC</strong><p>En el Centro SFA, detén el servidor, habilita el acceso por red local e inícialo nuevamente. Luego pulsa Actualizar.</p></div></div>}
         <div><Icon name="smartphone" size={20} /><div><strong>En el celular</strong><p>Conéctalo al mismo Wi-Fi o hotspot. Abre la cámara, apunta al QR y toca el enlace que aparezca.</p></div></div>
       </div>
-      <details className="mobile-troubleshooting"><summary>Si la página no abre<Icon name="chevron-down" size={16} /></summary><p>Comprueba que ambos equipos estén en la misma red y que el firewall permita Python en redes privadas. Evita redes de invitados que aíslen dispositivos.</p></details>
+      <details className="mobile-troubleshooting"><summary>Si la página no abre<Icon name="chevron-down" size={16} /></summary><p>Comprueba que ambos equipos estén en la misma red y que el firewall permita el Centro SFA en redes privadas. Para HTTPS local, el celular debe confiar en el certificado de esta PC. El GPS por internet de Android no necesita este QR ni compartir la red.</p></details>
       {error && <p role="alert" className="photo-error">{error}</p>}
     </div>
     <p className="mobile-network-footnote"><Icon name="shield-check" size={16} />Usa una red de confianza. El acceso local permite abrir el panel desde sus equipos.</p>
@@ -1379,11 +1393,17 @@ function ConfigurationCopies() {
   }
   async function restore(file: File) {
     if (file.size > 20 * 1024 * 1024) { notify("La copia supera el límite de 20 MB.", "error"); return; }
-    if (!window.confirm("Esta copia reemplazará los perfiles, fotos y ajustes actuales. El historial de eventos y las credenciales de Telegram no se modificarán. ¿Continuar?")) return;
+    let backup: unknown;
+    try { backup=JSON.parse(await file.text()); } catch { notify("La copia no contiene un JSON válido.","error");return; }
+    let impact:string;
+    try {impact=backupImpact(backup);} catch {notify("La copia no tiene la estructura de configuración de SFA.","error");return;}
+    confirmAction(() => { void restoreConfirmed(backup); }, {title:"Importar copia de configuración",description:impact+"Se reemplazarán los perfiles, fotos y ajustes locales. El historial y las credenciales de Telegram se conservarán. No importa cuentas, permisos ni geocercas de Supabase. Respalda la instalación antes de continuar.",confirmLabel:"Importar y reemplazar"});
+  }
+  async function restoreConfirmed(backup:unknown) {
     setBusy(true);
     try {
       await actionRequest("/api/configuration/import", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(JSON.parse(await file.text())),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(backup),
       });
       notify("Copia restaurada. Actualizando el panel…");
       window.setTimeout(() => window.location.reload(), 1000);
@@ -1393,12 +1413,13 @@ function ConfigurationCopies() {
     <div className="photo-actions"><button className="resident-button link-resident" disabled={busy} onClick={exportCopy}><Icon name="download" size={18} />Exportar copia</button><button className="resident-button link-resident" disabled={busy} onClick={() => input.current?.click()}><Icon name="upload" size={18} />Importar copia</button></div>
     <input ref={input} className="sr-only" type="file" accept=".json,application/json" aria-label="Seleccionar copia de configuración" disabled={busy} onChange={e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (file) void restore(file); }} />
     <p>La copia contiene datos de los residentes: guárdala en un lugar privado. No incluye el historial ni el token o Chat ID de Telegram.</p>
-    <p>Para conservar también el historial y las credenciales, cierra el programa y respalda la carpeta <code>data</code> del portable.</p>
+    <p>Para conservar la instalación completa, cierra el Centro y respalda <code>data/</code>, <code>.env</code> y sus certificados propios. Si el emisor FCM usa una credencial fuera de esa carpeta, resguárdala por separado. Ninguna copia traslada automáticamente las sesiones o permisos de Supabase.</p>
   </section>;
 }
 
-function SettingsScreen({
+export function SettingsScreen({
   peopleOnly = false,
+  remoteReading = null,
   initialTab,
   onPrepare,
   onTriggerFallSimulation,
@@ -1419,6 +1440,7 @@ function SettingsScreen({
   onUpdateNotifications,
 }: {
   peopleOnly?: boolean;
+  remoteReading?: ReturnType<typeof useRemoteHomePosition>["reading"];
   initialTab: SettingsEntry;
   onPrepare: () => void;
   onTriggerFallSimulation: () => void;
@@ -1435,13 +1457,13 @@ function SettingsScreen({
   onDeleteResident: (id: number) => void;
   onUpdateProfile: (p: ResidentProfile) => void;
   onPhotoChange: (id: number, url: string | null) => void;
-  onOpenMap: () => void;
+  onOpenMap: (source:LocationSource) => void;
   onUpdateNotifications: (n: NotificationConfig) => void;
 }) {
   const [activeTab, setActiveTab] = useState<
     "residents" | "notifications" | "geofence" | "mobile" | "hardware" | "backup"
   >(initialTab);
-  const [personTab, setPersonTab] = useState<"data" | "access">("data");
+  const [directorySource,setDirectorySource] = useState<"remote"|"local">("remote");
 
   const [profileForm, setProfileForm] = useState<ResidentProfile>(
     profile || {
@@ -1462,9 +1484,22 @@ function SettingsScreen({
   });
 
   const [showNewModal, setShowNewModal] = useState(false);
+  const newDialog=useRef<HTMLFormElement>(null);
+  useEffect(()=>{
+    if(!showNewModal)return;
+    const previous=document.activeElement;
+    newDialog.current?.querySelector<HTMLInputElement>("input")?.focus();
+    return()=>{if(previous instanceof HTMLElement && previous.isConnected)previous.focus();};
+  },[showNewModal]);
   const [notifForm, setNotifForm] =
     useState<NotificationConfig>(notificationConfig);
+  const profileDirty=!!profile && JSON.stringify({...profileForm,photo_url:null}) !== JSON.stringify({...profile,photo_url:null});
+  const notificationsDirty=JSON.stringify(notifForm)!==JSON.stringify(notificationConfig);
+  useDraftGuard(profileDirty || notificationsDirty);
+  const changeSettingsTab=(next:typeof activeTab)=>withTeamDraftExit(()=>{if(profile)setProfileForm(profile);setNotifForm(notificationConfig);setActiveTab(next);});
+  const changeDirectory=(next:typeof directorySource)=>withTeamDraftExit(()=>{if(profile)setProfileForm(profile);setDirectorySource(next);});
   const [testingTelegram, setTestingTelegram] = useState(false);
+  const [editingTelegram,setEditingTelegram]=useState(false);
 
   const [ports, setPorts] = useState<Port[]>([]);
   const [selectedPort, setSelectedPort] = useState("");
@@ -1517,19 +1552,26 @@ function SettingsScreen({
   }
   async function handleCreateNewResident(e: React.FormEvent) {
     e.preventDefault();
-    if (!newResidentForm.full_name) return;
+    if (!newResidentForm.full_name || saving) return;
+    setSaving(true);
     try {
       await onCreateResident(newResidentForm);
       setNewResidentForm({ full_name: "", room: "", phone: "", emergency_phone: "112", medical_notes: "" });
       setShowNewModal(false);
     } catch { /* The parent reports the failed action and keeps this form open. */ }
+    finally {setSaving(false);}
   }
   async function handleSaveNotifications() {
+    if(saving) return;
+    if(notifForm.telegram_token && !/^\d+:[A-Za-z0-9_-]+$/.test(notifForm.telegram_token.trim())) {notify("El token de Telegram no tiene el formato de BotFather. No se guardaron los cambios.","error");return;}
+    if(notifForm.telegram_chat_id && !/^(?:-?\d+|@[A-Za-z0-9_]+)$/.test(notifForm.telegram_chat_id.trim())) {notify("Chat ID debe ser un identificador de Telegram, no un correo ni una contraseña. No se guardaron los cambios.","error");return;}
+    setSaving(true);
     try {
       await actionRequest("/api/notifications", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notifForm) });
       onUpdateNotifications(notifForm);
       notify("Preferencias de notificación guardadas");
     } catch (e) { notify(e instanceof Error ? e.message : "No se pudo guardar la configuración.", "error"); }
+    finally {setSaving(false);}
   }
   async function handleTestTelegram() {
     setTestingTelegram(true);
@@ -1573,7 +1615,7 @@ function SettingsScreen({
               <button
                 key={tab.id}
                 aria-current={active ? "page" : undefined}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => changeSettingsTab(tab.id)}
                 className={`w-full flex items-baseline justify-between py-3 text-left transition cursor-pointer ${
                   active ? "font-serif italic text-[#14201D] text-lg" : "font-sans text-xs text-[#55625E] hover:text-[#14201D]"
                 }`}
@@ -1590,14 +1632,17 @@ function SettingsScreen({
       <div className="min-w-0">
         {activeTab === "backup" && <ConfigurationCopies />}
         {activeTab === "residents" && (
+          <>
+            <nav className="people-team-tabs people-source-tabs" aria-label="Directorio de personas"><button aria-pressed={directorySource === "remote"} onClick={() => changeDirectory("remote")}>Por internet</button><button aria-pressed={directorySource === "local"} onClick={() => changeDirectory("local")}>Perfiles de esta PC</button></nav>
           <div className="residents-layout space-y-8">
+            {directorySource === "remote" ? <CloudPeople reading={remoteReading} localId={profile?.id} onMap={() => onOpenMap("remote")}/> : <>
             <div className="flex items-baseline justify-between border-b border-[#DED8CC] pb-4">
               <div>
                 <h3 className="font-serif text-3xl font-light text-[#14201D]">
-                  Personas cuidadas
+                  Perfiles de esta PC
                 </h3>
                 <p className="text-xs text-[#55625E] mt-1">
-                  Personas registradas para el monitoreo de caídas y teleasistencia.
+                  Datos locales del cinturón. Editarlos no cambia la ficha por internet ni sus cuidadores.
                 </p>
               </div>
               <button
@@ -1659,9 +1704,8 @@ function SettingsScreen({
             </div>
 
             <section className="person-detail" aria-label="Ficha y relaciones de la persona">
-            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed={personTab === "data"} onClick={() => { if (personTab !== "data") withTeamDraftExit(() => setPersonTab("data")); }}><Icon name="user-round" size={17}/>Datos</button><button aria-pressed={personTab === "access"} onClick={() => setPersonTab("access")}><Icon name="users-round" size={17}/>Cuidadores y acceso</button></nav>}
-            {profile?.id && personTab === "access" && <div className="preparation-access"><LocalPersonAccess key={profile.id} localId={profile.id} onPrepare={onPrepare}/></div>}
-            {profile && personTab === "data" && (
+            {profile && <nav className="people-team-tabs local-person-tabs" aria-label="Ficha seleccionada"><button aria-label={`Datos de ${profile.full_name}`} aria-pressed><Icon name="user-round" size={17}/>Datos locales</button><button onClick={() => changeDirectory("remote")}><Icon name="users-round" size={17}/>Ver personas por internet</button></nav>}
+            {profile && (
               <form onSubmit={handleSaveProfile} className="sfa-editorial-card p-6 space-y-4">
                 {profile.id && <ResidentPhotoEditor profile={profile} onPhotoChange={onPhotoChange} />}
                 <p className="font-serif text-lg font-normal text-[#14201D]">
@@ -1750,15 +1794,30 @@ function SettingsScreen({
             {showNewModal && (
               <div className="fixed inset-0 z-50 grid place-items-center bg-[#14201D]/40 p-4">
                 <form
+                  ref={newDialog}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="new-local-resident-title"
+                  aria-busy={saving}
+                  onKeyDown={event=>{
+                    if(event.key === "Escape" && !saving){event.preventDefault();setShowNewModal(false);}
+                    if(event.key === "Tab"){
+                      const controls=Array.from(event.currentTarget.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input:not(:disabled),button:not(:disabled)"));
+                      const first=controls[0],last=controls[controls.length-1];
+                      if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus();}
+                      else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
+                    }
+                  }}
                   onSubmit={handleCreateNewResident}
                   className="w-full max-w-md rounded-2xl bg-[#FBFAF7] p-6 border border-[#DED8CC] space-y-4"
                 >
                   <div className="flex items-baseline justify-between border-b border-[#DED8CC] pb-3">
-                    <h4 className="font-serif text-xl font-normal text-[#14201D]">
-                      Alta de Residente
+                    <h4 id="new-local-resident-title" className="font-serif text-xl font-normal text-[#14201D]">
+                      Crear perfil local
                     </h4>
                     <button
                       type="button"
+                      disabled={saving}
                       onClick={() => setShowNewModal(false)}
                       className="text-xs text-[#55625E] hover:text-[#14201D]"
                     >
@@ -1815,6 +1874,7 @@ function SettingsScreen({
                   <div className="flex justify-end gap-3 pt-3">
                     <button
                       type="button"
+                      disabled={saving}
                       onClick={() => setShowNewModal(false)}
                       className="text-xs text-[#55625E] px-4 py-2"
                     >
@@ -1822,15 +1882,18 @@ function SettingsScreen({
                     </button>
                     <button
                       type="submit"
+                      disabled={saving}
                       className="rounded-full bg-[#14201D] text-white px-5 py-2 text-xs font-medium hover:bg-[#0F766E]"
                     >
-                      Registrar
+                      {saving ? "Registrando…" : "Registrar"}
                     </button>
                   </div>
                 </form>
               </div>
             )}
+            </>}
           </div>
+          </>
         )}
 
 {activeTab === "notifications" && (
@@ -1845,6 +1908,8 @@ function SettingsScreen({
             </div>
 
             <div className="notification-rules">
+              <div className="settings-save-status" role="status"><span>{notificationsDirty ? "Cambios locales sin guardar" : "Preferencias locales guardadas"}</span><button className="resident-button link-resident" type="button" disabled={!notificationsDirty || saving} onClick={() => void handleSaveNotifications()}>{saving ? "Guardando..." : "Guardar preferencias"}</button></div>
+              <p className="settings-scope-note">Estas reglas afectan al cinturón y seguimiento local de esta PC. No cambian los incidentes ni los avisos FCM de las fichas por internet.</p>
               <div className="flex items-baseline justify-between pt-3"><div><p className="text-sm text-[#14201D]">Geocerca y pérdida de ubicación</p><p className="text-xs text-[#55625E]">Salida, reingreso y falta de señal reciente</p></div><button type="button" role="switch" aria-checked={notifForm.notify_geofence} className="settings-switch" onClick={() => setNotifForm({ ...notifForm, notify_geofence: !notifForm.notify_geofence })}><span className="switch-track" aria-hidden="true" /><span className="sr-only">Avisos de geocerca</span></button></div>
               <div className="flex items-baseline justify-between pt-3">
                 <div>
@@ -1918,11 +1983,15 @@ function SettingsScreen({
               <p className="font-serif text-lg font-normal text-[#14201D]">
                 Canal de Telegram
               </p>
+              <button type="button" className="resident-button access-secondary" aria-expanded={editingTelegram} onClick={()=>setEditingTelegram(value=>!value)}>{editingTelegram ? "Ocultar datos del canal" : "Editar canal de Telegram"}</button>
+              {editingTelegram && <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-xs text-[#55625E]">
                   Bot Token (@BotFather)
                   <input
                     type="password"
+                    name="telegram-bot-token"
+                    autoComplete="section-telegram new-password"
                     value={notifForm.telegram_token}
                     onChange={(e) =>
                       setNotifForm({ ...notifForm, telegram_token: e.target.value })
@@ -1934,6 +2003,8 @@ function SettingsScreen({
                   Chat ID (@userinfobot)
                   <input
                     type="text"
+                    name="telegram-chat-id"
+                    autoComplete="off"
                     value={notifForm.telegram_chat_id}
                     onChange={(e) =>
                       setNotifForm({
@@ -1952,6 +2023,7 @@ function SettingsScreen({
                   onClick={handleTestTelegram}
                   disabled={
                     testingTelegram ||
+                    notificationsDirty ||
                     !notifForm.telegram_token ||
                     !notifForm.telegram_chat_id
                   }
@@ -1960,24 +2032,19 @@ function SettingsScreen({
                   {testingTelegram ? "enviando..." : "probar envío"}
                 </button>
               </div>
+              {notificationsDirty && <p className="cloud-footnote">Guarda las preferencias antes de probar el canal.</p>}
+              </>}
             </div>
 
-            <button
-              type="button"
-              onClick={handleSaveNotifications}
-              className="rounded-full bg-[#14201D] text-white px-5 py-2 text-xs font-medium hover:bg-[#0F766E] transition cursor-pointer"
-            >
-              Guardar configuración
-            </button>
           </div>
         )}
 
         {activeTab === "geofence" && (
           <section className="geofence-settings-summary">
-            <div className="geo-section-heading"><Icon name="scan-line" size={21} /><h3>Zona de referencia</h3></div>
+            <div className="geo-section-heading"><Icon name="scan-line" size={21} /><h3>Zona local de esta PC</h3></div>
             <div className="geofence-summary-main"><div><span className="care-eyebrow">{profile?.full_name || "Sin residente seleccionado"}</span><h2>{geofence.address_name || "Zona sin nombre"}</h2></div><strong className="geofence-summary-radius">{geofence.radius_m}<span>m de radio</span></strong></div>
             <dl className="geofence-summary-coordinates"><div><dt>Centro de la zona</dt><dd>{geofence.home_lat.toFixed(5)}, {geofence.home_lng.toFixed(5)}</dd></div><div><dt>Origen de la posición</dt><dd>Celular vinculado</dd></div></dl>
-            <button type="button" className="care-action" disabled={!profile?.id} onClick={onOpenMap}><Icon name="map" size={18} />Editar zona en el mapa<Icon name="arrow-right" size={17} /></button>
+            <button type="button" className="resident-button link-resident" disabled={!profile?.id} onClick={() => onOpenMap("local")}><Icon name="map" size={18} />Editar zona local en el mapa<Icon name="arrow-right" size={17} /></button>
           </section>
         )}
 

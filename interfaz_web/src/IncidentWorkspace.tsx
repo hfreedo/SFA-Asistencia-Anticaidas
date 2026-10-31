@@ -3,6 +3,7 @@ import { Bell, CheckCheck, Clock3, Hand, MapPin, MoreHorizontal, RefreshCw, Shie
 import "./incidents.css";
 import { ZoneSituation, zoneNeedsFollowup, type ZoneStatus } from "./ZoneSituation";
 import { relativeAge } from "./timeLabels";
+import { browserNoticesEnabled, enableBrowserNotices, setBrowserNotices, useBrowserNotices } from "./browserNotices";
 
 type Incident = { id: string; event_type: string; observed_at: string; simulated: boolean; detail: { text?: string };
   actor_id: string | null; outcome: "attending" | "attended" | "false_alarm" | null; updated_at: string | null };
@@ -11,7 +12,6 @@ export type IncidentSnapshot = { events: Incident[]; can_attend: boolean; viewer
 export type IncidentApi = { load: () => Promise<IncidentSnapshot>; attend: (id: string, expected: string | null, outcome: string) => Promise<void> };
 export type IncidentAttention = { pending:number; followup:boolean };
 export type IncidentFeed = { events: IncidentSnapshot["events"]; zone: ZoneStatus|null; checkedAt: number|null; error: string };
-const browserAllowed = () => typeof Notification !== "undefined" && window.isSecureContext && Notification.permission === "granted";
 const isPending = (item: Incident) => !item.outcome || item.outcome === "attending";
 function elapsed(stamp: string, now: number) {
   const seconds = Math.max(0, Math.floor((now - Date.parse(stamp)) / 1000));
@@ -29,15 +29,18 @@ export function IncidentWorkspace({ api, compact = false, connectionPaused = fal
   const [revision, setRevision] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [expanded,setExpanded] = useState(!compact);
-  const [desktop, setDesktop] = useState(browserAllowed);
+  const { enabled: desktop, supported: supportsDesktop } = useBrowserNotices();
   const [now, setNow] = useState(Date.now);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const [confirmation, setConfirmation] = useState<{ item: Incident; outcome: "attended" | "false_alarm" } | null>(null);
   const seen = useRef<Set<string> | null>(null);
-  const notify = useRef(browserAllowed());
+  const previousDesktop = useRef(desktop);
   const firstPending = useRef<HTMLLIElement>(null);
-  const supportsDesktop = typeof Notification !== "undefined" && window.isSecureContext;
+  useEffect(() => {
+    if (desktop && !previousDesktop.current) { seen.current = new Set(); setRevision(n => n + 1); }
+    previousDesktop.current = desktop;
+  }, [desktop]);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   useEffect(() => {
     let active = true; let requesting = false;
@@ -48,7 +51,7 @@ export function IncidentWorkspace({ api, compact = false, connectionPaused = fal
         const result = await api.load();
         if (!active) return;
         const events = result.events;
-        if (seen.current && notify.current && supportsDesktop && Notification.permission === "granted") {
+        if (seen.current && browserNoticesEnabled()) {
           for (const event of events) {
             const age = Date.now() - Date.parse(event.observed_at);
             if (!seen.current.has(event.id) && !event.outcome && age >= -30000 && age <= 300000) {
@@ -65,7 +68,7 @@ export function IncidentWorkspace({ api, compact = false, connectionPaused = fal
         if (code === "42501" || code === "PGRST301" || (failure as {status?:number})?.status === 401 || (failure as {status?:number})?.status === 403) { setItems([]); setZone(null); }
         const status = (failure as {status?:number})?.status;
         setCanAttend(false); setError(status === 401 || status === 403
-          ? "No se pudieron actualizar los incidentes. Abre Acceso y sincronización, inicia sesión y reanuda los envíos de esta PC; verifica el perfil vinculado y sus permisos."
+          ? "No se pudieron actualizar los incidentes. Abre Preparación y verifica la cuenta y la ficha que consultas. No necesitas reanudar el emisor PC."
           : "No se pudieron actualizar los incidentes. El último estado recibido no confirma la situación actual. Revisa conexión, sesión y permisos.");
       } }
       finally { requesting = false; }
@@ -88,10 +91,8 @@ export function IncidentWorkspace({ api, compact = false, connectionPaused = fal
   async function enableDesktop() {
     if (!supportsDesktop) return;
     try {
-      const allowed = await Notification.requestPermission();
-      notify.current = allowed === "granted"; setDesktop(notify.current);
-      if (notify.current) { seen.current = new Set(); setRevision(n => n + 1); }
-      setFeedback(notify.current ? "Avisos habilitados mientras este panel esté abierto." : "Avisos bloqueados por el navegador; los incidentes siguen disponibles aquí.");
+      const allowed = await enableBrowserNotices();
+      setFeedback(allowed ? "Avisos habilitados mientras este panel esté abierto." : "Avisos bloqueados por el navegador; los incidentes siguen disponibles aquí.");
     } catch { setFeedback("No se pudo solicitar el permiso del navegador."); }
   }
   const pending = items.filter(isPending);
@@ -107,7 +108,7 @@ export function IncidentWorkspace({ api, compact = false, connectionPaused = fal
     <div className="cloud-section-title"><ShieldAlert size={21}/><h3 id="incidents-title">Incidentes y atención</h3>
       <button className="access-secondary incident-refresh" title="Consultar incidentes" aria-label="Consultar incidentes" disabled={busy} onClick={()=>setRevision(n=>n+1)}><RefreshCw size={17}/></button>
       <details className="incident-options" onKeyDown={event=>{if(event.key === "Escape"){event.currentTarget.open=false;event.currentTarget.querySelector("summary")?.focus();}}}><summary title="Opciones de atención" aria-label="Opciones de atención"><MoreHorizontal size={20}/></summary><div>
-        {supportsDesktop && <button className="access-secondary" aria-pressed={desktop} onClick={()=>{if(desktop){notify.current=false;setDesktop(false);}else void enableDesktop();}}><Bell size={16}/>{desktop ? "Desactivar avisos en esta PC" : "Activar avisos en esta PC"}</button>}
+        {supportsDesktop && <button className="access-secondary" aria-pressed={desktop} onClick={()=>{if(desktop){setBrowserNotices(false);setFeedback("Avisos desactivados en este navegador. Los incidentes siguen visibles.");}else void enableDesktop();}}><Bell size={16}/>{desktop ? "Desactivar avisos en esta PC" : "Activar avisos en esta PC"}</button>}
         {onPrepare && <button className="access-secondary" onClick={onPrepare}>Preparar acceso y sincronización</button>}
         {compact && error && <details><summary>Ver detalle del diagnóstico</summary><p>{error}</p></details>}
         <p>Los avisos del navegador son opcionales. Los incidentes permanecen en este panel.</p>
